@@ -8,6 +8,20 @@ using static System.Math;
 
 namespace Single_Machine.NFFT
 {
+    /// <summary>
+    /// hack is here to have the first version resemble the IDG reference implementation more
+    /// </summary>
+    class SubgridHack
+    {
+        public int baselineIdx;
+        public int timeSampleStart;
+        public int timeSampleCount;
+
+        public int UPixel;
+        public int VPixel;
+        public int WLambda;
+    }
+
     class SubgridData
     {
         public int TimeStepCount { get; }
@@ -15,17 +29,15 @@ namespace Single_Machine.NFFT
         public int Station0 { get; }
         public int Station1 { get; }
 
-        public int XCoordinate { get; }
-        public int YCoordinate { get; }
-        public int ZCoordinate { get; }
-
+        public int UPixel { get; }
+        public int VPixel { get; }
+        public int WLambda { get; }
 
         public int ATermIndex { get; }
 
         public float UOffset { get; }
         public float VOffset { get; }
         public float WOffset { get; }
-
 
         public IList<UVWTuple> UVW { get; }
         public IList<float> Wavenumbers { get; }
@@ -35,10 +47,10 @@ namespace Single_Machine.NFFT
         {
             
 
-            this.UOffset = (float)((this.XCoordinate + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / p.ImageSize));
-            this.VOffset = (float)((this.YCoordinate + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / p.ImageSize));
+            this.UOffset = (float)((this.UPixel + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / p.ImageSize));
+            this.VOffset = (float)((this.VPixel + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / p.ImageSize));
 
-            double tmpW = p.WStepLambda * (this.ZCoordinate + 0.5); //????
+            double tmpW = p.WStepLambda * (this.WLambda + 0.5); //????
             this.WOffset = (float)(2 * PI * tmpW);
 
         }

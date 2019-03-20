@@ -8,5 +8,6 @@ namespace Single_Machine.NFFT
 {
     class Math
     {
+        public const double SPEED_OF_LIGHT = 299792458.0; //todo: get more accurate speed of light constant
     }
 }

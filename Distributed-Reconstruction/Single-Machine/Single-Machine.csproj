@@ -127,6 +127,7 @@
     <Compile Include="NFFT\Adder.cs" />
     <Compile Include="NFFT\GriddingParams.cs" />
     <Compile Include="NFFT\Math.cs" />
+    <Compile Include="NFFT\Plan.cs" />
     <Compile Include="NFFT\SubgridFFT.cs" />
     <Compile Include="NFFT\Gridder.cs" />
     <Compile Include="NFFT\NFFT.cs" />
