@@ -11,7 +11,7 @@ namespace Single_Machine.NFFT
 
         public static void ToImage()
         {
-            //Splitter
+            //Plan
 
             //Gridder
             //SubgridFFT

@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace Single_Machine.NFFT
 {
+    /// <summary>
+    /// Immutable class holding the gridding parameters
+    /// </summary>
     class GriddingParams
     {
         

@@ -48,6 +48,7 @@ namespace Single_Machine
             var baselines = uvw_raw.Length;
             var time_samples = uvw_raw[0].Length;
 
+            //TODO: completely wrong order. I thought C#/C++ was column major, but it is row major
             var uvw = new double[3, time_samples, baselines];
             for(int i = 0; i < baselines; i++)
             {

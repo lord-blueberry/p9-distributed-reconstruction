@@ -11,6 +11,12 @@ namespace Single_Machine.NFFT
     {
 
         #region Grid
+        public static void ForwardHack(GriddingParams p, List<List<SubgridHack>> metadata, float[] wavenumbers, float[,] spheroidal)
+        {
+
+        }
+
+
         public static void ForwardSubgrid(GriddingParams param, SubgridData data, float[,] spheroidal)
         {
             float[,] subgridR = new float[param.SubgridSize, param.SubgridSize];

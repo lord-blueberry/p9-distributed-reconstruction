@@ -15,6 +15,7 @@ namespace Single_Machine.NFFT
 
         public static List<List<SubgridHack>> CreatePlan(GriddingParams p, double[,,] uvw, double[,,] vis_real, double[,,] vis_imag, double[] frequencies)
         {
+            var imagesize = p.CellSize * p.GridSize;
             List<List<SubgridHack>> outputGrids = new List<List<SubgridHack>>(uvw.GetLength(2));
             for(int baseline = 0; baseline < uvw.GetLength(2); baseline++)
             {
@@ -32,8 +33,8 @@ namespace Single_Machine.NFFT
                         var dp = new Datapoint();
                         dp.timestep = time;
                         dp.channel = channel;
-                        dp.uPixel = MetersToPixels(uvw[0, time, baseline], p.CellSize, frequencies[channel]);
-                        dp.vPixel = MetersToPixels(uvw[1, time, baseline], p.CellSize, frequencies[channel]);
+                        dp.uPixel = MetersToPixels(uvw[0, time, baseline], imagesize, frequencies[channel]);
+                        dp.vPixel = MetersToPixels(uvw[1, time, baseline], imagesize, frequencies[channel]);
                         dp.wLambda = MetersToLambda(uvw[2, time, baseline], frequencies[channel]);
                         datapoints[time, channel] = dp;
                     }
@@ -114,7 +115,7 @@ namespace Single_Machine.NFFT
             return outputGrids;
         }
 
-        private static double MetersToPixels(double meters, double cellSize, double frequency) => meters * cellSize * (frequency / Math.SPEED_OF_LIGHT);
+        private static double MetersToPixels(double meters, double imageSize, double frequency) => meters * imageSize * (frequency / Math.SPEED_OF_LIGHT);
 
         private static double MetersToLambda(double meters, double frequency) => meters * (frequency / Math.SPEED_OF_LIGHT);
         
