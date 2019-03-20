@@ -8,21 +8,33 @@ namespace Single_Machine.NFFT
 {
     class GriddingParams
     {
-        public float ImageSize { get; }
-        public int KernelSize { get; }
-        public int SubgridSize { get; }
+        
         public int GridSize { get; }
+        public int SubgridSize { get; }
+        public int KernelSize { get; }
+        
+        public int MaxTimestepsPerSubgrid { get; }
+
         public float CellSize { get; }
+        public float ImageSize { get; }
 
         public int WLayerCount { get; }
         public float WStep { get; }
         public float WStepLambda { get; }
 
-        public int MaxTimestepsPerSubgrid { get; }
-
-        public GriddingParams(int kernelSize)
+        public GriddingParams(int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float cellSize, int wLayerCount, float wStep)
         {
-            this.KernelSize = KernelSize;
+            this.GridSize = gridSize;
+            this.SubgridSize = subgridSize;
+            this.KernelSize = kernelSize;
+
+            this.MaxTimestepsPerSubgrid = maxTimesteps;
+
+            this.CellSize = cellSize;
+            this.ImageSize = cellSize * gridSize;
+
+            this.WLayerCount = wLayerCount;
+            this.WStep = wStep;
         }
     }
 }

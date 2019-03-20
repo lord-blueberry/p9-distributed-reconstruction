@@ -34,6 +34,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="CSharpFITS_v1.1, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\CSharpFITS.1.1\lib\Net20\CSharpFITS_v1.1.dll</HintPath>
+    </Reference>
     <Reference Include="FFTW.NET, Version=1.0.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\FFTW.NET.1.0.1\lib\netstandard1.3\FFTW.NET.dll</HintPath>
     </Reference>
@@ -123,6 +126,7 @@
   <ItemGroup>
     <Compile Include="NFFT\Adder.cs" />
     <Compile Include="NFFT\GriddingParams.cs" />
+    <Compile Include="NFFT\Math.cs" />
     <Compile Include="NFFT\SubgridFFT.cs" />
     <Compile Include="NFFT\Gridder.cs" />
     <Compile Include="NFFT\NFFT.cs" />

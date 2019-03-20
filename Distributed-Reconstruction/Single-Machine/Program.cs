@@ -5,9 +5,12 @@ using System.Text;
 using System.Threading.Tasks;
 
 using FFTW.NET;
+using nom.tam.fits;
+using System.IO;
 
 namespace Single_Machine
 {
+    using NFFT;
     class Program
     {
         static void Main(string[] args)
@@ -34,31 +37,28 @@ namespace Single_Machine
             }
             */
 
+            Fits f = new Fits(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\freq.fits");
+            ImageHDU h = (ImageHDU)f.ReadHDU();
+            var frequencies = (double[])h.Kernel;
+            f = new Fits(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\uvw.fits");
+            h = (ImageHDU)f.ReadHDU();
+            // Double Cube Dimensions: baseline, time, uvw
+            var uvw = (System.Array)h.Kernel;
+            f = new Fits(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\vis.fits");
+            h = (ImageHDU)f.ReadHDU();
+            //Double cube Dimensions: baseline, time, channel, pol, complex_component
+            var vis = (System.Array)h.Kernel;
 
-            using (var timeDomain = new AlignedArrayComplex(16, 64, 24))
-            using (var frequencyDomain = new AlignedArrayComplex(16, timeDomain.GetSize()))
-            using (var fft = FftwPlanC2C.Create(timeDomain, frequencyDomain, DftDirection.Forwards))
-            using (var ifft = FftwPlanC2C.Create(frequencyDomain, timeDomain, DftDirection.Backwards))
-            {
-                // Set the input after the plan was created as the input may be overwritten
-                // during planning
-                for (int row = 0; row < timeDomain.GetLength(0); row++)
-                {
-                    for (int col = 0; col < timeDomain.GetLength(1); col++)
-                        timeDomain[row, col] = (double)row * col / timeDomain.Length;
-                }
+            //other input parameters:
+            int gridSize = 512;
+            int subgridsize = 32;
+            int kernelSize = 16;
 
-                // timeDomain -> frequencyDomain
-                fft.Execute();
+            int nr_timeslots = 1;
+            int max_nr_timesteps = 256;
+            float cellSize = 0.5f;
 
-                for (int i = frequencyDomain.Length / 2; i < frequencyDomain.Length; i++)
-                    frequencyDomain[i] = 0;
-
-                // frequencyDomain -> timeDomain
-                ifft.Execute();
-
-                // Do as many forwards and backwards transformations here as you like
-            }
+            var parameters = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
         }
 
 
