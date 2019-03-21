@@ -11,8 +11,9 @@ namespace Single_Machine.NFFT
     {
 
         #region Grid
-        public static void ForwardHack(GriddingParams p, List<List<SubgridHack>> metadata, float[] wavenumbers, float[,] spheroidal)
+        public static void ForwardHack(GriddingParams p, List<List<SubgridHack>> metadata, double[,,] uvw, double[,,] vis_real, double[,,] vis_imag, double[] frequencies, float[,] spheroidal)
         {
+            var wavenumbers = Math.FrequencyToWavenumber(frequencies);
 
         }
 

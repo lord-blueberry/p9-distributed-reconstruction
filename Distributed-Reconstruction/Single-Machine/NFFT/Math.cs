@@ -97,10 +97,18 @@ namespace Single_Machine.NFFT
                 x[i] = EvaluateSpheroidal(tmp);
             }
 
-            for(int i = 0; i < height; height++)
-                for (int j = 0; j < width; width++)
+            for(int i = 0; i < height; i++)
+                for (int j = 0; j < width; j++)
                     output[i, j] = y[i] * x[j];
                 
+            return output;
+        }
+
+        public static double[] FrequencyToWavenumber(double[] frequencies)
+        {
+            var output = new double[frequencies.Length];
+            for (int i = 0; i < output.Length; i++)
+                output[i] = (2.0f * System.Math.PI * frequencies[i] / SPEED_OF_LIGHT);
             return output;
         }
         #endregion

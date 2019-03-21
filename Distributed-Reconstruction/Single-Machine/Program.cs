@@ -49,16 +49,16 @@ namespace Single_Machine
             var time_samples = uvw_raw[0].Length;
 
             //TODO: completely wrong order. I thought C#/C++ was column major, but it is row major
-            var uvw = new double[3, time_samples, baselines];
+            var uvw = new double[baselines, time_samples, 3];
             for(int i = 0; i < baselines; i++)
             {
                 Array[] bl = (Array[])uvw_raw[i];
                 for(int j =0; j < time_samples; j++)
                 {
                     double[] values = (double[])bl[j];
-                    uvw[0, j, i] = values[0]; //u
-                    uvw[1, j, i] = values[1]; //v
-                    uvw[2, j, i] = values[2]; //w
+                    uvw[i, j, 0] = values[0]; //u
+                    uvw[i, j, 1] = values[1]; //v
+                    uvw[i, j, 2] = values[2]; //w
                 }
                 
             }
@@ -69,8 +69,8 @@ namespace Single_Machine
             var vis_raw = (Array[])h.Kernel;
 
             var channels = 8;
-            var vis_real = new double[channels, time_samples, baselines];
-            var vis_imag = new double[channels, time_samples, baselines];
+            var vis_real = new double[baselines, time_samples, channels];
+            var vis_imag = new double[baselines, time_samples, channels];
             for (int i = 0; i < baselines; i++)
             {
                 Array[] bl = (Array[])vis_raw[i];
@@ -84,8 +84,8 @@ namespace Single_Machine
                         double[] pol_YY = (double[])channel[3];
 
                         //add polarizations XX and YY together to form Intensity Visibilities only
-                        vis_real[k, j, i] = pol_XX[0] + pol_YY[0];
-                        vis_imag[k, j, i] = pol_XX[1] + pol_YY[1];
+                        vis_real[i, j, k] = pol_XX[0] + pol_YY[0];
+                        vis_imag[i, j, k] = pol_XX[1] + pol_YY[1];
                     }
                 }
             }
@@ -98,11 +98,13 @@ namespace Single_Machine
             int nr_timeslots = 1;
             int max_nr_timesteps = 256; //
             float cellSize = 1.0f;
-
             var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
+            var gridSpheroidal = Math.CalcIdentitySpheroidal(gridSize, gridSize);
+            var subgridSpheroidal = Math.CalcExampleSpheroidal(subgridsize, subgridsize);
 
-            var subgrids = Plan.CreatePlan(p, uvw, vis_real, vis_imag, frequencies);
-            //Gridder.ForwardSubgrid()
+
+            var subgrids = Plan.CreatePlan(p, uvw, frequencies);
+            Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequencies, subgridSpheroidal);
 
 
         }

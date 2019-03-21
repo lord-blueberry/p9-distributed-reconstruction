@@ -13,29 +13,29 @@ namespace Single_Machine.NFFT
 
         }
 
-        public static List<List<SubgridHack>> CreatePlan(GriddingParams p, double[,,] uvw, double[,,] vis_real, double[,,] vis_imag, double[] frequencies)
+        public static List<List<SubgridHack>> CreatePlan(GriddingParams p, double[,,] uvw, double[] frequencies)
         {
             var imagesize = p.CellSize * p.GridSize;
-            List<List<SubgridHack>> outputGrids = new List<List<SubgridHack>>(uvw.GetLength(2));
-            for(int baseline = 0; baseline < uvw.GetLength(2); baseline++)
+            List<List<SubgridHack>> outputGrids = new List<List<SubgridHack>>(uvw.GetLength(0));
+            for(int baseline = 0; baseline < uvw.GetLength(0); baseline++)
             {
                 var baselineOutput = new List<SubgridHack>(uvw.GetLength(1));
                 outputGrids.Add(baselineOutput);
                 //idg checks a-terms bins we ignore the a-term correction here, so we can simplify and only iterate over 
 
-                Datapoint[,] datapoints = new Datapoint[uvw.GetLength(1), vis_real.GetLength(0)]; //timeSamplesCount  channelsCount 
+                Datapoint[,] datapoints = new Datapoint[uvw.GetLength(1), frequencies.Length]; //timeSamplesCount  channelsCount 
                 int time = 0;
                 for (time = 0; time < uvw.GetLength(1); time++)
                 {
                     //convert visibilities
-                    for (int channel = 0; channel < vis_real.GetLength(0); channel++)
+                    for (int channel = 0; channel < frequencies.Length; channel++)
                     {
                         var dp = new Datapoint();
                         dp.timestep = time;
                         dp.channel = channel;
-                        dp.uPixel = MetersToPixels(uvw[0, time, baseline], imagesize, frequencies[channel]);
-                        dp.vPixel = MetersToPixels(uvw[1, time, baseline], imagesize, frequencies[channel]);
-                        dp.wLambda = MetersToLambda(uvw[2, time, baseline], frequencies[channel]);
+                        dp.uPixel = MetersToPixels(uvw[baseline, time, 0], imagesize, frequencies[channel]);
+                        dp.vPixel = MetersToPixels(uvw[baseline, time, 1], imagesize, frequencies[channel]);
+                        dp.wLambda = MetersToLambda(uvw[baseline, time, 2], frequencies[channel]);
                         datapoints[time, channel] = dp;
                     }
                 }
@@ -51,7 +51,7 @@ namespace Single_Machine.NFFT
                     for (; time < uvw.GetLength(1); time++)
                     {
                         var dpChannel0 = datapoints[time, 0];
-                        var dpChannelMax = datapoints[time, vis_real.GetLength(0) - 1];
+                        var dpChannelMax = datapoints[time, frequencies.Length - 1];
                         var hack = dpChannelMax.Copy();
                         hack.wLambda = dpChannel0.wLambda;  // hack taken over from IDG reference implementation
 
