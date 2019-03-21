@@ -110,7 +110,7 @@ namespace Single_Machine.NFFT
                     }
 
                 }
-            }
+            }//baseline
 
             return outputGrids;
         }

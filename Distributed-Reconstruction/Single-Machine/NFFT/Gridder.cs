@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Numerics;
 using static System.Math;
 
 namespace Single_Machine.NFFT
@@ -11,11 +12,77 @@ namespace Single_Machine.NFFT
     {
 
         #region Grid
-        public static void ForwardHack(GriddingParams p, List<List<SubgridHack>> metadata, double[,,] uvw, double[,,] vis_real, double[,,] vis_imag, double[] frequencies, float[,] spheroidal)
+        public static List<List<Complex[,]>> ForwardHack(GriddingParams p, List<List<SubgridHack>> metadata, double[,,] uvw, double[,,] vis_real, double[,,] vis_imag, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = Math.FrequencyToWavenumber(frequencies);
+            var imagesize = p.CellSize * p.GridSize;
+            var output = new List<List<Complex[,]>>(metadata.Count);
+            for (int baseline = 0; baseline < metadata.Count; baseline++)
+            {
+                var blMeta = metadata[baseline];
+                var blSubgrids = new List<Complex[,]>(blMeta.Count);
+                for (int subgrid = 0; subgrid < blMeta.Count; subgrid++)
+                {
+                    var meta = blMeta[subgrid];
+                    var subgridOutput = new Complex[p.SubgridSize, p.SubgridSize];
 
+                    //undoes shift from Planner
+                    var uOffset = (meta.UPixel + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / imagesize);
+                    var vOffset = (meta.VPixel + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / imagesize);
+                    var tmpW_lambda = p.WStepLambda * (meta.WLambda + 0.5);
+                    var wOffset = 2 * PI * tmpW_lambda;     //discrete w-correction, similar to w-stacking
+
+                    for (int y = 0; y < p.SubgridSize; y++)
+                    {
+                        for (int x = 0; x < p.SubgridSize; x++)
+                        {
+                            //real and imaginary part of the pixel. We ignore polarization here
+                            var pixelR = 0.0;
+                            var pixelI = 0.0;
+
+                            //calculate directional cosines. exp(2*PI*j * (u*l + v*m + w*n))
+                            var l = ComputeL(x, p.SubgridSize, imagesize);
+                            var m = ComputeL(y, p.SubgridSize, imagesize);
+                            var n = ComputeN(l, m);
+
+                            int sampleEnd = meta.timeSampleStart + meta.timeSampleCount;
+                            for(int time = meta.timeSampleStart; time < sampleEnd; time++)
+                            {
+                                var u = uvw[baseline, time, 0];
+                                var v = uvw[baseline, time, 1];
+                                var w = uvw[baseline, time, 2];
+                                double phaseIndex = u * l + v * m + w * n;
+                                double phaseOffset = uOffset * l + vOffset * m + wOffset * n;
+
+                                for (int channel = 0; channel < wavenumbers.Length; channel++)
+                                {
+                                    double phase = phaseOffset - (phaseIndex * wavenumbers[channel]);
+                                    double phasorReal = Cos(phase);
+                                    double phasorImag = Sin(phase);
+
+                                    pixelR += vis_real[baseline, time, channel] * phasorReal;
+                                    pixelI += vis_imag[baseline, time, channel] * phasorImag;
+                                }
+                            }
+
+                            //idg A-correction goes here
+
+                            var sph = spheroidal[y, x];
+                            int xDest = (x + (p.SubgridSize / 2)) % p.SubgridSize;
+                            int yDest = (x + (p.SubgridSize / 2)) % p.SubgridSize;
+                            subgridOutput[yDest, xDest] = new Complex(pixelR * sph, pixelI * sph);
+                        }
+                    }
+                    blSubgrids.Add(subgridOutput);
+
+                }
+                output.Add(blSubgrids);
+            }
+
+            return output;
         }
+
+
 
 
         public static void ForwardSubgrid(GriddingParams param, SubgridData data, float[,] spheroidal)

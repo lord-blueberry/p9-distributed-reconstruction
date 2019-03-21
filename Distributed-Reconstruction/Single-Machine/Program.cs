@@ -16,25 +16,7 @@ namespace Single_Machine
         static void Main(string[] args)
         {
             /*
-            using (var input = new AlignedArrayComplex(16, 64, 24))
-            using (var output = new AlignedArrayComplex(16, input.GetSize()))
-            {
-                for (int row = 0; row < input.GetLength(0); row++)
-                {
-                    for (int col = 0; col < input.GetLength(1); col++)
-                        input[row, col] = (double)row * col / input.Length;
-                }
 
-                DFT.FFT(input, output);
-                DFT.IFFT(output, output);
-
-                for (int row = 0; row < input.GetLength(0); row++)
-                {
-                    for (int col = 0; col < input.GetLength(1); col++)
-                        Console.Write((output[row, col].Real / input[row, col].Real / input.Length).ToString("F2").PadLeft(6));
-                    Console.WriteLine();
-                }
-            }
             */
 
             Fits f = new Fits(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\freq.fits");
@@ -48,7 +30,6 @@ namespace Single_Machine
             var baselines = uvw_raw.Length;
             var time_samples = uvw_raw[0].Length;
 
-            //TODO: completely wrong order. I thought C#/C++ was column major, but it is row major
             var uvw = new double[baselines, time_samples, 3];
             for(int i = 0; i < baselines; i++)
             {
@@ -97,16 +78,17 @@ namespace Single_Machine
 
             int nr_timeslots = 1;
             int max_nr_timesteps = 256; //
-            float cellSize = 1.0f;
+            float cellSize = 0.0025f/gridSize; //cell size is what, degrees? radians?
             var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
             var gridSpheroidal = Math.CalcIdentitySpheroidal(gridSize, gridSize);
-            var subgridSpheroidal = Math.CalcExampleSpheroidal(subgridsize, subgridsize);
-
+            var subgridSpheroidal = Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
 
             var subgrids = Plan.CreatePlan(p, uvw, frequencies);
-            Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequencies, subgridSpheroidal);
-
-
+            var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequencies, subgridSpheroidal);
+            var ftgridded = SubgridFFT.ForwardHack(p, gridded);
+            var grid = Adder.AddHack(p, subgrids, ftgridded);
+            
+            //remove spheroidal from grid?
         }
 
 
