@@ -69,7 +69,7 @@ namespace Single_Machine.NFFT
 
                             var sph = spheroidal[y, x];
                             int xDest = (x + (p.SubgridSize / 2)) % p.SubgridSize;
-                            int yDest = (x + (p.SubgridSize / 2)) % p.SubgridSize;
+                            int yDest = (y + (p.SubgridSize / 2)) % p.SubgridSize;
                             subgridOutput[yDest, xDest] = new Complex(pixelR * sph, pixelI * sph);
                         }
                     }
@@ -134,6 +134,7 @@ namespace Single_Machine.NFFT
 
         private static float ComputeL(int x, int subgridSize, float imageSize)
         {
+            //TODO: think about removing 0.5f and replacing imagesize / subgrids with cellsize
             return (x + 0.5f - (subgridSize / 2)) * imageSize / subgridSize;
         }
         private static float ComputeN(float l, float m)
