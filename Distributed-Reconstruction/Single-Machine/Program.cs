@@ -17,8 +17,9 @@ namespace Single_Machine
     {
         static void Main(string[] args)
         {
-            ImagePhasor();
-            Image();
+            SingleSubgrid();
+            SingleVisibility2();
+            
             Fits f = new Fits(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\freq.fits");
             ImageHDU h = (ImageHDU)f.ReadHDU();
             var frequencies = (double[])h.Kernel;
@@ -95,7 +96,7 @@ namespace Single_Machine
             var grid = Adder.AddHack(p, subgrids, ftgridded);
             SubgridFFT.Shift(grid);
             
-            var img = SubgridFFT.ForwardFFT(grid);
+            var img = SubgridFFT.ForwardiFFT(grid);
             //SubgridFFT.Shift(grid);
 
             //remove spheroidal from grid
@@ -125,85 +126,170 @@ namespace Single_Machine
             }
         }
 
-        private static void Image()
+
+        public static void SingleSubgrid()
         {
-            double[] frequency = { 857000000f };
-
-            double visR = 3.214400053024292;
-            double visI = 0.801982581615448;
-
-            double u = 0.17073525427986169 * frequency[0] / Math.SPEED_OF_LIGHT;
-            double v = -399.17929423647 * frequency[0] / Math.SPEED_OF_LIGHT;
-            double w = -2.7543493956327438 * frequency[0] / Math.SPEED_OF_LIGHT;
-
-            var vis = new Complex(visR, visI);
-            var I = new Complex(0, 1);
-
-            double yStep = 1.0 / 8.0;
-            double xStep = 1.0 / 16.0;
-            double cell = 8.0 / 3600 * PI / 180;
-
-            for (int y = 0; y < 4; y++)
-            {
-                Complex[] row = new Complex[8];
-                for(int x = 0; x< 8;x++ )
-                {
-
-                    var c = vis * Complex.Exp(2 * PI * I * (u* (x) * cell + v * (y) * cell));
-                    row[x] = c;
-                }
-            }
-        }
-
-        private static void ImagePhasor()
-        {
-            double[] frequency = { 857000000f };
-            
-            double visR = 3.214400053024292;
-            double visI = 0.801982581615448;
-            
-            double u = 0.17073525427986169;
-            double v = -399.17929423647;
-            double w = -2.7543493956327438;
-
-            var wavenumbers = Math.FrequencyToWavenumber(frequency);
-
-            var vis = new Complex(visR, visI);
-
+            int max_nr_timesteps = 256;
+            int gridSize = 64;
             int subgridsize = 16;
-            double cellSize = 8.0 / 3600 * PI / 180;
-            double imagesize = subgridsize * cellSize;
+            int kernelSize = 2;
+            float imageSize = 0.0025f;
+            float cellSize = imageSize / gridSize;
+            var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
+
+            double v = -50;
+            double wavelength = -4 / imageSize / v;
+            double u = 4 / imageSize / wavelength;
+            double freq = wavelength * Math.SPEED_OF_LIGHT;
+            double[] frequency = { freq, freq };
+
+            double visR = 3.9;
+            double visI = 0.0;
+
+            var vis_real = new double[1, 1, 2];
+            var vis_imag = new double[1, 1, 2];
+            vis_real[0, 0, 0] = visR;
+            vis_imag[0, 0, 0] = visI;
+            vis_real[0, 0, 1] = 0;
+            vis_imag[0, 0, 1] = 0;
+            var uvw = new double[1, 1, 3];
+            uvw[0, 0, 0] = u;
+            uvw[0, 0, 1] = v;
+            uvw[0, 0, 2] = 0;
+
+            //var imgIFT = IFT(new Complex(visR, visI), u, v, freq, gridSize, imageSize);
+            //Write(imgIFT);
+
+            var subgridSpheroidal = Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
 
 
-           
-            Complex[,] img = new Complex[16,16];
-            for(int y = 0; y < 16; y++)
+            var subgrids = Plan.CreatePlan(p, uvw, frequency);
+            var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequency, subgridSpheroidal);
+            var ftgridded = SubgridFFT.ForwardHack(p, gridded);
+            var grid = Adder.AddHack(p, subgrids, ftgridded);
+            //SubgridFFT.Shift(gg);
+            var img = SubgridFFT.ForwardiFFT(grid);
+            //SubgridFFT.Shift(img);
+            Write(img);
+        }
+
+
+        public static void SingleVisibility2()
+        {
+            /*  baseline 1036
+                timestep 1
+                channel 0 */
+            double[] frequency = { 857000000f, 857000000f };
+
+            //only xx polarization
+            double visR = 3.8931689262390137;
+            double visI = 0.061203371733427048;
+
+            double u = -9.3063146568965749;
+            double v = (-1)*-35.529046011622995;
+            double w = 0;
+
+            int nr_timeslots = 1;
+            int max_nr_timesteps = 256;
+            int gridSize = 64;
+            int subgridsize = 64;
+            int kernelSize = 16;
+            float properCellSize = (float)(2.0 / 3600.0 * PI / 180.0);
+            var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, properCellSize, 1, 0.0f);
+
+            var vis_real = new double[1, 1, 2];
+            var vis_imag = new double[1, 1, 2];
+            vis_real[0, 0, 0] = visR;
+            vis_imag[0, 0, 0] = visI;
+            vis_real[0, 0, 1] = 0;
+            vis_imag[0, 0, 1] = 0;
+            var uvw = new double[1, 1, 3];
+            uvw[0, 0, 0] = u;
+            uvw[0, 0, 1] = v;
+            uvw[0, 0, 2] = w;
+
+            var subgridSpheroidal = Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
+
+            var subgrids = Plan.CreatePlan(p, uvw, frequency);
+            var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequency, subgridSpheroidal);
+            var imgg = gridded[0][0];
+            var ftgridded = SubgridFFT.ForwardHack(p, gridded);
+            //var ftgridded = SubgridFFT.ForwardPlan(p, gridded);
+            var gg = ftgridded[0][0];
+            var grid = Adder.AddHack(p, subgrids, ftgridded);
+            //Write(grid);
+            //SubgridFFT.Shift(gg);
+            var img = SubgridFFT.ForwardiFFT(gg);
+            //SubgridFFT.Shift(img);
+            Write(img);
+
+        }
+
+        public static void Write(Complex[,] img)
+        {
+            var img2 = new double[img.GetLength(0)][];
+            for (int i = 0; i < img2.Length; i++)
             {
-                for (int x = 0; x < 16; x++)
+                var gg2 = new double[img.GetLength(1)];
+                img2[i] = gg2;
+                for (int j = 0; j < img.GetLength(1); j++)
                 {
-                    var l = ComputeL(x, subgridsize, imagesize);
-                    var m = ComputeL(y, subgridsize, imagesize);
-
-                    double phaseIndex = u * l + v * y;
-                    double phase = (phaseIndex * wavenumbers[0]);
-                    var tf = new Complex(Cos(phase), Sin(phase));
-                    var c = vis * tf;
-                    img[y, x] = c;
+                    gg2[j] = img[i, j].Real;
                 }
             }
 
-            
+            var f = new Fits();
+            var hhdu = FitsFactory.HDUFactory(img2);
+            f.AddHDU(hhdu);
 
-
+            using (BufferedDataStream fstream = new BufferedDataStream(new FileStream("Outputfile.fits", FileMode.Create)))
+            {
+                f.Write(fstream);
+            }
         }
-
-
-        private static double ComputeL(int x, int subgridSize, double imageSize)
+        public static void Write(double[,] img)
         {
-            return (x - (subgridSize / 2)) * imageSize / subgridSize;
+            var img2 = new double[img.GetLength(0)][];
+            for (int i = 0; i < img2.Length; i++)
+            {
+                var gg2 = new double[img.GetLength(1)];
+                img2[i] = gg2;
+                for (int j = 0; j < img.GetLength(1); j++)
+                {
+                    gg2[j] = img[i, j];
+                }
+            }
+
+            var f = new Fits();
+            var hhdu = FitsFactory.HDUFactory(img2);
+            f.AddHDU(hhdu);
+
+            using (BufferedDataStream fstream = new BufferedDataStream(new FileStream("Outputfile.fits", FileMode.Create)))
+            {
+                f.Write(fstream);
+            }
         }
 
+        public static Complex[,] IFT(Complex vis, double u, double v, double freq, int gridSize, double imageSize)
+        {
+            u = u * freq / Math.SPEED_OF_LIGHT;
+            v = v * freq / Math.SPEED_OF_LIGHT;
 
-
+            var output = new Complex[gridSize, gridSize];
+            var I = new Complex(0, 1);
+            var cell = imageSize / gridSize;
+            for (int y = 0; y < gridSize; y++)
+            {
+                for(int x = 0; x < gridSize; x++)
+                {
+                    int xi = x - gridSize / 2;
+                    int yi = y - gridSize / 2;
+                    var d = Complex.Exp(2 * PI * I * (u * (xi) * cell + v * (yi) * cell));
+                    var c = vis * d;
+                    output[y, x] = c;
+                }
+            }
+            return output;
+        }
     }
 }

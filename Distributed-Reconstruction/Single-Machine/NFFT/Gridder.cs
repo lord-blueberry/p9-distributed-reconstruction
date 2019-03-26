@@ -26,7 +26,7 @@ namespace Single_Machine.NFFT
                     var meta = blMeta[subgrid];
                     var subgridOutput = new Complex[p.SubgridSize, p.SubgridSize];
 
-                    //undoes shift from Planner
+                    // [+ p.SubgridSize / 2 - p.GridSize / 2] undoes shift from Planner
                     var uOffset = (meta.UPixel + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / imagesize);
                     var vOffset = (meta.VPixel + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / imagesize);
                     var tmpW_lambda = p.WStepLambda * (meta.WLambda + 0.5);

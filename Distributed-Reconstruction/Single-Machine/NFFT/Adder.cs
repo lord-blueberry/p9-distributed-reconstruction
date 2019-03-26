@@ -42,6 +42,21 @@ namespace Single_Machine.NFFT
                         }
 
                     }
+                    else
+                    {
+                        //throw new Exception("invalid grid");
+                        for (int y = 0; y < p.SubgridSize; y++)
+                        {
+                            for (int x = 0; x < p.SubgridSize; x++)
+                            {
+                                int xSrc = (x + (p.SubgridSize / 2)) % p.SubgridSize;
+                                int ySrc = (y + (p.SubgridSize / 2)) % p.SubgridSize;
+                                double phase = PI * (x + y - p.SubgridSize) / p.SubgridSize;
+                                Complex phasor = new Complex(Cos(phase), Sin(phase));
+                                grid[gridY + y, gridX + x] += data[ySrc, xSrc] * phasor;
+                            }
+                        }
+                    }
 
                 }
             }
