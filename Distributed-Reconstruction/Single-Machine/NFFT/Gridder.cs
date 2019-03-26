@@ -36,9 +36,10 @@ namespace Single_Machine.NFFT
                     {
                         for (int x = 0; x < p.SubgridSize; x++)
                         {
+                            if (x == 32 && y == 32)
+                                System.Console.Write("");
                             //real and imaginary part of the pixel. We ignore polarization here
-                            var pixelR = 0.0;
-                            var pixelI = 0.0;
+                            var pixel = new Complex();
 
                             //calculate directional cosines. exp(2*PI*j * (u*l + v*m + w*n))
                             var l = ComputeL(x, p.SubgridSize, imagesize);
@@ -57,11 +58,10 @@ namespace Single_Machine.NFFT
                                 for (int channel = 0; channel < wavenumbers.Length; channel++)
                                 {
                                     double phase = phaseOffset - (phaseIndex * wavenumbers[channel]);
-                                    double phasorReal = Cos(phase);
-                                    double phasorImag = Sin(phase);
+                                    var phasor = new Complex(Cos(phase), Sin(phase));
+                                    var vis = new Complex(vis_real[baseline, time, channel], vis_imag[baseline, time, channel]);
 
-                                    pixelR += vis_real[baseline, time, channel] * phasorReal;
-                                    pixelI += vis_imag[baseline, time, channel] * phasorImag;
+                                    pixel += vis * phasor;
                                 }
                             }
 
@@ -70,7 +70,7 @@ namespace Single_Machine.NFFT
                             var sph = spheroidal[y, x];
                             int xDest = (x + (p.SubgridSize / 2)) % p.SubgridSize;
                             int yDest = (y + (p.SubgridSize / 2)) % p.SubgridSize;
-                            subgridOutput[yDest, xDest] = new Complex(pixelR * sph, pixelI * sph);
+                            subgridOutput[yDest, xDest] = pixel * sph;
                         }
                     }
                     blSubgrids.Add(subgridOutput);
@@ -94,6 +94,7 @@ namespace Single_Machine.NFFT
             {
                 for(int x = 0; x < param.SubgridSize; x++)
                 {
+                    
                     //real and imaginary part of the pixel. We ignore polarization here
                     var pixelR = 0.0f;
                     var pixelI = 0.0f;
@@ -135,7 +136,7 @@ namespace Single_Machine.NFFT
         private static float ComputeL(int x, int subgridSize, float imageSize)
         {
             //TODO: think about removing 0.5f and replacing imagesize / subgrids with cellsize
-            return (x + 0.5f - (subgridSize / 2)) * imageSize / subgridSize;
+            return (x - (subgridSize / 2)) * imageSize / subgridSize;
         }
         private static float ComputeN(float l, float m)
         {
