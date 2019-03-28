@@ -31,5 +31,24 @@ namespace Single_Machine_Test
 
 
         }
+
+        [TestMethod]
+        public void SingleVisibility2()
+        {
+            /*  baseline 1036
+                timestep 1
+                channel 0 */
+            double[] frequency = { 857000000f };
+
+            //only xx polarization
+            double visR = 3.8931689262390137;
+            double visI = 0.061203371733427048;
+
+            double u = -9.3063146568965749;
+            double v = -35.529046011622995;
+            double w = 0;
+
+
+        }
     }
 }

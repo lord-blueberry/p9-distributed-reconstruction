@@ -10,6 +10,47 @@ namespace Single_Machine.NFFT
 {
     class SubgridFFT
     {
+
+        public static List<List<Complex[,]>> ForwardPlan(GriddingParams p, List<List<Complex[,]>> subgrids)
+        {
+            var output = new List<List<Complex[,]>>(subgrids.Count);
+            for (int baseline = 0; baseline < subgrids.Count; baseline++)
+            {
+                var blSubgrids = subgrids[baseline];
+                var blOutput = new List<Complex[,]>(blSubgrids.Count);
+                for (int subgrid = 0; subgrid < blSubgrids.Count; subgrid++)
+                {
+                    var sub = blSubgrids[subgrid];
+                    var outFourier = new Complex[p.SubgridSize, p.SubgridSize];
+                    using (var imageSpace = new AlignedArrayComplex(16, p.SubgridSize, p.SubgridSize))
+                    using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
+                    using (var plan = FftwPlanC2C.Create(imageSpace, fourierSpace, DftDirection.Forwards))
+                    {
+                        //copy
+                        for (int i = 0; i < p.SubgridSize; i++)
+                        {
+                            for (int j = 0; j < p.SubgridSize; j++)
+                                imageSpace[i, j] = sub[i, j].Real;
+                        }
+                        
+                        plan.Execute();
+                        //var norm = 1.0;
+                        
+                        //NORMALIZE
+
+                        for (int i = 0; i < p.SubgridSize; i++)
+                        {
+                            for (int j = 0; j < p.SubgridSize; j++)
+                                outFourier[i, j] = fourierSpace[i, j];
+                        }
+
+                    }
+                }
+            }
+
+            return output;
+        }
+
         public static List<List<Complex[,]>> ForwardHack(GriddingParams p, List<List<Complex[,]>> subgrids)
         {
             var output = new List<List<Complex[,]>>(subgrids.Count);
@@ -30,14 +71,15 @@ namespace Single_Machine.NFFT
                             for (int j = 0; j < p.SubgridSize; j++)
                                 imageSpace[i, j] = sub[i, j];
                         }
-                        DFT.IFFT(imageSpace, fourierSpace);
-
+                        
+                        DFT.FFT(imageSpace, fourierSpace);
                         //NORMALIZE
+                        var norm = 1.0 / (p.SubgridSize * p.SubgridSize);
 
                         for (int i = 0; i < p.SubgridSize; i++)
                         {
                             for (int j = 0; j < p.SubgridSize; j++)
-                                outFourier[i, j] = fourierSpace[i, j];
+                                outFourier[i, j] = fourierSpace[i, j] * norm;
                         }
                     }
                     blOutput.Add(outFourier);
@@ -49,7 +91,7 @@ namespace Single_Machine.NFFT
         }
 
 
-        public static double[,] ForwardFFT(Complex[,] grid)
+        public static double[,] ForwardiFFT(Complex[,] grid)
         {
             double[,] output = new double[grid.GetLength(0), grid.GetLength(1)];
             using (var imageSpace = new AlignedArrayComplex(16, grid.GetLength(0), grid.GetLength(1)))
@@ -70,6 +112,37 @@ namespace Single_Machine.NFFT
                     for (int x = 0; x < grid.GetLength(1); x++)
                     {
                         output[y, x] = imageSpace[y, x].Real;
+                    }
+                }
+
+            }
+
+            return output;
+        }
+
+
+        public static Complex[,] ForwardFFT2(Complex[,] grid)
+        {
+            Complex[,] output = new Complex[grid.GetLength(0), grid.GetLength(1)];
+            using (var imageSpace = new AlignedArrayComplex(16, grid.GetLength(0), grid.GetLength(1)))
+            using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
+            {
+                for (int y = 0; y < grid.GetLength(0); y++)
+                {
+                    for (int x = 0; x < grid.GetLength(1); x++)
+                    {
+                        fourierSpace[y, x] = grid[y, x];
+                    }
+                }
+
+                DFT.FFT(fourierSpace, imageSpace);
+                double norm = 1.0 / (grid.GetLength(0) * grid.GetLength(1));
+
+                for (int y = 0; y < grid.GetLength(0); y++)
+                {
+                    for (int x = 0; x < grid.GetLength(1); x++)
+                    {
+                        output[y, x] = imageSpace[y, x] * norm;
                     }
                 }
 

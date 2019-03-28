@@ -36,7 +36,14 @@ namespace Single_Machine.NFFT
                                 int xSrc = (x + (p.SubgridSize / 2)) % p.SubgridSize;
                                 int ySrc = (y + (p.SubgridSize / 2)) % p.SubgridSize;
                                 double phase = PI * (x + y - p.SubgridSize) / p.SubgridSize;
+
+                                //phase = 0;
+                                if (y == 8)
+                                    Console.Write("");
+
                                 Complex phasor = new Complex(Cos(phase), Sin(phase));
+                                var d = data[ySrc, xSrc];
+                                var tmp = data[ySrc, xSrc] * phasor;
                                 grid[gridY + y, gridX + x] += data[ySrc, xSrc] * phasor;
                             }
                         }
@@ -52,6 +59,7 @@ namespace Single_Machine.NFFT
                                 int xSrc = (x + (p.SubgridSize / 2)) % p.SubgridSize;
                                 int ySrc = (y + (p.SubgridSize / 2)) % p.SubgridSize;
                                 double phase = PI * (x + y - p.SubgridSize) / p.SubgridSize;
+                                //phase = 0;
                                 Complex phasor = new Complex(Cos(phase), Sin(phase));
                                 grid[gridY + y, gridX + x] += data[ySrc, xSrc] * phasor;
                             }

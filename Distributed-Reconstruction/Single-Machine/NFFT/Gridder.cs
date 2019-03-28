@@ -36,8 +36,6 @@ namespace Single_Machine.NFFT
                     {
                         for (int x = 0; x < p.SubgridSize; x++)
                         {
-                            if (x == 32 && y == 32)
-                                System.Console.Write("");
                             //real and imaginary part of the pixel. We ignore polarization here
                             var pixel = new Complex();
 

@@ -221,6 +221,7 @@ namespace Single_Machine.NFFT
                 int uvMinPixels = System.Math.Min(UPixel, VPixel);
 
                 // Return whether the subgrid fits in grid and w-stack
+                //TODO: HACKED value here, uvMinPixels >= 0
                 return uvMinPixels >= 1 &&
                     uvMaxPixels <= (param.GridSize - param.SubgridSize) &&
                     WIndex >= -param.WLayerCount &&
