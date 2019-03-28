@@ -22,6 +22,11 @@ namespace Single_Machine.NFFT
 
         public static void ToVisibilities()
         {
+            //FFT
+            //splitter
+            //subgridFFT
+            
+            //De-Gridder
 
         }
     }

@@ -8,10 +8,6 @@ namespace Single_Machine.NFFT
 {
     class Plan
     {
-        public Plan()
-        {
-
-        }
 
         public static List<List<SubgridHack>> CreatePlan(GriddingParams p, double[,,] uvw, double[] frequencies)
         {

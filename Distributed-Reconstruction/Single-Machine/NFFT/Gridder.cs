@@ -130,12 +130,87 @@ namespace Single_Machine.NFFT
                 }
             }
         }
+        #endregion
+
+
+        #region De-grid
+        public static Complex[,,] BackwardsHack(GriddingParams p, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)
+        {
+            var wavenumbers = Math.FrequencyToWavenumber(frequencies);
+            var imagesize = p.CellSize * p.GridSize;
+
+            var outputVis = new Complex[uvw.GetLength(0), uvw.GetLength(1), wavenumbers.Length];
+            for (int baseline = 0; baseline < metadata.Count; baseline++)
+            {
+                var blMeta = metadata[baseline];
+                var blSubgrids = subgridData[baseline];
+                for (int subgrid = 0; subgrid < blMeta.Count; subgrid++)
+                {
+                    //de-apply a-term correction
+                    var meta = blMeta[subgrid];
+                    var data = blSubgrids[subgrid];
+                    var pixels_copy = new Complex[p.SubgridSize, p.SubgridSize];
+                    for (int y = 0; y < p.SubgridSize; y++)
+                    {
+                        for (int x = 0; x < p.SubgridSize; x++)
+                        {
+                            var sph = spheroidal[y, x];
+                            int xSrc = (x + (p.SubgridSize / 2)) % p.SubgridSize;
+                            int ySrc = (y + (p.SubgridSize / 2)) % p.SubgridSize;
+
+                            pixels_copy[y, x] = sph * data[ySrc, xSrc];
+                        }
+                    }
+
+                    var uOffset = (meta.UPixel + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / imagesize);
+                    var vOffset = (meta.VPixel + p.SubgridSize / 2 - p.GridSize / 2) * (2 * PI / imagesize);
+                    var tmpW_lambda = p.WStepLambda * (meta.WLambda + 0.5);
+                    var wOffset = 2 * PI * tmpW_lambda;
+
+                    int sampleEnd = meta.timeSampleStart + meta.timeSampleCount;
+                    for (int time = meta.timeSampleStart; time < sampleEnd; time++)
+                    {
+                        var u = uvw[baseline, time, 0];
+                        var v = uvw[baseline, time, 1];
+                        var w = uvw[baseline, time, 2];
+
+                        for (int channel = 0; channel < wavenumbers.Length; channel++)
+                        {
+                            var visibility = new Complex();
+                            for (int y = 0; y < p.SubgridSize; y++)
+                            {
+                                for (int x = 0; x < p.SubgridSize; x++)
+                                {
+                                    //calculate directional cosines. exp(2*PI*j * (u*l + v*m + w*n))
+                                    var l = ComputeL(x, p.SubgridSize, imagesize);
+                                    var m = ComputeL(y, p.SubgridSize, imagesize);
+                                    var n = ComputeN(l, m);
+
+                                    double phaseIndex = u * l + v * m + w * n;
+                                    double phaseOffset = uOffset * l + vOffset * m + wOffset * n;
+                                    double phase = (phaseIndex * wavenumbers[channel]) - phaseOffset;
+                                    var phasor = new Complex(Cos(phase), Sin(phase));
+                                    visibility += pixels_copy[y, x] * phasor;
+                                }
+                            }
+
+                            double scale = 1.0f / (p.SubgridSize * p.SubgridSize);
+                            outputVis[baseline, time, channel] = visibility * scale;
+                        }
+                    }
+                        
+                }
+            }
+
+            return outputVis;
+        }
+        #endregion
 
         private static float ComputeL(int x, int subgridSize, float imageSize)
         {
-            //TODO: think about removing 0.5f and replacing imagesize / subgrids with cellsize
             return (x - (subgridSize / 2)) * imageSize / subgridSize;
         }
+
         private static float ComputeN(float l, float m)
         {
             //evaluate n = 1.0f - sqrt(1.0 - (l * l) - (m * m))
@@ -144,10 +219,5 @@ namespace Single_Machine.NFFT
             var tmp = (l * l) + (m * m);
             return tmp / ((float)(tmp / 1.0f + Sqrt(1.0 - tmp)));
         }
-        #endregion
-
-        #region De-grid
-        #endregion
-
     }
 }

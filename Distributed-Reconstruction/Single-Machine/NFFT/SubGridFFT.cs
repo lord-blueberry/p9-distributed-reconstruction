@@ -51,6 +51,7 @@ namespace Single_Machine.NFFT
             return output;
         }
 
+        #region important bits
         public static List<List<Complex[,]>> ForwardHack(GriddingParams p, List<List<Complex[,]>> subgrids)
         {
             var output = new List<List<Complex[,]>>(subgrids.Count);
@@ -73,7 +74,6 @@ namespace Single_Machine.NFFT
                         }
                         
                         DFT.FFT(imageSpace, fourierSpace);
-                        //NORMALIZE
                         var norm = 1.0 / (p.SubgridSize * p.SubgridSize);
 
                         for (int i = 0; i < p.SubgridSize; i++)
@@ -90,6 +90,43 @@ namespace Single_Machine.NFFT
             return output;
         }
 
+        public static List<List<Complex[,]>> IFFTHack(GriddingParams p, List<List<Complex[,]>> subgrids)
+        {
+            var output = new List<List<Complex[,]>>(subgrids.Count);
+            for (int baseline = 0; baseline < subgrids.Count; baseline++)
+            {
+                var blSubgrids = subgrids[baseline];
+                var blOutput = new List<Complex[,]>(blSubgrids.Count);
+                for (int subgrid = 0; subgrid < blSubgrids.Count; subgrid++)
+                {
+                    var sub = blSubgrids[subgrid];
+                    var outImage = new Complex[p.SubgridSize, p.SubgridSize];
+                    using (var fourierSpace = new AlignedArrayComplex(16, p.SubgridSize, p.SubgridSize))
+                    using (var imageSpace = new AlignedArrayComplex(16, fourierSpace.GetSize()))
+                    {
+                        //copy
+                        for (int i = 0; i < p.SubgridSize; i++)
+                        {
+                            for (int j = 0; j < p.SubgridSize; j++)
+                                fourierSpace[i, j] = sub[i, j];
+                        }
+
+                        DFT.IFFT(fourierSpace, imageSpace);
+                        var norm = 1.0 / (p.SubgridSize * p.SubgridSize);
+
+                        for (int i = 0; i < p.SubgridSize; i++)
+                        {
+                            for (int j = 0; j < p.SubgridSize; j++)
+                                outImage[i, j] = imageSpace[i, j] * norm;
+                        }
+                    }
+                    blOutput.Add(outImage);
+                }
+                output.Add(blOutput);
+            }
+            return output;
+        }
+        #endregion
 
         public static double[,] ForwardiFFT(Complex[,] grid)
         {
