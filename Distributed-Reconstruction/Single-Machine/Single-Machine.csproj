@@ -124,15 +124,14 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="NFFT\Adder.cs" />
-    <Compile Include="NFFT\GriddingParams.cs" />
-    <Compile Include="NFFT\Math.cs" />
-    <Compile Include="NFFT\Plan.cs" />
-    <Compile Include="NFFT\SubgridFFT.cs" />
-    <Compile Include="NFFT\Gridder.cs" />
-    <Compile Include="NFFT\NFFT.cs" />
-    <Compile Include="NFFT\Splitter.cs" />
-    <Compile Include="NFFT\SubgridData.cs" />
+    <Compile Include="IDG\Adder.cs" />
+    <Compile Include="IDG\GriddingParams.cs" />
+    <Compile Include="IDG\Math.cs" />
+    <Compile Include="IDG\Plan.cs" />
+    <Compile Include="IDG\SubgridFFT.cs" />
+    <Compile Include="IDG\Gridder.cs" />
+    <Compile Include="IDG\IDG.cs" />
+    <Compile Include="IDG\SubgridData.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

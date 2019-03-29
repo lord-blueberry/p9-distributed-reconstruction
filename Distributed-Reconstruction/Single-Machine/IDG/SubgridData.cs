@@ -6,12 +6,12 @@ using System.Text;
 using System.Threading.Tasks;
 using static System.Math;
 
-namespace Single_Machine.NFFT
+namespace Single_Machine.IDG
 {
     /// <summary>
     /// hack is here to have the first version resemble the IDG reference implementation more
     /// </summary>
-    class SubgridHack
+    public class SubgridHack
     {
         public int baselineIdx;
         public int timeSampleStart;

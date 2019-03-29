@@ -12,7 +12,7 @@ using System.Numerics;
 
 namespace Single_Machine
 {
-    using NFFT;
+    using IDG;
     class Program
     {
         static void Main(string[] args)
@@ -52,6 +52,7 @@ namespace Single_Machine
             var channels = 8;
             var vis_real = new double[baselines, time_samples, channels];
             var vis_imag = new double[baselines, time_samples, channels];
+            long visibilitiesCount = 0;
             for (int i = 0; i < baselines; i++)
             {
                 Array[] bl = (Array[])vis_raw[i];
@@ -67,6 +68,7 @@ namespace Single_Machine
                         //add polarizations XX and YY together to form Intensity Visibilities only
                         vis_real[i, j, k] = (pol_XX[0] + pol_YY[0]) / 2.0;
                         vis_imag[i, j, k] = (pol_XX[1] + pol_YY[1]) / 2.0;
+                        visibilitiesCount++;
                     }
                 }
             }
@@ -85,17 +87,17 @@ namespace Single_Machine
             int nr_timeslots = 1;
             int max_nr_timesteps = 256;
             float imagesize = 0.0025f;
-            float cellSize = imagesize / gridSize;
-            var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
+            //float cellSize = imagesize / gridSize;
+            var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)properCellSize, 1, 0.0f);
             var gridSpheroidal = Math.CalcIdentitySpheroidal(gridSize, gridSize);
             var subgridSpheroidal = Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
 
-            var subgrids = Plan.CreatePlan(p, uvw, frequencies);
+            var subgrids = Partitioner.CreatePartition(p, uvw, frequencies);
             var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequencies, subgridSpheroidal);
             var ftgridded = SubgridFFT.ForwardHack(p, gridded);
             var grid = Adder.AddHack(p, subgrids, ftgridded);
             SubgridFFT.Shift(grid);
-            var img = SubgridFFT.ForwardiFFT(grid);
+            var img = SubgridFFT.ForwardiFFT(grid, visibilitiesCount);
             SubgridFFT.Shift(img);
 
             //remove spheroidal from grid
@@ -103,7 +105,7 @@ namespace Single_Machine
                 for(int j = 0; j < img.GetLength(1); j++)
                     img[i, j] = img[i,j] / gridSpheroidal[i,j];
 
-            Write(img, "full.fits");
+            Write(img, "my_dirty.fits");
         }
 
 
@@ -154,7 +156,7 @@ namespace Single_Machine
              var subgridSpheroidal = Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
 
 
-            var subgrids = Plan.CreatePlan(p, uvw, frequency);
+            var subgrids = Partitioner.CreatePartition(p, uvw, frequency);
             var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequency, subgridSpheroidal);
             
             var ftgridded = SubgridFFT.ForwardHack(p, gridded);
@@ -210,7 +212,7 @@ namespace Single_Machine
             var subgridSpheroidal = Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
 
 
-            var subgrids = Plan.CreatePlan(p, uvw, frequency);
+            var subgrids = Partitioner.CreatePartition(p, uvw, frequency);
             var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequency, subgridSpheroidal);
             //var img2 = gridded[0][0];
             //Write(img2);
@@ -261,7 +263,7 @@ namespace Single_Machine
 
             var subgridSpheroidal = Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
 
-            var subgrids = Plan.CreatePlan(p, uvw, frequency);
+            var subgrids = Partitioner.CreatePartition(p, uvw, frequency);
             var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequency, subgridSpheroidal);
             var imgg = gridded[0][0];
             var ftgridded = SubgridFFT.ForwardHack(p, gridded);

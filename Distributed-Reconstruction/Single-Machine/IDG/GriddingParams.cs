@@ -4,12 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Single_Machine.NFFT
+namespace Single_Machine.IDG
 {
     /// <summary>
     /// Immutable class holding the gridding parameters
     /// </summary>
-    class GriddingParams
+    public class GriddingParams
     {
         
         public int GridSize { get; }

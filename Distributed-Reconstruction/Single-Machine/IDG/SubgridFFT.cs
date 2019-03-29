@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using FFTW.NET;
 using System.Numerics;
 
-namespace Single_Machine.NFFT
+namespace Single_Machine.IDG
 {
     class SubgridFFT
     {
@@ -128,7 +128,7 @@ namespace Single_Machine.NFFT
         }
         #endregion
 
-        public static double[,] ForwardiFFT(Complex[,] grid)
+        public static double[,] ForwardiFFT(Complex[,] grid, long visibilitiesCount = 1)
         {
             double[,] output = new double[grid.GetLength(0), grid.GetLength(1)];
             using (var imageSpace = new AlignedArrayComplex(16, grid.GetLength(0), grid.GetLength(1)))
@@ -148,7 +148,7 @@ namespace Single_Machine.NFFT
                 {
                     for (int x = 0; x < grid.GetLength(1); x++)
                     {
-                        output[y, x] = imageSpace[y, x].Real;
+                        output[y, x] = imageSpace[y, x].Real/visibilitiesCount;
                     }
                 }
 

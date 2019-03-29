@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Numerics;
 using static System.Math;
 
-namespace Single_Machine.NFFT
+namespace Single_Machine.IDG
 {
     class Adder
     {

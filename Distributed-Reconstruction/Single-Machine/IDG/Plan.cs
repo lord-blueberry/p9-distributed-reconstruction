@@ -4,12 +4,20 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Single_Machine.NFFT
+namespace Single_Machine.IDG
 {
-    class Plan
+    public class Partitioner
     {
-
-        public static List<List<SubgridHack>> CreatePlan(GriddingParams p, double[,,] uvw, double[] frequencies)
+        /// <summary>
+        /// Partitions the Visibility data into subgrids. 
+        /// 
+        /// In the original implementation, this is called "Plan"
+        /// </summary>
+        /// <param name="p"></param>
+        /// <param name="uvw"></param>
+        /// <param name="frequencies"></param>
+        /// <returns></returns>
+        public static List<List<SubgridHack>> CreatePartition(GriddingParams p, double[,,] uvw, double[] frequencies)
         {
             var imagesize = p.CellSize * p.GridSize;
             List<List<SubgridHack>> outputGrids = new List<List<SubgridHack>>(uvw.GetLength(0));

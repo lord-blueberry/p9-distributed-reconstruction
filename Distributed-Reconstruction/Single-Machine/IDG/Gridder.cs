@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Numerics;
 using static System.Math;
 
-namespace Single_Machine.NFFT
+namespace Single_Machine.IDG
 {
     class Gridder
     {
@@ -80,9 +80,6 @@ namespace Single_Machine.NFFT
             return output;
         }
 
-
-
-
         public static void ForwardSubgrid(GriddingParams param, SubgridData data, float[,] spheroidal)
         {
             float[,] subgridR = new float[param.SubgridSize, param.SubgridSize];
@@ -131,7 +128,6 @@ namespace Single_Machine.NFFT
             }
         }
         #endregion
-
 
         #region De-grid
         public static Complex[,,] BackwardsHack(GriddingParams p, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Single_Machine.NFFT
+namespace Single_Machine.IDG
 {
     class Math
     {
