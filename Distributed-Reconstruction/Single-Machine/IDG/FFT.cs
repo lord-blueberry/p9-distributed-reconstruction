@@ -48,6 +48,44 @@ namespace Single_Machine.IDG
             return output;
         }
 
+        public static List<List<Complex[,]>> SubgridIFFT(GriddingConstants c, List<List<Complex[,]>> subgrids)
+        {
+            var output = new List<List<Complex[,]>>(subgrids.Count);
+            for (int baseline = 0; baseline < subgrids.Count; baseline++)
+            {
+                var blSubgrids = subgrids[baseline];
+                var blOutput = new List<Complex[,]>(blSubgrids.Count);
+                for (int subgrid = 0; subgrid < blSubgrids.Count; subgrid++)
+                {
+                    var sub = blSubgrids[subgrid];
+                    var outFourier = new Complex[c.SubgridSize, c.SubgridSize];
+                    using (var imageSpace = new AlignedArrayComplex(16, c.SubgridSize, c.SubgridSize))
+                    using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
+                    {
+                        //copy
+                        for (int i = 0; i < c.SubgridSize; i++)
+                        {
+                            for (int j = 0; j < c.SubgridSize; j++)
+                                imageSpace[i, j] = sub[i, j];
+                        }
+
+                        DFT.FFT(imageSpace, fourierSpace);
+                        var norm = 1.0 / (c.SubgridSize * c.SubgridSize);
+
+                        for (int i = 0; i < c.SubgridSize; i++)
+                        {
+                            for (int j = 0; j < c.SubgridSize; j++)
+                                outFourier[i, j] = fourierSpace[i, j] * norm;
+                        }
+                    }
+                    blOutput.Add(outFourier);
+                }
+                output.Add(blOutput);
+            }
+
+            return output;
+        }
+
         public static double[,] GridIFFT(Complex[,] grid, long visibilitiesCount = 1)
         {
             double[,] output = new double[grid.GetLength(0), grid.GetLength(1)];
@@ -99,6 +137,34 @@ namespace Single_Machine.IDG
 
             return output;
         }
+
+        /// <summary>
+        /// Just here for debug purposes
+        /// </summary>
+        /// <param name="image"></param>
+        /// <returns></returns>
+        public static Complex[,] GridFFT(Complex[,] image)
+        {
+            Complex[,] output = new Complex[image.GetLength(0), image.GetLength(1)];
+            using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))
+            using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
+            {
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        imageSpace[y, x] = image[y, x];
+
+                DFT.FFT(imageSpace, fourierSpace);
+                //double norm = 1.0 / (image.GetLength(0) * image.GetLength(1));
+                var norm = 1.0;
+
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        output[y, x] = fourierSpace[y, x] * norm;
+            }
+
+            return output;
+        }
+
 
         public static void Shift(Complex[,] grid)
         {
