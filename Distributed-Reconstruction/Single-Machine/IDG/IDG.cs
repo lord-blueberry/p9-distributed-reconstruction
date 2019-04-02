@@ -9,11 +9,11 @@ namespace Single_Machine.IDG
 {
     class IDG
     {
-        public static double[,] ToImage(GriddingParams p, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
+        public static double[,] ToImage(GriddingConstants p, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             //Plan
 
-            var subgrids = Gridder.ForwardHack(p, metadata, uvw, null, null, frequencies, null);
+            //var subgrids = Gridder.ForwardHack(p, metadata, uvw, null, null, frequencies, null);
 
             //SubgridFFT
 
@@ -23,7 +23,7 @@ namespace Single_Machine.IDG
             return null;
         }
 
-        public static Complex[,,] ToVisibilities(GriddingParams p)
+        public static Complex[,,] ToVisibilities(GriddingConstants p)
         {
             //FFT
             //splitter

@@ -12,7 +12,7 @@ namespace Single_Machine.IDG
     {
 
         #region Grid
-        public static List<List<Complex[,]>> ForwardHack(GriddingConstants p, List<List<SubgridHack>> metadata, double[,,] uvw, double[,,] vis_real, double[,,] vis_imag, double[] frequencies, float[,] spheroidal)
+        public static List<List<Complex[,]>> ForwardHack(GriddingConstants p, List<List<SubgridHack>> metadata, double[,,] uvw, Complex[,,] visibilities, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = Math.FrequencyToWavenumber(frequencies);
             var imagesize = p.CellSize * p.GridSize;
@@ -57,7 +57,7 @@ namespace Single_Machine.IDG
                                 {
                                     double phase = phaseOffset - (phaseIndex * wavenumbers[channel]);
                                     var phasor = new Complex(Cos(phase), Sin(phase));
-                                    var vis = new Complex(vis_real[baseline, time, channel], vis_imag[baseline, time, channel]);
+                                    var vis = visibilities[baseline, time, channel];
 
                                     pixel += vis * phasor;
                                 }
@@ -78,54 +78,6 @@ namespace Single_Machine.IDG
             }
 
             return output;
-        }
-
-        public static void ForwardSubgrid(GriddingConstants param, SubgridData data, float[,] spheroidal)
-        {
-            float[,] subgridR = new float[param.SubgridSize, param.SubgridSize];
-            float[,] subgridI = new float[param.SubgridSize, param.SubgridSize];
-
-            for (int y = 0; y < param.SubgridSize; y++)
-            {
-                for(int x = 0; x < param.SubgridSize; x++)
-                {
-                    
-                    //real and imaginary part of the pixel. We ignore polarization here
-                    var pixelR = 0.0f;
-                    var pixelI = 0.0f;
-
-                    //compute l m n
-                    var l = ComputeL(x, param.SubgridSize, param.ImageSize);
-                    var m = ComputeL(y, param.SubgridSize, param.ImageSize);
-                    var n = ComputeN(l, m);
-
-                    for(int time = 0; time < data.UVW.Count; time++)
-                    {
-                        var uvw = data.UVW[time];
-                        var phaseIndex = uvw.U * l + uvw.V * m + uvw.W * n;
-                        var phaseOffset = data.UOffset * l + data.VOffset * m + data.WOffset * n;
-                        for (int channel = 0; channel < data.Wavenumbers.Count; channel++)
-                        {
-                            var phase = phaseOffset - (phaseIndex * data.Wavenumbers[channel]);
-                            var visibility = data.Visibilities[channel, time];
-
-                            var phasorR = (float)Cos(phase);
-                            var phasorI = (float)Sin(phase);
-                            pixelR += visibility.Real * phasorR;
-                            pixelI += visibility.Imag * phasorI;
-                        }
-                    }
-
-                    //A-Projection would be here, but gets ignored
-
-                    //shift pixels. x=0 and y=0 are the center pixel
-                    var sph = spheroidal[x, y];
-                    int x_dest = (x + (param.SubgridSize / 2)) % param.SubgridSize;
-                    int y_dest = (x + (param.SubgridSize / 2)) % param.SubgridSize;
-                    subgridR[x, y] = pixelR * sph;
-                    subgridI[x, y] = pixelI * sph;
-                }
-            }
         }
         #endregion
 

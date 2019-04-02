@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static System.Math;
+using System.Numerics;
 
 namespace Single_Machine.IDG
 {
@@ -41,7 +42,7 @@ namespace Single_Machine.IDG
 
         public IList<UVWTuple> UVW { get; }
         public IList<float> Wavenumbers { get; }
-        public Visibility[,] Visibilities { get; }
+        public Complex[,] Visibilities { get; }
 
         public SubgridData(GriddingConstants p)
         {
@@ -67,18 +68,6 @@ namespace Single_Machine.IDG
                 this.U = u;
                 this.V = v;
                 this.W = w;
-            }
-        }
-
-        public class Visibility
-        {
-            public float Real { get; }
-            public float Imag { get; }
-
-            public Visibility(float real, float imag)
-            {
-                this.Real = real;
-                this.Imag = imag;
             }
         }
     }
