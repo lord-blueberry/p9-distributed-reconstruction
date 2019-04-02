@@ -124,12 +124,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Deconvolution\CoordinateDescent.cs" />
+    <Compile Include="Deconvolution\CDClean.cs" />
     <Compile Include="IDG\Adder.cs" />
-    <Compile Include="IDG\GriddingParams.cs" />
+    <Compile Include="IDG\GriddingConstants.cs" />
     <Compile Include="IDG\Math.cs" />
-    <Compile Include="IDG\Plan.cs" />
-    <Compile Include="IDG\SubgridFFT.cs" />
+    <Compile Include="IDG\Partitioner.cs" />
+    <Compile Include="IDG\FFT.cs" />
     <Compile Include="IDG\Gridder.cs" />
     <Compile Include="IDG\IDG.cs" />
     <Compile Include="IDG\SubgridData.cs" />
