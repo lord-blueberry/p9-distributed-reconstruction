@@ -119,6 +119,13 @@ namespace Single_Machine
             Program.Write(img);
         }
 
+        #region debug full pipeline
+        public static void DebugFullPipeline()
+        {
+
+        }
+        #endregion
+
         #region helpers
         public static void Add(Complex[,] c0, Complex[,] c1)
         {
