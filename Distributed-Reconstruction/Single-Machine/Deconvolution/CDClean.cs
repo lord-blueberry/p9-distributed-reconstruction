@@ -39,7 +39,7 @@ namespace Single_Machine.Deconvolution
                     if(xNew != xOld)
                     {
                         xImage[y, x] = xNew;
-                        var xDiff =  xOld - xNew;
+                        var xDiff = xNew - xOld;
                         ModifyResidual(residual, psf, y, x, xDiff);
                     }
                 }
@@ -82,7 +82,9 @@ namespace Single_Machine.Deconvolution
                     if (yDst >= 0 & yDst < residual.GetLength(0) &
                         xDst >= 0 & xDst < residual.GetLength(1))
                     {
-                        residual[yDst, xDst] = xDiff * psf[i, j];
+                        var res = residual[yDst, xDst];
+                        var psff = psf[i, j];
+                        residual[yDst, xDst] -= xDiff * psf[i, j];
                     }
                 }
             }
