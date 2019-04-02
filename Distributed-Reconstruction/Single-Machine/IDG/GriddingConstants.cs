@@ -25,6 +25,10 @@ namespace Single_Machine.IDG
         public float WStep { get; }
         public float WStepLambda { get; }
 
+        public float[,] subgridSpheroidal { get; }
+        public float[,] gridSpheroidal { get; }
+
+
         public GriddingConstants(int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float cellSize, int wLayerCount, float wStep)
         {
             this.GridSize = gridSize;
@@ -38,6 +42,9 @@ namespace Single_Machine.IDG
 
             this.WLayerCount = wLayerCount;
             this.WStep = wStep;
+
+            this.gridSpheroidal = Math.CalcIdentitySpheroidal(gridSize, gridSize);
+            this.subgridSpheroidal = Math.CalcIdentitySpheroidal(subgridSize, subgridSize);
         }
     }
 }

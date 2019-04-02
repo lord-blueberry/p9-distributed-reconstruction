@@ -97,7 +97,7 @@ namespace Single_Machine
             var ftgridded = FFT.SubgridFFT(p, gridded);
             var grid = Adder.AddHack(p, subgrids, ftgridded);
             FFT.Shift(grid);
-            var img = FFT.SubgridIFFT(grid, visibilitiesCount);
+            var img = FFT.GridIFFT(grid, visibilitiesCount);
             FFT.Shift(img);
 
             //remove spheroidal from grid
@@ -145,7 +145,7 @@ namespace Single_Machine
             var ift2 = IFT(new Complex(visR1, 0), u1, v, freq, gridSize, imageSize);
             Add(ift1, ift2);
             Write(ift1, "iftOutput.fits");
-            var fourierFT = FFT.FFTGrid(ift1);
+            var fourierFT = FFT.GridFFT(ift1);
             Write(fourierFT, "iftOutput.fits");
             WriteImag(fourierFT);
             
@@ -167,7 +167,7 @@ namespace Single_Machine
             FFT.Shift(grid);
             Write(grid);
             WriteImag(grid);
-            var img = FFT.SubgridIFFT(grid);
+            var img = FFT.GridIFFT(grid);
             FFT.Shift(img);
             Write(img);
         }
@@ -215,7 +215,7 @@ namespace Single_Machine
             var grid = Adder.AddHack(p, subgrids, ftgridded);
             Write(grid);
             FFT.Shift(grid);
-            var img = FFT.SubgridIFFT(grid);
+            var img = FFT.GridIFFT(grid);
             FFT.Shift(img);
             Write(img);
         }
@@ -261,7 +261,7 @@ namespace Single_Machine
             var grid = Adder.AddHack(p, subgrids, ftgridded);
             //Write(grid);
             FFT.Shift(grid);
-            var img = FFT.SubgridIFFT(grid);
+            var img = FFT.GridIFFT(grid);
             FFT.Shift(img);
             Write(img);
 
