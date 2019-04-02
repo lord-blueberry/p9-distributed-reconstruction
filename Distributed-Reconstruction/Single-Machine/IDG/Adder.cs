@@ -10,9 +10,9 @@ namespace Single_Machine.IDG
 {
     class Adder
     {
-        public static Complex[,] AddHack(GriddingConstants constants, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgrids)
+        public static Complex[,] AddHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgrids)
         {
-            var grid = new Complex[constants.GridSize, constants.GridSize];
+            var grid = new Complex[c.GridSize, c.GridSize];
 
             for (int baseline = 0; baseline < subgrids.Count; baseline++)
             {
@@ -27,16 +27,16 @@ namespace Single_Machine.IDG
                     int gridY = meta.VPixel;
 
                     //TODO: gridX >= 0, even though in plan we check that it is >= 1. 
-                    if (gridX >= 0 && gridX < constants.GridSize - constants.SubgridSize &&
-                        gridY >= 0 && gridY < constants.GridSize - constants.SubgridSize)
+                    if (gridX >= 0 && gridX < c.GridSize - c.SubgridSize &&
+                        gridY >= 0 && gridY < c.GridSize - c.SubgridSize)
                     {
-                        for(int y = 0; y < constants.SubgridSize; y++)
+                        for(int y = 0; y < c.SubgridSize; y++)
                         {
-                            for(int x = 0; x < constants.SubgridSize; x++)
+                            for(int x = 0; x < c.SubgridSize; x++)
                             {
-                                int xSrc = (x + (constants.SubgridSize / 2)) % constants.SubgridSize;
-                                int ySrc = (y + (constants.SubgridSize / 2)) % constants.SubgridSize;
-                                double phase = PI * (x + y - constants.SubgridSize) / constants.SubgridSize;
+                                int xSrc = (x + (c.SubgridSize / 2)) % c.SubgridSize;
+                                int ySrc = (y + (c.SubgridSize / 2)) % c.SubgridSize;
+                                double phase = PI * (x + y - c.SubgridSize) / c.SubgridSize;
 
                                 //phase = 0;
                                 if (y == 8)
@@ -53,13 +53,13 @@ namespace Single_Machine.IDG
                     else
                     {
                         //throw new Exception("invalid grid");
-                        for (int y = 0; y < constants.SubgridSize; y++)
+                        for (int y = 0; y < c.SubgridSize; y++)
                         {
-                            for (int x = 0; x < constants.SubgridSize; x++)
+                            for (int x = 0; x < c.SubgridSize; x++)
                             {
-                                int xSrc = (x + (constants.SubgridSize / 2)) % constants.SubgridSize;
-                                int ySrc = (y + (constants.SubgridSize / 2)) % constants.SubgridSize;
-                                double phase = PI * (x + y - constants.SubgridSize) / constants.SubgridSize;
+                                int xSrc = (x + (c.SubgridSize / 2)) % c.SubgridSize;
+                                int ySrc = (y + (c.SubgridSize / 2)) % c.SubgridSize;
+                                double phase = PI * (x + y - c.SubgridSize) / c.SubgridSize;
                                 //phase = 0;
                                 Complex phasor = new Complex(Cos(phase), Sin(phase));
                                 grid[gridY + y, gridX + x] += data[ySrc, xSrc] * phasor;
@@ -72,7 +72,7 @@ namespace Single_Machine.IDG
             return grid;
         }
 
-        public static List<List<Complex[,]>> SplitHack(GriddingConstants constants, List<List<SubgridHack>> metadata, Complex[,] grid)
+        public static List<List<Complex[,]>> SplitHack(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,] grid)
         {
             var subgrids = new List<List<Complex[,]>>(metadata.Count);
 
@@ -85,21 +85,21 @@ namespace Single_Machine.IDG
                 for (int subgrid = 0; subgrid < blSubgridsData.Count; subgrid++)
                 {
                     var meta = blMeta[subgrid];
-                    var data = new Complex[constants.SubgridSize, constants.SubgridSize];
+                    var data = new Complex[c.SubgridSize, c.SubgridSize];
                     blSubgridsData.Add(data);
 
                     int gridX = meta.UPixel;
                     int gridY = meta.VPixel;
-                    if (gridX >= 0 && gridX < constants.GridSize - constants.SubgridSize &&
-                        gridY >= 0 && gridY < constants.GridSize - constants.SubgridSize)
+                    if (gridX >= 0 && gridX < c.GridSize - c.SubgridSize &&
+                        gridY >= 0 && gridY < c.GridSize - c.SubgridSize)
                     {
-                        for (int y = 0; y < constants.SubgridSize; y++)
+                        for (int y = 0; y < c.SubgridSize; y++)
                         {
-                            for (int x = 0; x < constants.SubgridSize; x++)
+                            for (int x = 0; x < c.SubgridSize; x++)
                             {
-                                int xDst = (x + (constants.SubgridSize / 2)) % constants.SubgridSize;
-                                int yDst = (y + (constants.SubgridSize / 2)) % constants.SubgridSize;
-                                double phase = -PI * (x + y - constants.SubgridSize) / constants.SubgridSize;
+                                int xDst = (x + (c.SubgridSize / 2)) % c.SubgridSize;
+                                int yDst = (y + (c.SubgridSize / 2)) % c.SubgridSize;
+                                double phase = -PI * (x + y - c.SubgridSize) / c.SubgridSize;
                                 var phasor = new Complex(Cos(phase), Sin(phase));
                                 data[yDst, xDst] = grid[gridY + y, gridX + x] * phasor;
                             }

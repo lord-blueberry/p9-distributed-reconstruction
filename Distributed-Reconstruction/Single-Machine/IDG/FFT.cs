@@ -10,9 +10,7 @@ namespace Single_Machine.IDG
 {
     class FFT
     {
-        #region IDG Forward
-
-        public static List<List<Complex[,]>> SubgridFFT(GriddingConstants constants, List<List<Complex[,]>> subgrids)
+        public static List<List<Complex[,]>> SubgridFFT(GriddingConstants c, List<List<Complex[,]>> subgrids)
         {
             var output = new List<List<Complex[,]>>(subgrids.Count);
             for (int baseline= 0; baseline < subgrids.Count; baseline++)
@@ -22,23 +20,23 @@ namespace Single_Machine.IDG
                 for (int subgrid = 0; subgrid < blSubgrids.Count; subgrid++)
                 {
                     var sub = blSubgrids[subgrid];
-                    var outFourier = new Complex[constants.SubgridSize, constants.SubgridSize];
-                    using (var imageSpace = new AlignedArrayComplex(16, constants.SubgridSize, constants.SubgridSize))
+                    var outFourier = new Complex[c.SubgridSize, c.SubgridSize];
+                    using (var imageSpace = new AlignedArrayComplex(16, c.SubgridSize, c.SubgridSize))
                     using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
                     {
                         //copy
-                        for (int i = 0; i < constants.SubgridSize; i++)
+                        for (int i = 0; i < c.SubgridSize; i++)
                         {
-                            for (int j = 0; j < constants.SubgridSize; j++)
+                            for (int j = 0; j < c.SubgridSize; j++)
                                 imageSpace[i, j] = sub[i, j];
                         }
                         
                         DFT.FFT(imageSpace, fourierSpace);
-                        var norm = 1.0 / (constants.SubgridSize * constants.SubgridSize);
+                        var norm = 1.0 / (c.SubgridSize * c.SubgridSize);
 
-                        for (int i = 0; i < constants.SubgridSize; i++)
+                        for (int i = 0; i < c.SubgridSize; i++)
                         {
-                            for (int j = 0; j < constants.SubgridSize; j++)
+                            for (int j = 0; j < c.SubgridSize; j++)
                                 outFourier[i, j] = fourierSpace[i, j] * norm;
                         }
                     }
@@ -101,7 +99,6 @@ namespace Single_Machine.IDG
 
             return output;
         }
-        #endregion
 
         public static void Shift(Complex[,] grid)
         {

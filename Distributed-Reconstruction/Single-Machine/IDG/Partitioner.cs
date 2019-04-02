@@ -13,13 +13,13 @@ namespace Single_Machine.IDG
         /// 
         /// In the original implementation, this is called "Plan"
         /// </summary>
-        /// <param name="p"></param>
+        /// <param name="c"></param>
         /// <param name="uvw"></param>
         /// <param name="frequencies"></param>
         /// <returns></returns>
-        public static List<List<SubgridHack>> CreatePartition(GriddingConstants p, double[,,] uvw, double[] frequencies)
+        public static List<List<SubgridHack>> CreatePartition(GriddingConstants c, double[,,] uvw, double[] frequencies)
         {
-            var imagesize = p.CellSize * p.GridSize;
+            var imagesize = c.CellSize * c.GridSize;
             List<List<SubgridHack>> outputGrids = new List<List<SubgridHack>>(uvw.GetLength(0));
             for(int baseline = 0; baseline < uvw.GetLength(0); baseline++)
             {
@@ -45,7 +45,7 @@ namespace Single_Machine.IDG
                 }
 
                 time = 0;
-                Subgrid subgrid = new Subgrid(p);
+                Subgrid subgrid = new Subgrid(c);
                 while (time < uvw.GetLength(1))
                 {
                     subgrid.Reset();
@@ -62,7 +62,7 @@ namespace Single_Machine.IDG
                         if (subgrid.AddVisibility(dpChannel0) && subgrid.AddVisibility(hack))
                         {
                             timeSamplePerSubgrid++;
-                            if (timeSamplePerSubgrid == p.MaxTimestepsPerSubgrid)
+                            if (timeSamplePerSubgrid == c.MaxTimestepsPerSubgrid)
                                 break;
                         }
                         else

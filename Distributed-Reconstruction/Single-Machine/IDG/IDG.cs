@@ -9,11 +9,11 @@ namespace Single_Machine.IDG
 {
     class IDG
     {
-        public static double[,] ToImage(GriddingConstants constants, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        public static double[,] ToImage(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, long visibilitiesCount)
         {
-            var gridded = Gridder.ForwardHack(constants, metadata, uvw, visibilities, frequencies, constants.subgridSpheroidal);
-            var ftgridded = FFT.SubgridFFT(constants, gridded);
-            var grid = Adder.AddHack(constants, metadata, ftgridded);
+            var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.subgridSpheroidal);
+            var ftgridded = FFT.SubgridFFT(c, gridded);
+            var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
             var img = FFT.GridIFFT(grid, visibilitiesCount);
             FFT.Shift(img);
@@ -21,12 +21,12 @@ namespace Single_Machine.IDG
             return img;
         }
 
-        public static Complex[,,] ToVisibilities(GriddingConstants constants, List<List<SubgridHack>> metadata, double[,] image)
+        public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image)
         {
             FFT.Shift(image);
             var grid = FFT.GridFFT(image);
             FFT.Shift(grid);
-            var gridded = Adder.SplitHack(constants, metadata, grid);
+            var gridded = Adder.SplitHack(c, metadata, grid);
             //FFT
             //splitter
             //subgridFFT

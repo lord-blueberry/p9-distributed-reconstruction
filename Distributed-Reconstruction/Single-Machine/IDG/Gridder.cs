@@ -12,10 +12,10 @@ namespace Single_Machine.IDG
     {
 
         #region Grid
-        public static List<List<Complex[,]>> ForwardHack(GriddingConstants cconstants, List<List<SubgridHack>> metadata, double[,,] uvw, Complex[,,] visibilities, double[] frequencies, float[,] spheroidal)
+        public static List<List<Complex[,]>> ForwardHack(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, Complex[,,] visibilities, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = Math.FrequencyToWavenumber(frequencies);
-            var imagesize = cconstants.CellSize * cconstants.GridSize;
+            var imagesize = c.CellSize * c.GridSize;
             var output = new List<List<Complex[,]>>(metadata.Count);
             for (int baseline = 0; baseline < metadata.Count; baseline++)
             {
@@ -24,24 +24,24 @@ namespace Single_Machine.IDG
                 for (int subgrid = 0; subgrid < blMeta.Count; subgrid++)
                 {
                     var meta = blMeta[subgrid];
-                    var subgridOutput = new Complex[cconstants.SubgridSize, cconstants.SubgridSize];
+                    var subgridOutput = new Complex[c.SubgridSize, c.SubgridSize];
 
                     // [+ p.SubgridSize / 2 - p.GridSize / 2] undoes shift from Planner
-                    var uOffset = (meta.UPixel + cconstants.SubgridSize / 2 - cconstants.GridSize / 2) * (2 * PI / imagesize);
-                    var vOffset = (meta.VPixel + cconstants.SubgridSize / 2 - cconstants.GridSize / 2) * (2 * PI / imagesize);
-                    var tmpW_lambda = cconstants.WStepLambda * (meta.WLambda + 0.5);
+                    var uOffset = (meta.UPixel + c.SubgridSize / 2 - c.GridSize / 2) * (2 * PI / imagesize);
+                    var vOffset = (meta.VPixel + c.SubgridSize / 2 - c.GridSize / 2) * (2 * PI / imagesize);
+                    var tmpW_lambda = c.WStepLambda * (meta.WLambda + 0.5);
                     var wOffset = 2 * PI * tmpW_lambda;     //discrete w-correction, similar to w-stacking
 
-                    for (int y = 0; y < cconstants.SubgridSize; y++)
+                    for (int y = 0; y < c.SubgridSize; y++)
                     {
-                        for (int x = 0; x < cconstants.SubgridSize; x++)
+                        for (int x = 0; x < c.SubgridSize; x++)
                         {
                             //real and imaginary part of the pixel. We ignore polarization here
                             var pixel = new Complex();
 
                             //calculate directional cosines. exp(2*PI*j * (u*l + v*m + w*n))
-                            var l = ComputeL(x, cconstants.SubgridSize, imagesize);
-                            var m = ComputeL(y, cconstants.SubgridSize, imagesize);
+                            var l = ComputeL(x, c.SubgridSize, imagesize);
+                            var m = ComputeL(y, c.SubgridSize, imagesize);
                             var n = ComputeN(l, m);
 
                             int sampleEnd = meta.timeSampleStart + meta.timeSampleCount;
@@ -66,8 +66,8 @@ namespace Single_Machine.IDG
                             //idg A-correction goes here
 
                             var sph = spheroidal[y, x];
-                            int xDest = (x + (cconstants.SubgridSize / 2)) % cconstants.SubgridSize;
-                            int yDest = (y + (cconstants.SubgridSize / 2)) % cconstants.SubgridSize;
+                            int xDest = (x + (c.SubgridSize / 2)) % c.SubgridSize;
+                            int yDest = (y + (c.SubgridSize / 2)) % c.SubgridSize;
                             subgridOutput[yDest, xDest] = pixel * sph;
                         }
                     }
@@ -82,10 +82,10 @@ namespace Single_Machine.IDG
         #endregion
 
         #region De-grid
-        public static Complex[,,] BackwardsHack(GriddingConstants constants, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)
+        public static Complex[,,] BackwardsHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = Math.FrequencyToWavenumber(frequencies);
-            var imagesize = constants.CellSize * constants.GridSize;
+            var imagesize = c.CellSize * c.GridSize;
 
             var outputVis = new Complex[uvw.GetLength(0), uvw.GetLength(1), wavenumbers.Length];
             for (int baseline = 0; baseline < metadata.Count; baseline++)
@@ -97,22 +97,22 @@ namespace Single_Machine.IDG
                     //de-apply a-term correction
                     var meta = blMeta[subgrid];
                     var data = blSubgrids[subgrid];
-                    var pixels_copy = new Complex[constants.SubgridSize, constants.SubgridSize];
-                    for (int y = 0; y < constants.SubgridSize; y++)
+                    var pixels_copy = new Complex[c.SubgridSize, c.SubgridSize];
+                    for (int y = 0; y < c.SubgridSize; y++)
                     {
-                        for (int x = 0; x < constants.SubgridSize; x++)
+                        for (int x = 0; x < c.SubgridSize; x++)
                         {
                             var sph = spheroidal[y, x];
-                            int xSrc = (x + (constants.SubgridSize / 2)) % constants.SubgridSize;
-                            int ySrc = (y + (constants.SubgridSize / 2)) % constants.SubgridSize;
+                            int xSrc = (x + (c.SubgridSize / 2)) % c.SubgridSize;
+                            int ySrc = (y + (c.SubgridSize / 2)) % c.SubgridSize;
 
                             pixels_copy[y, x] = sph * data[ySrc, xSrc];
                         }
                     }
 
-                    var uOffset = (meta.UPixel + constants.SubgridSize / 2 - constants.GridSize / 2) * (2 * PI / imagesize);
-                    var vOffset = (meta.VPixel + constants.SubgridSize / 2 - constants.GridSize / 2) * (2 * PI / imagesize);
-                    var tmpW_lambda = constants.WStepLambda * (meta.WLambda + 0.5);
+                    var uOffset = (meta.UPixel + c.SubgridSize / 2 - c.GridSize / 2) * (2 * PI / imagesize);
+                    var vOffset = (meta.VPixel + c.SubgridSize / 2 - c.GridSize / 2) * (2 * PI / imagesize);
+                    var tmpW_lambda = c.WStepLambda * (meta.WLambda + 0.5);
                     var wOffset = 2 * PI * tmpW_lambda;
 
                     int sampleEnd = meta.timeSampleStart + meta.timeSampleCount;
@@ -125,13 +125,13 @@ namespace Single_Machine.IDG
                         for (int channel = 0; channel < wavenumbers.Length; channel++)
                         {
                             var visibility = new Complex();
-                            for (int y = 0; y < constants.SubgridSize; y++)
+                            for (int y = 0; y < c.SubgridSize; y++)
                             {
-                                for (int x = 0; x < constants.SubgridSize; x++)
+                                for (int x = 0; x < c.SubgridSize; x++)
                                 {
                                     //calculate directional cosines. exp(2*PI*j * (u*l + v*m + w*n))
-                                    var l = ComputeL(x, constants.SubgridSize, imagesize);
-                                    var m = ComputeL(y, constants.SubgridSize, imagesize);
+                                    var l = ComputeL(x, c.SubgridSize, imagesize);
+                                    var m = ComputeL(y, c.SubgridSize, imagesize);
                                     var n = ComputeN(l, m);
 
                                     double phaseIndex = u * l + v * m + w * n;
@@ -142,7 +142,7 @@ namespace Single_Machine.IDG
                                 }
                             }
 
-                            double scale = 1.0f / (constants.SubgridSize * constants.SubgridSize);
+                            double scale = 1.0f / (c.SubgridSize * c.SubgridSize);
                             outputVis[baseline, time, channel] = visibility * scale;
                         }
                     }
