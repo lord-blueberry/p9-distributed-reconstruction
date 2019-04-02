@@ -34,12 +34,14 @@ namespace Single_Machine.IDG
                     //convert visibilities
                     for (int channel = 0; channel < frequencies.Length; channel++)
                     {
-                        var dp = new Datapoint();
-                        dp.timestep = time;
-                        dp.channel = channel;
-                        dp.uPixel = MetersToPixels(uvw[baseline, time, 0], imagesize, frequencies[channel]);
-                        dp.vPixel = MetersToPixels(uvw[baseline, time, 1], imagesize, frequencies[channel]);
-                        dp.wLambda = MetersToLambda(uvw[baseline, time, 2], frequencies[channel]);
+                        var dp = new Datapoint
+                        {
+                            timestep = time,
+                            channel = channel,
+                            uPixel = MetersToPixels(uvw[baseline, time, 0], imagesize, frequencies[channel]),
+                            vPixel = MetersToPixels(uvw[baseline, time, 1], imagesize, frequencies[channel]),
+                            wLambda = MetersToLambda(uvw[baseline, time, 2], frequencies[channel])
+                        };
                         datapoints[time, channel] = dp;
                     }
                 }
@@ -93,7 +95,7 @@ namespace Single_Machine.IDG
                         }
                     }
 
-                    subgrid.finish();
+                    subgrid.Finish();
                     if (subgrid.InRange())
                     {
                         //TODO: Fix hack and hand over data properly
@@ -246,7 +248,7 @@ namespace Single_Machine.IDG
                 VPixel -= (param.SubgridSize) / 2;
             }
 
-            public void finish()
+            public void Finish()
             {
                 finished = true;
                 this.ComputeCoordinates();

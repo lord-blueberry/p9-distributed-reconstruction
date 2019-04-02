@@ -165,7 +165,6 @@ namespace Single_Machine.IDG
             return output;
         }
 
-
         public static void Shift(Complex[,] grid)
         {
             // Interchange entries in 4 quadrants, 1 <--> 3 and 2 <--> 4

@@ -28,17 +28,19 @@ namespace Single_Machine.IDG
 
         public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies)
         {
+            //add spheroidal to grid?
+            for (int i = 0; i < image.GetLength(0); i++)
+                for (int j = 0; j < image.GetLength(1); j++)
+                    image[i, j] = image[i, j] / c.GridSpheroidal[i, j];
+
             FFT.Shift(image);
             var grid = FFT.GridFFT(image);
             FFT.Shift(grid);
             var ftGridded = Adder.SplitHack(c, metadata, grid);
             var gridded = FFT.SubgridIFFT(c, ftGridded);
             var visibilities = Gridder.BackwardsHack(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
-            //splitter
-            //subgridFFT
 
-            //De-Gridder
-            return null;
+            return visibilities;
         }
     }
 }
