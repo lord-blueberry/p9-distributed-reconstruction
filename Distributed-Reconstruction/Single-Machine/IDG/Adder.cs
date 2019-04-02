@@ -10,7 +10,7 @@ namespace Single_Machine.IDG
 {
     class Adder
     {
-        public static Complex[,] AddHack(GriddingParams p, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgrids)
+        public static Complex[,] AddHack(GriddingConstants p, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgrids)
         {
             var grid = new Complex[p.GridSize, p.GridSize];
 
@@ -72,7 +72,7 @@ namespace Single_Machine.IDG
             return grid;
         }
 
-        public static List<List<Complex[,]>> SplitHack(GriddingParams p, List<List<SubgridHack>> metadata, Complex[,] grid)
+        public static List<List<Complex[,]>> SplitHack(GriddingConstants p, List<List<SubgridHack>> metadata, Complex[,] grid)
         {
             var subgrids = new List<List<Complex[,]>>(metadata.Count);
 

@@ -9,7 +9,7 @@ namespace Single_Machine.IDG
     /// <summary>
     /// Immutable class holding the gridding parameters
     /// </summary>
-    public class GriddingParams
+    public class GriddingConstants
     {
         
         public int GridSize { get; }
@@ -25,7 +25,7 @@ namespace Single_Machine.IDG
         public float WStep { get; }
         public float WStepLambda { get; }
 
-        public GriddingParams(int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float cellSize, int wLayerCount, float wStep)
+        public GriddingConstants(int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float cellSize, int wLayerCount, float wStep)
         {
             this.GridSize = gridSize;
             this.SubgridSize = subgridSize;

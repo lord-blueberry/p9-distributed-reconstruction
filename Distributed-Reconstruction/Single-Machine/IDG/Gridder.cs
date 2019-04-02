@@ -12,7 +12,7 @@ namespace Single_Machine.IDG
     {
 
         #region Grid
-        public static List<List<Complex[,]>> ForwardHack(GriddingParams p, List<List<SubgridHack>> metadata, double[,,] uvw, double[,,] vis_real, double[,,] vis_imag, double[] frequencies, float[,] spheroidal)
+        public static List<List<Complex[,]>> ForwardHack(GriddingConstants p, List<List<SubgridHack>> metadata, double[,,] uvw, double[,,] vis_real, double[,,] vis_imag, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = Math.FrequencyToWavenumber(frequencies);
             var imagesize = p.CellSize * p.GridSize;
@@ -80,7 +80,7 @@ namespace Single_Machine.IDG
             return output;
         }
 
-        public static void ForwardSubgrid(GriddingParams param, SubgridData data, float[,] spheroidal)
+        public static void ForwardSubgrid(GriddingConstants param, SubgridData data, float[,] spheroidal)
         {
             float[,] subgridR = new float[param.SubgridSize, param.SubgridSize];
             float[,] subgridI = new float[param.SubgridSize, param.SubgridSize];
@@ -130,7 +130,7 @@ namespace Single_Machine.IDG
         #endregion
 
         #region De-grid
-        public static Complex[,,] BackwardsHack(GriddingParams p, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)
+        public static Complex[,,] BackwardsHack(GriddingConstants p, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = Math.FrequencyToWavenumber(frequencies);
             var imagesize = p.CellSize * p.GridSize;

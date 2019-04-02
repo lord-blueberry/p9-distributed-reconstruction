@@ -88,17 +88,17 @@ namespace Single_Machine
             int max_nr_timesteps = 256;
             float imagesize = 0.0025f;
             //float cellSize = imagesize / gridSize;
-            var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)properCellSize, 1, 0.0f);
+            var p = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)properCellSize, 1, 0.0f);
             var gridSpheroidal = Math.CalcIdentitySpheroidal(gridSize, gridSize);
             var subgridSpheroidal = Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
 
             var subgrids = Partitioner.CreatePartition(p, uvw, frequencies);
             var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequencies, subgridSpheroidal);
-            var ftgridded = SubgridFFT.ForwardHack(p, gridded);
+            var ftgridded = FFT.SubgridFFT(p, gridded);
             var grid = Adder.AddHack(p, subgrids, ftgridded);
-            SubgridFFT.Shift(grid);
-            var img = SubgridFFT.ForwardiFFT(grid, visibilitiesCount);
-            SubgridFFT.Shift(img);
+            FFT.Shift(grid);
+            var img = FFT.SubgridIFFT(grid, visibilitiesCount);
+            FFT.Shift(img);
 
             //remove spheroidal from grid
             for (int i = 0; i < img.GetLength(0); i++ )
@@ -117,7 +117,7 @@ namespace Single_Machine
             int kernelSize = 2;
             float imageSize = 0.0025f;
             float cellSize = imageSize / gridSize;
-            var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
+            var p = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
 
             double v = -50;
             double wavelength = -4 / imageSize / v;
@@ -148,7 +148,7 @@ namespace Single_Machine
             var ift2 = IFT(new Complex(visR1, 0), u1, v, freq, gridSize, imageSize);
             Add(ift1, ift2);
             Write(ift1, "iftOutput.fits");
-            var fourierFT = SubgridFFT.ForwardFFT2(ift1);
+            var fourierFT = FFT.FFTGrid(ift1);
             Write(fourierFT, "iftOutput.fits");
             WriteImag(fourierFT);
             
@@ -159,7 +159,7 @@ namespace Single_Machine
             var subgrids = Partitioner.CreatePartition(p, uvw, frequency);
             var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequency, subgridSpheroidal);
             
-            var ftgridded = SubgridFFT.ForwardHack(p, gridded);
+            var ftgridded = FFT.SubgridFFT(p, gridded);
 
             var img2 = ftgridded[0][0];
             Write(img2);
@@ -167,11 +167,11 @@ namespace Single_Machine
 
             var grid = Adder.AddHack(p, subgrids, ftgridded);
             
-            SubgridFFT.Shift(grid);
+            FFT.Shift(grid);
             Write(grid);
             WriteImag(grid);
-            var img = SubgridFFT.ForwardiFFT(grid);
-            SubgridFFT.Shift(img);
+            var img = FFT.SubgridIFFT(grid);
+            FFT.Shift(img);
             Write(img);
         }
 
@@ -184,7 +184,7 @@ namespace Single_Machine
             int kernelSize = 2;
             float imageSize = 0.0025f;
             float cellSize = imageSize / gridSize;
-            var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
+            var p = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
 
             double v = -50;
             double wavelength = -4 / imageSize / v;
@@ -216,13 +216,13 @@ namespace Single_Machine
             var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequency, subgridSpheroidal);
             //var img2 = gridded[0][0];
             //Write(img2);
-            var ftgridded = SubgridFFT.ForwardHack(p, gridded);
+            var ftgridded = FFT.SubgridFFT(p, gridded);
 
             var grid = Adder.AddHack(p, subgrids, ftgridded);
             Write(grid);
-            SubgridFFT.Shift(grid);
-            var img = SubgridFFT.ForwardiFFT(grid);
-            SubgridFFT.Shift(img);
+            FFT.Shift(grid);
+            var img = FFT.SubgridIFFT(grid);
+            FFT.Shift(img);
             Write(img);
         }
 
@@ -248,7 +248,7 @@ namespace Single_Machine
             int subgridsize = 64;
             int kernelSize = 16;
             float properCellSize = (float)(2.0 / 3600.0 * PI / 180.0);
-            var p = new GriddingParams(gridSize, subgridsize, kernelSize, max_nr_timesteps, properCellSize, 1, 0.0f);
+            var p = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, properCellSize, 1, 0.0f);
 
             var vis_real = new double[1, 1, 2];
             var vis_imag = new double[1, 1, 2];
@@ -266,12 +266,12 @@ namespace Single_Machine
             var subgrids = Partitioner.CreatePartition(p, uvw, frequency);
             var gridded = Gridder.ForwardHack(p, subgrids, uvw, vis_real, vis_imag, frequency, subgridSpheroidal);
             var imgg = gridded[0][0];
-            var ftgridded = SubgridFFT.ForwardHack(p, gridded);
+            var ftgridded = FFT.SubgridFFT(p, gridded);
             var grid = Adder.AddHack(p, subgrids, ftgridded);
             //Write(grid);
-            SubgridFFT.Shift(grid);
-            var img = SubgridFFT.ForwardiFFT(grid);
-            SubgridFFT.Shift(img);
+            FFT.Shift(grid);
+            var img = FFT.SubgridIFFT(grid);
+            FFT.Shift(img);
             Write(img);
 
         }

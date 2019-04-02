@@ -17,7 +17,7 @@ namespace Single_Machine.IDG
         /// <param name="uvw"></param>
         /// <param name="frequencies"></param>
         /// <returns></returns>
-        public static List<List<SubgridHack>> CreatePartition(GriddingParams p, double[,,] uvw, double[] frequencies)
+        public static List<List<SubgridHack>> CreatePartition(GriddingConstants p, double[,,] uvw, double[] frequencies)
         {
             var imagesize = p.CellSize * p.GridSize;
             List<List<SubgridHack>> outputGrids = new List<List<SubgridHack>>(uvw.GetLength(0));
@@ -148,7 +148,7 @@ namespace Single_Machine.IDG
         /// </summary>
         private class Subgrid
         {
-            private GriddingParams param;
+            private GriddingConstants param;
             private double uMin;
             private double uMax;
             private double vMin;
@@ -161,7 +161,7 @@ namespace Single_Machine.IDG
             public int VPixel { get; set; }
             public int WIndex { get; set; }
 
-            public Subgrid(GriddingParams p)
+            public Subgrid(GriddingConstants p)
             {
                 this.param = p;
                 this.Reset();

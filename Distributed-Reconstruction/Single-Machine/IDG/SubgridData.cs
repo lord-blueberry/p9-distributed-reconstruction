@@ -43,7 +43,7 @@ namespace Single_Machine.IDG
         public IList<float> Wavenumbers { get; }
         public Visibility[,] Visibilities { get; }
 
-        public SubgridData(GriddingParams p)
+        public SubgridData(GriddingConstants p)
         {
             
 
