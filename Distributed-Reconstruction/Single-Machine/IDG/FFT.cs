@@ -31,8 +31,14 @@ namespace Single_Machine.IDG
                                 imageSpace[i, j] = sub[i, j];
                         }
                         
-                        DFT.FFT(imageSpace, fourierSpace);
+                        /*
+                         * This is not a bug
+                         * The original IDG implementation uses the inverse Fourier transform here, even though the
+                         * Subgrids are already in image space.
+                         */
+                        DFT.IFFT(imageSpace, fourierSpace);
                         var norm = 1.0 / (c.SubgridSize * c.SubgridSize);
+                        
 
                         for (int i = 0; i < c.SubgridSize; i++)
                         {
@@ -70,12 +76,13 @@ namespace Single_Machine.IDG
                         }
 
                         DFT.FFT(imageSpace, fourierSpace);
-                        var norm = 1.0 / (c.SubgridSize * c.SubgridSize);
+
+                        //normalization is done in the Gridder
 
                         for (int i = 0; i < c.SubgridSize; i++)
                         {
                             for (int j = 0; j < c.SubgridSize; j++)
-                                outFourier[i, j] = fourierSpace[i, j] * norm;
+                                outFourier[i, j] = fourierSpace[i, j];
                         }
                     }
                     blOutput.Add(outFourier);
@@ -101,12 +108,14 @@ namespace Single_Machine.IDG
                 }
 
                 DFT.IFFT(fourierSpace, imageSpace);
+                var norm = 1.0 / (grid.GetLength(0) * grid.GetLength(1));
+               
 
                 for (int y = 0; y < grid.GetLength(0); y++)
                 {
                     for (int x = 0; x < grid.GetLength(1); x++)
                     {
-                        output[y, x] = imageSpace[y, x].Real/visibilitiesCount;
+                        output[y, x] = imageSpace[y, x].Real / visibilitiesCount;
                     }
                 }
 
@@ -127,8 +136,8 @@ namespace Single_Machine.IDG
                         imageSpace[y, x] = image[y, x];
 
                 DFT.FFT(imageSpace, fourierSpace);
-                //double norm = 1.0 / (image.GetLength(0) * image.GetLength(1));
-                var norm = 1.0;
+                var norm = 1.0 / (image.GetLength(0) * image.GetLength(1));
+                norm = 1.0;
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
@@ -154,8 +163,7 @@ namespace Single_Machine.IDG
                         imageSpace[y, x] = image[y, x];
 
                 DFT.FFT(imageSpace, fourierSpace);
-                //double norm = 1.0 / (image.GetLength(0) * image.GetLength(1));
-                var norm = 1.0;
+                double norm = 1.0 / (image.GetLength(0) * image.GetLength(1));
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)

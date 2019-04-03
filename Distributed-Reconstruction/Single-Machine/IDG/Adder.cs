@@ -76,13 +76,13 @@ namespace Single_Machine.IDG
         {
             var subgrids = new List<List<Complex[,]>>(metadata.Count);
 
-            for (int baseline = 0; baseline < subgrids.Count; baseline++)
+            for (int baseline = 0; baseline < metadata.Count; baseline++)
             {
                 var blMeta = metadata[baseline];
                 var blSubgridsData = new List<Complex[,]>(blMeta.Count);
                 subgrids.Add(blSubgridsData);
 
-                for (int subgrid = 0; subgrid < blSubgridsData.Count; subgrid++)
+                for (int subgrid = 0; subgrid < blMeta.Count; subgrid++)
                 {
                     var meta = blMeta[subgrid];
                     var data = new Complex[c.SubgridSize, c.SubgridSize];

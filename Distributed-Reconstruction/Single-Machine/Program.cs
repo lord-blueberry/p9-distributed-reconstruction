@@ -19,7 +19,9 @@ namespace Single_Machine
         {
             //SingleSubgrid();
             //SingleVisibility2();
-            
+
+            Debug.DebugFullPipeline();
+
             Fits f = new Fits(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\freq.fits");
             ImageHDU h = (ImageHDU)f.ReadHDU();
             var frequencies = (double[])h.Kernel;
@@ -105,7 +107,7 @@ namespace Single_Machine
                 for(int j = 0; j < img.GetLength(1); j++)
                     img[i, j] = img[i,j] / gridSpheroidal[i,j];
 
-            Write(img, "my_dirty.fits");
+            Debug.Write(img, "my_dirty.fits");
         }
 
         public static void SingleSubgrid_orig()
@@ -148,82 +150,16 @@ namespace Single_Machine
             var ftgridded = FFT.SubgridFFT(p, gridded);
 
             var grid = Adder.AddHack(p, subgrids, ftgridded);
-            Write(grid);
+            Debug.Write(grid);
             FFT.Shift(grid);
             var img = FFT.GridIFFT(grid);
             FFT.Shift(img);
-            Write(img);
+            Debug.Write(img);
         }
 
 
 
-        public static void Write(Complex[,] img, string file = "Outputfile.fits")
-        {
-            var img2 = new double[img.GetLength(0)][];
-            for (int i = 0; i < img2.Length; i++)
-            {
-                var gg2 = new double[img.GetLength(1)];
-                img2[i] = gg2;
-                for (int j = 0; j < img.GetLength(1); j++)
-                {
-                    gg2[j] = img[i, j].Real;
-                }
-            }
 
-            var f = new Fits();
-            var hhdu = FitsFactory.HDUFactory(img2);
-            f.AddHDU(hhdu);
-
-            using (BufferedDataStream fstream = new BufferedDataStream(new FileStream(file, FileMode.Create)))
-            {
-                f.Write(fstream);
-            }
-        }
-        public static void Write(double[,] img, string file = "Outputfile.fits")
-        {
-            var img2 = new double[img.GetLength(0)][];
-            for (int i = 0; i < img2.Length; i++)
-            {
-                var gg2 = new double[img.GetLength(1)];
-                img2[i] = gg2;
-                for (int j = 0; j < img.GetLength(1); j++)
-                {
-                    gg2[j] = img[i, j];
-                }
-            }
-
-            var f = new Fits();
-            var hhdu = FitsFactory.HDUFactory(img2);
-            f.AddHDU(hhdu);
-
-            using (BufferedDataStream fstream = new BufferedDataStream(new FileStream(file, FileMode.Create)))
-            {
-                f.Write(fstream);
-            }
-        }
-
-        public static void WriteImag(Complex[,] img)
-        {
-            var img2 = new double[img.GetLength(0)][];
-            for (int i = 0; i < img2.Length; i++)
-            {
-                var gg2 = new double[img.GetLength(1)];
-                img2[i] = gg2;
-                for (int j = 0; j < img.GetLength(1); j++)
-                {
-                    gg2[j] = img[i, j].Imaginary;
-                }
-            }
-
-            var f = new Fits();
-            var hhdu = FitsFactory.HDUFactory(img2);
-            f.AddHDU(hhdu);
-
-            using (BufferedDataStream fstream = new BufferedDataStream(new FileStream("Outputfile_imag.fits", FileMode.Create)))
-            {
-                f.Write(fstream);
-            }
-        }
 
 
 
