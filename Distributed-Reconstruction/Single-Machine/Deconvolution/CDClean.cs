@@ -20,27 +20,36 @@ namespace Single_Machine.Deconvolution
         /// <param name="residual">residual image</param>
         /// <param name="psf">point spread function in image space</param>
         /// <param name="lambda">regularization parameter</param>
-        public static void CoordinateDescent(double[,] xImage, double[,] residual, double[,] psf, double lambda)
+        public static void CoordinateDescent(double[,] xImage, double[,] residual, double[,] psf, double lambda, int maxIteration = 100)
         {
+            int iter = 0;
+            bool converged = false;
+            var precision = 1e-6;
+      
             // the "a" of the parabola equation a* x*x + b*x + c
             var a = CalcPSFSquared(psf);
-
-            for (int y = 0; y < residual.GetLength(0); y++)
+            while (iter < maxIteration & !converged)
             {
-                for(int x = 0; x < residual.GetLength(1); x++)
+                converged = true;
+                iter++;
+                for (int y = 0; y < residual.GetLength(0); y++)
                 {
-                    var xOld = xImage[y, x];
-                    var b = CalculateB(residual, psf, y, x);
-
-                    //calculate minimum of parabola, eg -2b/a
-                    var xNew = xOld + (b / a);
-                    xNew = ShrinkAbsolute(xNew, lambda);
-
-                    if(xNew != xOld)
+                    for (int x = 0; x < residual.GetLength(1); x++)
                     {
-                        xImage[y, x] = xNew;
+                        var xOld = xImage[y, x];
+                        var b = CalculateB(residual, psf, y, x);
+
+                        //calculate minimum of parabola, eg -2b/a
+                        var xNew = xOld + (b / a);
+                        xNew = ShrinkAbsolute(xNew, lambda);
                         var xDiff = xNew - xOld;
-                        ModifyResidual(residual, psf, y, x, xDiff);
+
+                        if (Math.Abs(xDiff) > precision)
+                        {
+                            converged = false;
+                            xImage[y, x] = xNew;
+                            ModifyResidual(residual, psf, y, x, xDiff);
+                        }
                     }
                 }
             }
