@@ -182,7 +182,7 @@ namespace Single_Machine
                 }
             }
 
-            int gridSize = 512;
+            int gridSize = 256;
             int subgridsize = 16;
             int kernelSize = 4;
             //cell = image / grid
@@ -194,10 +194,17 @@ namespace Single_Machine
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
             var psf = NUFFT.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
-            Write(psf, "psf.fits");
-            var visPSF = NUFFT.ToVisibilities(c, metadata, psf, uvw, frequencies, visibilitiesCount);
             var image = NUFFT.ToImage(c, metadata, visibilities, uvw, frequencies, visibilitiesCount);
-            Write(image, "my_dirty_norm.fits");
+            var psf2 = CutImg(psf);
+            Write(image, "dirty.fits");
+            var reconstruction = new double[gridSize, gridSize];
+            CDClean.CoordinateDescent(reconstruction, image, psf2, 3.0, 10);
+            Write(reconstruction, "reconstruction.fits");
+            Write(image, "residual.fits");
+            CDClean.CoordinateDescent(reconstruction, image, psf2, 2.5, 10);
+            Write(reconstruction, "reconstruction.fits");
+            Write(image, "residual.fits");
+
             var vis2 = NUFFT.ToVisibilities(c, metadata, image, uvw, frequencies, visibilitiesCount);
             var diffVis = Substract(visibilities, vis2);
             var image2 = NUFFT.ToImage(c, metadata, diffVis, uvw, frequencies, visibilitiesCount);
@@ -327,6 +334,18 @@ namespace Single_Machine
             {
                 f.Write(fstream);
             }
+        }
+
+        private static double[,] CutImg(double[,] image)
+        {
+            var output = new double[128, 128];
+            var yOffset = image.GetLength(0) / 2 - output.GetLength(0) / 2;
+            var xOffset = image.GetLength(1) / 2 - output.GetLength(1) / 2;
+
+            for (int y = 0; y < output.GetLength(0); y++)
+                for (int x = 0; x < output.GetLength(0); x++)
+                    output[y, x] = image[yOffset+y, xOffset + x];
+            return output;
         }
         #endregion
     }

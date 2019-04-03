@@ -52,7 +52,7 @@ namespace Single_Machine.IDG
                     }
                     else
                     {
-                        //throw new Exception("invalid grid");
+                        throw new Exception("invalid grid");
                         for (int y = 0; y < c.SubgridSize; y++)
                         {
                             for (int x = 0; x < c.SubgridSize; x++)

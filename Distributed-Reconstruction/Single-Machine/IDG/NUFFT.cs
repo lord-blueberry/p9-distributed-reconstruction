@@ -19,9 +19,9 @@ namespace Single_Machine.IDG
             FFT.Shift(img);
 
             //remove spheroidal from grid
-            for (int i = 0; i < img.GetLength(0); i++)
-                for (int j = 0; j < img.GetLength(1); j++)
-                    img[i, j] = img[i, j] / c.GridSpheroidal[i, j];
+            for (int y = 0; y < img.GetLength(0); y++)
+                for (int x = 0; x < img.GetLength(1); x++)
+                    img[y, x] = img[y, x] / c.GridSpheroidal[y, x];
 
             return img;
         }
@@ -38,18 +38,33 @@ namespace Single_Machine.IDG
             var ftgridded = FFT.SubgridFFT(c, gridded);
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
-            var img = FFT.GridIFFT(grid, visibilitiesCount);
-            FFT.Shift(img);
+            var psf = FFT.GridIFFT(grid, visibilitiesCount);
+            FFT.Shift(psf);
 
             //remove spheroidal from grid
-            for (int i = 0; i < img.GetLength(0); i++)
-                for (int j = 0; j < img.GetLength(1); j++)
-                    img[i, j] = img[i, j] / c.GridSpheroidal[i, j];
+            for (int y = 0; y < psf.GetLength(0); y++)
+                for (int x = 0; x < psf.GetLength(1); x++)
+                    psf[y, x] = psf[y, x] / c.GridSpheroidal[y, x];
 
-            return img;
+            return psf;
         }
 
-        public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        public static double[,] CalculateNormedPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        {
+            var psf = CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
+
+            var sum = 0.0;
+            for (int y = 0; y < psf.GetLength(0); y++)
+                for (int x = 0; x < psf.GetLength(1); x++)
+                    sum += psf[y, x];
+
+            for (int y = 0; y < psf.GetLength(0); y++)
+                for (int x = 0; x < psf.GetLength(1); x++)
+                    psf[y, x] = psf[y, x] / sum;
+            return psf;
+        }
+
+            public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies, long visibilitiesCount)
         {
             //add spheroidal to grid?
             for (int i = 0; i < image.GetLength(0); i++)
