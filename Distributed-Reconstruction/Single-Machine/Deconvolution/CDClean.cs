@@ -110,8 +110,8 @@ namespace Single_Machine.Deconvolution
         }
 
         private static double ShrinkAbsolute(double value, double lambda) 
-        {
-            value = Math.Abs(value) - lambda;
+        { 
+            value = Math.Max(value, 0.0) - lambda;
             return Math.Max(value, 0.0);
         }
 
