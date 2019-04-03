@@ -16,6 +16,7 @@ namespace Single_Machine
 {
     class Debug
     {
+        #region idg
         public static void SingleVisibility2()
         {
             /*  baseline 1036
@@ -123,6 +124,33 @@ namespace Single_Machine
             FFT.Shift(img);
             Write(img);
         }
+        #endregion
+
+        public static void DebugCD()
+        {
+            var imSize = 16;
+            var psfSize = 4;
+            var psf = new double[psfSize, psfSize];
+
+            var psfSum = 8.0;
+            psf[1, 1] = 1 / psfSum;
+            psf[1, 2] = 2 / psfSum;
+            psf[1, 3] = 3 / psfSum;
+            psf[2, 1] = 3 / psfSum;
+            psf[2, 2] = 8 / psfSum;
+            psf[2, 3] = 2 / psfSum;
+            psf[3, 1] = 5 / psfSum;
+            psf[3, 2] = 3 / psfSum;
+            psf[3, 3] = 2 / psfSum;
+
+            var image = new double[imSize, imSize];
+            image[9, 9] = 15.0;
+            image[9, 8] = 2.0;
+            var conv = Convolve(image, psf);
+
+            var xImage = new double[imSize, imSize];
+            CDClean.CoordinateDescent(xImage, conv, psf, 0.1, 100);
+        }
 
         #region debug full pipeline
         public static void DebugFullPipeline()
@@ -214,6 +242,33 @@ namespace Single_Machine
         #endregion
 
         #region helpers
+        private static double[,] Convolve(double[,] image, double[,] kernel)
+        {
+            var output = new double[image.GetLength(0), image.GetLength(1)];
+            for (int y = 0; y < image.GetLength(0); y++)
+            {
+                for (int x = 0; x < image.GetLength(1); x++)
+                {
+                    double sum = 0;
+                    for (int yk = 0; yk < kernel.GetLength(0); yk++)
+                    {
+                        for (int xk = 0; xk < kernel.GetLength(1); xk++)
+                        {
+                            int ySrc = y + yk - ((kernel.GetLength(0) - 1) - kernel.GetLength(0) / 2);
+                            int xSrc = x + xk - ((kernel.GetLength(1) - 1) - kernel.GetLength(1) / 2);
+                            if (ySrc >= 0 & ySrc < image.GetLength(0) &
+                                xSrc >= 0 & xSrc < image.GetLength(1))
+                            {
+                                sum += image[ySrc, xSrc] * kernel[kernel.GetLength(0) - 1 - yk, kernel.GetLength(1) - 1 - xk];
+                            }
+                        }
+                    }
+                    output[y, x] = sum;
+                }
+            }
+            return output;
+        }
+
         public static Complex[,,] Substract(Complex[,,] vis0, Complex[,,] vis1)
         {
             var output = new Complex[vis0.GetLength(0), vis0.GetLength(1), vis0.GetLength(2)];
