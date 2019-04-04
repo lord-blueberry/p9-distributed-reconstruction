@@ -34,7 +34,7 @@ namespace Single_Machine_Test
         }
 
         [TestMethod]
-        public void TestSynthetic0()
+        public void TestConvergence0()
         {
             var imSize = 64;
             var psfSize = 4;
@@ -66,7 +66,7 @@ namespace Single_Machine_Test
 
 
         [TestMethod]
-        public void TestSynthetic1()
+        public void TestConvergence1()
         {
             var imSize = 64;
             var psfSize = 4;
