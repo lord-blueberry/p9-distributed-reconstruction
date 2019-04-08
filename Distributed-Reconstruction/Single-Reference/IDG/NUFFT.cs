@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Numerics;
 
-namespace Single_Machine.IDG
+namespace Single_Reference.IDG
 {
     class NUFFT
     {

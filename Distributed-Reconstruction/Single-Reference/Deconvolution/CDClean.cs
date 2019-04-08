@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Single_Machine.Deconvolution
+namespace Single_Reference.Deconvolution
 {
     /// <summary>
     /// Cooordinate Descent "CLEAN" iteration.

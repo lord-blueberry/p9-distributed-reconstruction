@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using FFTW.NET;
 using System.Numerics;
 
-namespace Single_Machine.IDG
+namespace Single_Reference.IDG
 {
     class FFT
     {
@@ -39,7 +39,6 @@ namespace Single_Machine.IDG
                         DFT.IFFT(imageSpace, fourierSpace);
                         var norm = 1.0 / (c.SubgridSize * c.SubgridSize);
                         
-
                         for (int i = 0; i < c.SubgridSize; i++)
                         {
                             for (int j = 0; j < c.SubgridSize; j++)

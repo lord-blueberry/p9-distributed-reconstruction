@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using static System.Math;
 using System.Numerics;
 
-namespace Single_Machine.IDG
+namespace Single_Reference.IDG
 {
     /// <summary>
     /// hack is here to have the first version resemble the IDG reference implementation more

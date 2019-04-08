@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Single_Machine.IDG
+namespace Single_Reference.IDG
 {
     /// <summary>
     /// Immutable class holding the gridding parameters

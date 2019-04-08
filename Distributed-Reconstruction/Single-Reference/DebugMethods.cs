@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Single_Machine.IDG;
+using Single_Reference.IDG;
 using System.Numerics;
+using static System.Math;
+
 
 namespace Single_Reference
 {
@@ -58,6 +60,49 @@ namespace Single_Reference
             var visibilities2 = Gridder.BackwardsHack(p, metadata, subgrids2, uvw, frequency, subgridSpheroidal);
         }
 
+        #endregion
+
+        #region full
+        public static void DebugFullPipeline()
+        {
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\uvw.fits");
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+            var visibilitiesCount = uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
+
+            int gridSize = 256;
+            int subgridsize = 16;
+            int kernelSize = 4;
+            //cell = image / grid
+            int max_nr_timesteps = 256;
+            double cellSize = 0.5 / 3600.0 * PI / 180.0;
+
+            var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            //visibilitiesCount = 1;
+            var psf = NUFFT.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
+            var image = NUFFT.ToImage(c, metadata, visibilities, uvw, frequencies, visibilitiesCount);
+            var psfVis = NUFFT.ToVisibilities(c, metadata, psf, uvw, frequencies, visibilitiesCount);
+            var psf2 = CutImg(psf);
+            FitsIO.Write(image, "dirty.fits");
+            var reconstruction = new double[gridSize, gridSize];
+            CDClean.CoordinateDescent(reconstruction, image, psf2, 3.0, 10);
+            FitsIO.Write(reconstruction, "reconstruction.fits");
+            FitsIO.Write(image, "residual.fits");
+            CDClean.CoordinateDescent(reconstruction, image, psf2, 2.5, 10);
+            FitsIO.Write(reconstruction, "reconstruction.fits");
+            FitsIO.Write(image, "residual.fits");
+
+            var vis2 = NUFFT.ToVisibilities(c, metadata, image, uvw, frequencies, visibilitiesCount);
+            var diffVis = Substract(visibilities, vis2);
+            var image2 = NUFFT.ToImage(c, metadata, diffVis, uvw, frequencies, visibilitiesCount);
+            var vis3 = NUFFT.ToVisibilities(c, metadata, image2, uvw, frequencies, visibilitiesCount);
+
+        }
+        #endregion
+
+        #region helpers
         #endregion
     }
 }

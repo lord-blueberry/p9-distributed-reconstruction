@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Numerics;
 using static System.Math;
 
-namespace Single_Machine.IDG
+namespace Single_Reference.IDG
 {
     class Gridder
     {
@@ -14,7 +14,7 @@ namespace Single_Machine.IDG
         #region Grid
         public static List<List<Complex[,]>> ForwardHack(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, Complex[,,] visibilities, double[] frequencies, float[,] spheroidal)
         {
-            var wavenumbers = Math.FrequencyToWavenumber(frequencies);
+            var wavenumbers = MathFunctions.FrequencyToWavenumber(frequencies);
             var imagesize = c.CellSize * c.GridSize;
             var output = new List<List<Complex[,]>>(metadata.Count);
             for (int baseline = 0; baseline < metadata.Count; baseline++)
@@ -84,7 +84,7 @@ namespace Single_Machine.IDG
         #region De-grid
         public static Complex[,,] BackwardsHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)
         {
-            var wavenumbers = Math.FrequencyToWavenumber(frequencies);
+            var wavenumbers = MathFunctions.FrequencyToWavenumber(frequencies);
             var imagesize = c.CellSize * c.GridSize;
 
             var outputVis = new Complex[uvw.GetLength(0), uvw.GetLength(1), wavenumbers.Length];
