@@ -62,6 +62,57 @@ namespace Single_Machine
             Write(img);
         }
 
+
+        public static void DebugForwardBackward()
+        {
+            int max_nr_timesteps = 256;
+            int gridSize = 64;
+            int subgridsize = 48;
+            int kernelSize = 2;
+            float imageSize = 0.0025f;
+            float cellSize = imageSize / gridSize;
+            var p = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
+
+            double v = -50;
+            double wavelength = -4 / imageSize / v;
+            double u = 4 / imageSize / wavelength;
+            double freq = wavelength * IDG.Math.SPEED_OF_LIGHT;
+            double[] frequency = { freq };
+            double u1 = 10 / imageSize / wavelength;
+
+            double visR0 = 3.9;
+            double visR1 = 5.2;
+
+            var visibilities = new Complex[1, 2, 1];
+            visibilities[0, 0, 0] = new Complex(visR0, 0);
+            visibilities[0, 1, 0] = new Complex(visR1, 0);
+            var uvw = new double[1, 2, 3];
+            uvw[0, 0, 0] = u;
+            uvw[0, 0, 1] = v;
+            uvw[0, 0, 2] = 0;
+            uvw[0, 1, 0] = u1;
+            uvw[0, 1, 1] = v;
+            uvw[0, 1, 2] = 0;
+
+            var subgridSpheroidal = IDG.Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
+            var metadata = Partitioner.CreatePartition(p, uvw, frequency);
+
+            var gridded_subgrids = Gridder.ForwardHack(p, metadata, uvw, visibilities, frequency, subgridSpheroidal);
+            var ftgridded = FFT.SubgridFFT(p, gridded_subgrids);
+            var grid = Adder.AddHack(p, metadata, ftgridded);
+            FFT.Shift(grid);
+            var img = FFT.GridIFFT(grid, 2);
+            FFT.Shift(img);
+
+            FFT.Shift(img);
+            var grid2 = FFT.GridFFT(img, 2);
+            FFT.Shift(grid2);
+            var ftGridded2 = Adder.SplitHack(p, metadata, grid2);
+            var subgrids2 = FFT.SubgridIFFT(p, ftGridded2);
+            var visibilities2 = Gridder.BackwardsHack(p, metadata, subgrids2, uvw, frequency, subgridSpheroidal);
+
+        }
+
         public static void SingleSubgrid()
         {
             int max_nr_timesteps = 256;
@@ -100,7 +151,7 @@ namespace Single_Machine
             Write(ift1, "iftOutput.fits");
             var fourierFT = FFT.GridFFT(ift1);
             Write(fourierFT, "iftOutput.fits");
-            WriteImag(fourierFT);
+            WriteImag(fourierFT, "iftOutput_imag.fits");
 
 
             var subgridSpheroidal = IDG.Math.CalcIdentitySpheroidal(subgridsize, subgridsize);
@@ -123,34 +174,16 @@ namespace Single_Machine
             var img = FFT.GridIFFT(grid);
             FFT.Shift(img);
             Write(img);
+
+            FFT.Shift(img);
+            var grid2 = FFT.GridFFT(img);
+            FFT.Shift(grid2);
+            var ftGridded = Adder.SplitHack(p, subgrids, grid);
+            var gridded2 = FFT.SubgridIFFT(p, ftGridded);
+            var visibilities2 = Gridder.BackwardsHack(p, subgrids, gridded2, uvw, frequency, subgridSpheroidal);
+
         }
         #endregion
-
-        public static void DebugCD()
-        {
-            var imSize = 16;
-            var psfSize = 4;
-            var psf = new double[psfSize, psfSize];
-
-            var psfSum = 8.0;
-            psf[1, 1] = 1 / psfSum;
-            psf[1, 2] = 2 / psfSum;
-            psf[1, 3] = 3 / psfSum;
-            psf[2, 1] = 3 / psfSum;
-            psf[2, 2] = 8 / psfSum;
-            psf[2, 3] = 2 / psfSum;
-            psf[3, 1] = 5 / psfSum;
-            psf[3, 2] = 3 / psfSum;
-            psf[3, 3] = 2 / psfSum;
-
-            var image = new double[imSize, imSize];
-            image[9, 9] = 15.0;
-            image[9, 8] = 2.0;
-            var conv = Convolve(image, psf);
-
-            var xImage = new double[imSize, imSize];
-            CDClean.CoordinateDescent(xImage, conv, psf, 0.1, 100);
-        }
 
         #region debug full pipeline
         public static void DebugFullPipeline()
@@ -221,8 +254,10 @@ namespace Single_Machine
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
+            //visibilitiesCount = 1;
             var psf = NUFFT.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
             var image = NUFFT.ToImage(c, metadata, visibilities, uvw, frequencies, visibilitiesCount);
+            var psfVis = NUFFT.ToVisibilities(c, metadata, psf, uvw, frequencies, visibilitiesCount);
             var psf2 = CutImg(psf);
             Write(image, "dirty.fits");
             var reconstruction = new double[gridSize, gridSize];
@@ -368,7 +403,7 @@ namespace Single_Machine
             }
         }
 
-        public static void WriteImag(Complex[,] img)
+        public static void WriteImag(Complex[,] img, string file = "Outputfile_imag.fits")
         {
             var img2 = new double[img.GetLength(0)][];
             for (int i = 0; i < img2.Length; i++)
@@ -385,7 +420,7 @@ namespace Single_Machine
             var hhdu = FitsFactory.HDUFactory(img2);
             f.AddHDU(hhdu);
 
-            using (BufferedDataStream fstream = new BufferedDataStream(new FileStream("Outputfile_imag.fits", FileMode.Create)))
+            using (BufferedDataStream fstream = new BufferedDataStream(new FileStream(file, FileMode.Create)))
             {
                 f.Write(fstream);
             }

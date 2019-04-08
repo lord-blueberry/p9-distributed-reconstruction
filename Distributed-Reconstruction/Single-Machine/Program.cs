@@ -17,9 +17,7 @@ namespace Single_Machine
     {
         static void Main(string[] args)
         {
-            //SingleSubgrid();
-            //SingleVisibility2();
-            Debug.DebugCD();
+            Debug.DebugForwardBackward();
             Debug.DebugFullPipeline();
 
             Fits f = new Fits(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\freq.fits");
