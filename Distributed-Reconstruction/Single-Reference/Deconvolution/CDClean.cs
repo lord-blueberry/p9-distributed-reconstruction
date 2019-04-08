@@ -30,8 +30,8 @@ namespace Single_Reference.Deconvolution
             var a = CalcPSFSquared(psf);
             while (iter < maxIteration & !converged)
             {
-                converged = true;
                 iter++;
+                var activeSet = new HashSet<Tuple<int, int>>();
                 for (int y = 0; y < residual.GetLength(0); y++)
                 {
                     for (int x = 0; x < residual.GetLength(1); x++)
@@ -46,11 +46,49 @@ namespace Single_Reference.Deconvolution
 
                         if (Math.Abs(xDiff) > precision)
                         {
-                            converged = false;
+                            activeSet.Add(new Tuple<int, int>(y, x));
                             xImage[y, x] = xNew;
                             ModifyResidual(residual, psf, y, x, xDiff);
                         }
                     }
+                }
+
+                converged = activeSet.Count > 0;
+                bool activeSetConverged = false;
+                while(!activeSetConverged)
+                {
+                    activeSetConverged = true;
+                    var delete = new List<Tuple<int, int>>();
+                    foreach (var pixel in activeSet)
+                    {
+                        var y = pixel.Item1;
+                        var x = pixel.Item2;
+                        var xOld = xImage[y, x];
+                        var b = CalculateB(residual, psf, y, x);
+
+                        //calculate minimum of parabola, eg -2b/a
+                        var xNew = xOld + (b / a);
+                        xNew = ShrinkAbsolute(xNew, lambda);
+                        var xDiff = xNew - xOld;
+
+                        //approximately zero, remove from active set
+                        if (xNew == 0.0)
+                        {
+                            activeSetConverged = false;
+                            xImage[y, x] = 0.0;
+                            ModifyResidual(residual, psf, y, x, xDiff);
+                            delete.Add(pixel);
+                        }
+                        else if (Math.Abs(xDiff) > precision)
+                        {
+                            activeSetConverged = false;
+                            xImage[y, x] = xNew;
+                            ModifyResidual(residual, psf, y, x, xDiff);
+                        }
+                    }
+
+                    foreach (var pixel in delete)
+                        activeSet.Remove(pixel);
                 }
             }
         }

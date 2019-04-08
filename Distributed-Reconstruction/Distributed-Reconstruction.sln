@@ -11,7 +11,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Single-Machine-Test", "Sing
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Single-Reference", "Single-Reference\Single-Reference.csproj", "{EC2EB8AD-1CAD-4C9B-869B-A48C83777BC8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Distributed-Reference", "Distributed-Reference\Distributed-Reference.csproj", "{8607AF83-E455-426C-972B-95023C56F32E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Distributed-Reference", "Distributed-Reference\Distributed-Reference.csproj", "{8607AF83-E455-426C-972B-95023C56F32E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Single-Reference-Test", "Single-Reference-Test\Single-Reference-Test.csproj", "{18D111DF-DE96-426F-AC1F-FA9EA9ECCEDF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +41,10 @@ Global
 		{8607AF83-E455-426C-972B-95023C56F32E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8607AF83-E455-426C-972B-95023C56F32E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8607AF83-E455-426C-972B-95023C56F32E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18D111DF-DE96-426F-AC1F-FA9EA9ECCEDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18D111DF-DE96-426F-AC1F-FA9EA9ECCEDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18D111DF-DE96-426F-AC1F-FA9EA9ECCEDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{18D111DF-DE96-426F-AC1F-FA9EA9ECCEDF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

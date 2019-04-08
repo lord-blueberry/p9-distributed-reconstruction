@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Single_Reference.IDG;
+using Single_Reference.Deconvolution;
 using System.Numerics;
 using static System.Math;
 
@@ -98,11 +99,128 @@ namespace Single_Reference
             var diffVis = Substract(visibilities, vis2);
             var image2 = NUFFT.ToImage(c, metadata, diffVis, uvw, frequencies, visibilitiesCount);
             var vis3 = NUFFT.ToVisibilities(c, metadata, image2, uvw, frequencies, visibilitiesCount);
-
         }
         #endregion
 
         #region helpers
+        private static double[,] CutImg(double[,] image)
+        {
+            var output = new double[128, 128];
+            var yOffset = image.GetLength(0) / 2 - output.GetLength(0) / 2;
+            var xOffset = image.GetLength(1) / 2 - output.GetLength(1) / 2;
+
+            for (int y = 0; y < output.GetLength(0); y++)
+                for (int x = 0; x < output.GetLength(0); x++)
+                    output[y, x] = image[yOffset + y, xOffset + x];
+            return output;
+        }
+
+        private static double[,] Convolve(double[,] image, double[,] kernel)
+        {
+            var output = new double[image.GetLength(0), image.GetLength(1)];
+            for (int y = 0; y < image.GetLength(0); y++)
+            {
+                for (int x = 0; x < image.GetLength(1); x++)
+                {
+                    double sum = 0;
+                    for (int yk = 0; yk < kernel.GetLength(0); yk++)
+                    {
+                        for (int xk = 0; xk < kernel.GetLength(1); xk++)
+                        {
+                            int ySrc = y + yk - ((kernel.GetLength(0) - 1) - kernel.GetLength(0) / 2);
+                            int xSrc = x + xk - ((kernel.GetLength(1) - 1) - kernel.GetLength(1) / 2);
+                            if (ySrc >= 0 & ySrc < image.GetLength(0) &
+                                xSrc >= 0 & xSrc < image.GetLength(1))
+                            {
+                                sum += image[ySrc, xSrc] * kernel[kernel.GetLength(0) - 1 - yk, kernel.GetLength(1) - 1 - xk];
+                            }
+                        }
+                    }
+                    output[y, x] = sum;
+                }
+            }
+            return output;
+        }
+
+        private static Complex[,,] Substract(Complex[,,] vis0, Complex[,,] vis1)
+        {
+            var output = new Complex[vis0.GetLength(0), vis0.GetLength(1), vis0.GetLength(2)];
+            for (int i = 0; i < vis0.GetLength(0); i++)
+                for (int j = 0; j < vis0.GetLength(1); j++)
+                    for (int k = 0; k < vis0.GetLength(2); k++)
+                        output[i, j, k] = vis0[i, j, k] - vis1[i, j, k];
+            return output;
+        }
+
+        private static Complex[,,] Add(Complex[,,] vis0, Complex[,,] vis1)
+        {
+            var output = new Complex[vis0.GetLength(0), vis0.GetLength(1), vis0.GetLength(2)];
+            for (int i = 0; i < vis0.GetLength(0); i++)
+                for (int j = 0; j < vis0.GetLength(1); j++)
+                    for (int k = 0; k < vis0.GetLength(2); k++)
+                        output[i, j, k] = vis0[i, j, k] + vis1[i, j, k];
+            return output;
+        }
+
+
+        private static void Add(Complex[,] c0, Complex[,] c1)
+        {
+            for (int i = 0; i < c0.GetLength(0); i++)
+            {
+                for (int j = 0; j < c0.GetLength(1); j++)
+                    c0[i, j] += c1[i, j];
+            }
+        }
+
+        private static Complex[,] IFT(Complex vis, double u, double v, double freq, int gridSize, double imageSize)
+        {
+            u = u * freq / MathFunctions.SPEED_OF_LIGHT;
+            v = v * freq / MathFunctions.SPEED_OF_LIGHT;
+
+            var output = new Complex[gridSize, gridSize];
+            var I = new Complex(0, 1);
+            var cell = imageSize / gridSize;
+            for (int y = 0; y < gridSize; y++)
+            {
+                for (int x = 0; x < gridSize; x++)
+                {
+                    int xi = x - gridSize / 2;
+                    int yi = y - gridSize / 2;
+                    var d = Complex.Exp(2 * PI * I * (u * (xi) * cell + v * (yi) * cell));
+                    var c = vis * d;
+                    output[y, x] = c;
+                }
+            }
+            return output;
+        }
         #endregion
+
+        public static void TestConvergence0()
+        {
+            var imSize = 64;
+            var psfSize = 4;
+            var psf = new double[psfSize, psfSize];
+
+            var psfSum = 8.0;
+            psf[1, 1] = 1 / psfSum;
+            psf[1, 2] = 2 / psfSum;
+            psf[1, 3] = 3 / psfSum;
+            psf[2, 1] = 3 / psfSum;
+            psf[2, 2] = 8 / psfSum;
+            psf[2, 3] = 2 / psfSum;
+            psf[3, 1] = 5 / psfSum;
+            psf[3, 2] = 3 / psfSum;
+            psf[3, 3] = 2 / psfSum;
+
+            var groundTruth = new double[imSize, imSize];
+            groundTruth[33, 33] = 15.0;
+
+            var image = Convolve(groundTruth, psf);
+            var reconstruction = new double[imSize, imSize];
+            CDClean.CoordinateDescent(reconstruction, image, psf, 0.1);
+
+            var precision = 0.1;
+        }
+
     }
 }

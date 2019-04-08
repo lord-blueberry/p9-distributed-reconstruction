@@ -4,7 +4,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Numerics;
 
 
-namespace Single_Machine_Test
+namespace Single_Reference_Test
 {
     [TestClass]
     public class TestSubgridding

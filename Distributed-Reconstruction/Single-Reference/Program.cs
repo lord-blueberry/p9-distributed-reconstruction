@@ -6,7 +6,8 @@ namespace Single_Reference
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            DebugMethods.TestConvergence0();
+            DebugMethods.DebugFullPipeline();
         }
     }
 }
