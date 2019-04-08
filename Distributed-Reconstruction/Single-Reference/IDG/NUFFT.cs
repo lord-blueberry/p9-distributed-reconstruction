@@ -39,7 +39,7 @@ namespace Single_Reference.IDG
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
             var psf = FFT.GridIFFT(grid, visibilitiesCount);
-            FFT.Shift(psf);
+            //FFT.Shift(psf); //why is this wrong?
 
             //remove spheroidal from grid
             for (int y = 0; y < psf.GetLength(0); y++)
@@ -64,7 +64,7 @@ namespace Single_Reference.IDG
             return psf;
         }
 
-            public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies, long visibilitiesCount)
         {
             //add spheroidal to grid?
             for (int i = 0; i < image.GetLength(0); i++)

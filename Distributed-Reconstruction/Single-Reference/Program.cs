@@ -6,7 +6,8 @@ namespace Single_Reference
     {
         static void Main(string[] args)
         {
-            DebugMethods.TestConvergence0();
+            DebugMethods.DebugForwardBackward();
+            //DebugMethods.TestConvergence1();
             DebugMethods.DebugFullPipeline();
         }
     }

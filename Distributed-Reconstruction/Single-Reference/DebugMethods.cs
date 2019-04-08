@@ -16,7 +16,7 @@ namespace Single_Reference
         {
             int max_nr_timesteps = 256;
             int gridSize = 64;
-            int subgridsize = 48;
+            int subgridsize = 16;
             int kernelSize = 2;
             float imageSize = 0.0025f;
             float cellSize = imageSize / gridSize;
@@ -28,21 +28,28 @@ namespace Single_Reference
             double freq = wavelength * MathFunctions.SPEED_OF_LIGHT;
             double[] frequency = { freq };
             double u1 = 10 / imageSize / wavelength;
+            double u2 = 9 / imageSize / wavelength;
 
             double visR0 = 3.9;
             double visR1 = 5.2;
+            double visR2 = 8.2;
 
-            var visibilities = new Complex[1, 2, 1];
+            var visibilities = new Complex[1, 3, 1];
             visibilities[0, 0, 0] = new Complex(visR0, 0);
             visibilities[0, 1, 0] = new Complex(visR1, 0);
-            var uvw = new double[1, 2, 3];
+            visibilities[0, 2, 0] = new Complex(visR2, 0);
+            var uvw = new double[1, 3, 3];
             uvw[0, 0, 0] = u;
             uvw[0, 0, 1] = v;
             uvw[0, 0, 2] = 0;
             uvw[0, 1, 0] = u1;
             uvw[0, 1, 1] = v;
             uvw[0, 1, 2] = 0;
+            uvw[0, 2, 0] = u2;
+            uvw[0, 2, 1] = v;
+            uvw[0, 2, 2] = 0;
 
+            var visCount = 1;
             var subgridSpheroidal = MathFunctions.CalcIdentitySpheroidal(subgridsize, subgridsize);
             var metadata = Partitioner.CreatePartition(p, uvw, frequency);
 
@@ -50,11 +57,11 @@ namespace Single_Reference
             var ftgridded = FFT.SubgridFFT(p, gridded_subgrids);
             var grid = Adder.AddHack(p, metadata, ftgridded);
             FFT.Shift(grid);
-            var img = FFT.GridIFFT(grid, 2);
+            var img = FFT.GridIFFT(grid, visCount);
             FFT.Shift(img);
 
             FFT.Shift(img);
-            var grid2 = FFT.GridFFT(img, 2);
+            var grid2 = FFT.GridFFT(img, visCount);
             FFT.Shift(grid2);
             var ftGridded2 = Adder.SplitHack(p, metadata, grid2);
             var subgrids2 = FFT.SubgridIFFT(p, ftGridded2);
@@ -87,13 +94,15 @@ namespace Single_Reference
             var psfVis = NUFFT.ToVisibilities(c, metadata, psf, uvw, frequencies, visibilitiesCount);
             var psf2 = CutImg(psf);
             FitsIO.Write(image, "dirty.fits");
+            FitsIO.Write(psf, "psf.fits");
+            /*
             var reconstruction = new double[gridSize, gridSize];
-            CDClean.CoordinateDescent(reconstruction, image, psf2, 3.0, 10);
+            CDClean.CoordinateDescent(reconstruction, image, psf2, 2.0, 5);
             FitsIO.Write(reconstruction, "reconstruction.fits");
             FitsIO.Write(image, "residual.fits");
-            CDClean.CoordinateDescent(reconstruction, image, psf2, 2.5, 10);
+            CDClean.CoordinateDescent(reconstruction, image, psf2, 1.0, 5);
             FitsIO.Write(reconstruction, "reconstruction.fits");
-            FitsIO.Write(image, "residual.fits");
+            FitsIO.Write(image, "residual.fits");*/
 
             var vis2 = NUFFT.ToVisibilities(c, metadata, image, uvw, frequencies, visibilitiesCount);
             var diffVis = Substract(visibilities, vis2);
@@ -222,5 +231,33 @@ namespace Single_Reference
             var precision = 0.1;
         }
 
+        public static void TestConvergence1()
+        {
+            var imSize = 32;
+            var psfSize = 4;
+            var psf = new double[psfSize, psfSize];
+
+            var psfSum = 8.0;
+            psf[1, 1] = 1 / psfSum;
+            psf[1, 2] = 2 / psfSum;
+            psf[1, 3] = 3 / psfSum;
+            psf[2, 1] = 3 / psfSum;
+            psf[2, 2] = 8 / psfSum;
+            psf[2, 3] = 2 / psfSum;
+            psf[3, 1] = 5 / psfSum;
+            psf[3, 2] = 3 / psfSum;
+            psf[3, 3] = 2 / psfSum;
+
+            var groundTruth = new double[imSize, imSize];
+            groundTruth[17, 17] = 15.0;
+            groundTruth[16, 17] = 3.0;
+            groundTruth[15, 17] = 2.0;
+            groundTruth[16, 16] = 5.0;
+            var convolved = Convolve(groundTruth, psf);
+            var reconstruction = new double[imSize, imSize];
+            CDClean.CoordinateDescent(reconstruction, convolved, psf, 0.1);
+
+            var precision = 0.1;
+        }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace Single_Reference.Deconvolution
 {
@@ -24,7 +25,7 @@ namespace Single_Reference.Deconvolution
         {
             int iter = 0;
             bool converged = false;
-            var precision = 1e-6;
+            var precision = 1e-4;
       
             // the "a" of the parabola equation a* x*x + b*x + c
             var a = CalcPSFSquared(psf);
@@ -32,6 +33,7 @@ namespace Single_Reference.Deconvolution
             {
                 iter++;
                 var activeSet = new HashSet<Tuple<int, int>>();
+                double max = 0.0;
                 for (int y = 0; y < residual.GetLength(0); y++)
                 {
                     for (int x = 0; x < residual.GetLength(1); x++)
@@ -41,6 +43,7 @@ namespace Single_Reference.Deconvolution
 
                         //calculate minimum of parabola, eg -2b/a
                         var xNew = xOld + (b / a);
+                        max = Math.Max(max, xNew);
                         xNew = ShrinkAbsolute(xNew, lambda);
                         var xDiff = xNew - xOld;
 
@@ -53,9 +56,11 @@ namespace Single_Reference.Deconvolution
                     }
                 }
 
-                converged = activeSet.Count > 0;
+
+                converged = activeSet.Count  == 0;
                 bool activeSetConverged = false;
-                while(!activeSetConverged)
+
+                while (!activeSetConverged)
                 {
                     activeSetConverged = true;
                     var delete = new List<Tuple<int, int>>();
@@ -90,6 +95,7 @@ namespace Single_Reference.Deconvolution
                     foreach (var pixel in delete)
                         activeSet.Remove(pixel);
                 }
+                //converged = true;
             }
         }
 
@@ -98,8 +104,10 @@ namespace Single_Reference.Deconvolution
             int yOffset = y - psf.GetLength(0) / 2;
             int xOffset = x - psf.GetLength(1) / 2;
 
-            var b = 0.0;
-            for (int i = 0; i < psf.GetLength(0); i++)
+            var lockObj = new Object();
+            var b2 = 0.0;
+            
+            Parallel.For(0, psf.GetLength(0), () => 0.0, (i, loop, b2Local) =>
             {
                 for (int j = 0; j < psf.GetLength(1); j++)
                 {
@@ -108,19 +116,26 @@ namespace Single_Reference.Deconvolution
                     if (ySrc >= 0 & ySrc < residual.GetLength(0) &
                         xSrc >= 0 & xSrc < residual.GetLength(1))
                     {
-                        b += residual[ySrc, xSrc] * psf[i, j];
+                        b2Local += residual[ySrc, xSrc] * psf[i, j];
                     }
                 }
-            }
+                return b2Local;
+            }, (local) =>
+            {
+                lock (lockObj)
+                {
+                    b2 += local;
+                }
+            });
 
-            return b;
+            return b2;
         }
 
         private static void ModifyResidual(double[,] residual, double[,] psf, int y, int x, double xDiff)
         {
             int yOffset = y - psf.GetLength(0) / 2;
             int xOffset = x - psf.GetLength(1) / 2;
-            for (int i = 0; i < psf.GetLength(0); i++)
+            Parallel.For(0, psf.GetLength(0), i =>
             {
                 for (int j = 0; j < psf.GetLength(1); j++)
                 {
@@ -130,11 +145,11 @@ namespace Single_Reference.Deconvolution
                         xDst >= 0 & xDst < residual.GetLength(1))
                     {
                         var res = residual[yDst, xDst];
-                        var psff = psf[i, j];
                         residual[yDst, xDst] -= xDiff * psf[i, j];
                     }
                 }
-            }
+            });
+            
         }
 
         private static double CalcPSFSquared(double[,] psf)
