@@ -39,7 +39,7 @@ namespace Single_Reference.IDG
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
             var psf = FFT.GridIFFT(grid, visibilitiesCount);
-            //FFT.Shift(psf); //why is this wrong?
+            FFT.Shift(psf);
 
             //remove spheroidal from grid
             for (int y = 0; y < psf.GetLength(0); y++)

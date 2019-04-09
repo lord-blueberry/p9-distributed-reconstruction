@@ -106,14 +106,12 @@ namespace Single_Reference.IDG
                 }
 
                 DFT.IFFT(fourierSpace, imageSpace);
-                var norm = 1.0 / (grid.GetLength(0) * grid.GetLength(1));
-               
-
+ 
                 for (int y = 0; y < grid.GetLength(0); y++)
                 {
                     for (int x = 0; x < grid.GetLength(1); x++)
                     {
-                        output[y, x] = imageSpace[y, x].Real / visibilitiesCount;
+                        output[y, x] = imageSpace[y, x].Real;
                     }
                 }
 
@@ -149,7 +147,7 @@ namespace Single_Reference.IDG
         /// </summary>
         /// <param name="image"></param>
         /// <returns></returns>
-        public static Complex[,] GridFFT(Complex[,] image)
+        public static Complex[,] GridFFTDebug(Complex[,] image)
         {
             Complex[,] output = new Complex[image.GetLength(0), image.GetLength(1)];
             using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))

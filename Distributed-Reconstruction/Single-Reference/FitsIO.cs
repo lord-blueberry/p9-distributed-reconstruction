@@ -135,7 +135,7 @@ namespace Single_Reference
             //Double cube Dimensions: baseline, time, channel, pol, complex_component
             var vis_raw = (Array[])h.Kernel;
             var visibilities = new Complex[baselinesCount, timessamplesCount, channelsCount];
-            long visibilitiesCount = 0;
+            double norm = 2.0 * baselinesCount * timessamplesCount * channelsCount;
             for (int i = 0; i < baselinesCount; i++)
             {
                 Array[] bl = (Array[])vis_raw[i];
@@ -150,10 +150,8 @@ namespace Single_Reference
 
                         //add polarizations XX and YY together to form Intensity Visibilities only
                         visibilities[i, j, k] = new Complex(
-                            (pol_XX[0] + pol_YY[0]) / 2.0,
-                            (pol_XX[1] + pol_YY[1]) / 2.0
-                            );
-                        visibilitiesCount++;
+                            (pol_XX[0] + pol_YY[0]) / norm,
+                            (pol_XX[1] + pol_YY[1]) / norm);
                     }
                 }
             }
