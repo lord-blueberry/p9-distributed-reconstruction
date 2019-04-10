@@ -8,7 +8,7 @@ using System.Numerics;
 
 namespace Single_Reference.IDGSequential
 {
-    class FFT
+    public class FFT
     {
         public static List<List<Complex[,]>> SubgridFFT(GriddingConstants c, List<List<Complex[,]>> subgrids)
         {

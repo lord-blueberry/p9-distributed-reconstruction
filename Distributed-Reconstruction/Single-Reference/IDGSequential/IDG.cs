@@ -7,8 +7,40 @@ using System.Numerics;
 
 namespace Single_Reference.IDGSequential
 {
-    class NUFFT
+    public class IDG
     {
+        public static Complex[,] GridImage(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
+        {
+            var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
+            var ftgridded = FFT.SubgridFFT(c, gridded);
+            var grid = Adder.AddHack(c, metadata, ftgridded);
+            FFT.Shift(grid);
+
+            return grid;
+        }
+
+        public static Complex[,] GridPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        {
+            var visibilities = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
+            for (int i = 0; i < visibilities.GetLength(0); i++)
+                for (int j = 0; j < visibilities.GetLength(1); j++)
+                    for (int k = 0; k < visibilities.GetLength(2); k++)
+                        visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
+
+            return GridImage(c, metadata, visibilities, uvw, frequencies);
+        }
+
+        public static Complex[,,] DeGrid(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,] grid, double[,,] uvw, double[] frequencies)
+        {
+            FFT.Shift(grid);
+            var ftGridded = Adder.SplitHack(c, metadata, grid);
+            var gridded = FFT.SubgridIFFT(c, ftGridded);
+            var visibilities = Gridder.BackwardsHack(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
+
+            return visibilities;
+        }
+
+
         public static double[,] ToImage(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);

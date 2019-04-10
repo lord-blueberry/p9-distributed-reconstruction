@@ -237,9 +237,9 @@ namespace Single_Reference
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
             //visibilitiesCount = 1;
-            var psf = NUFFT.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
-            var image = NUFFT.ToImage(c, metadata, visibilities, uvw, frequencies);
-            var psfVis = NUFFT.ToVisibilities(c, metadata, psf, uvw, frequencies);
+            var psf = IDG.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
+            var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
+            var psfVis = IDG.ToVisibilities(c, metadata, psf, uvw, frequencies);
             var psf2 = CutImg(psf);
             FitsIO.Write(image, "dirty.fits");
             FitsIO.Write(psf, "psf.fits");
@@ -252,10 +252,10 @@ namespace Single_Reference
             FitsIO.Write(reconstruction, "reconstruction.fits");
             FitsIO.Write(image, "residual.fits");
 
-            var vis2 = NUFFT.ToVisibilities(c, metadata, image, uvw, frequencies);
+            var vis2 = IDG.ToVisibilities(c, metadata, image, uvw, frequencies);
             var diffVis = Substract(visibilities, vis2);
-            var image2 = NUFFT.ToImage(c, metadata, diffVis, uvw, frequencies);
-            var vis3 = NUFFT.ToVisibilities(c, metadata, image2, uvw, frequencies);
+            var image2 = IDG.ToImage(c, metadata, diffVis, uvw, frequencies);
+            var vis3 = IDG.ToVisibilities(c, metadata, image2, uvw, frequencies);
         }
         #endregion
 
