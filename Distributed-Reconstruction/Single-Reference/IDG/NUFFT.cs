@@ -9,13 +9,13 @@ namespace Single_Reference.IDG
 {
     class NUFFT
     {
-        public static double[,] ToImage(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        public static double[,] ToImage(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
             var ftgridded = FFT.SubgridFFT(c, gridded);
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
-            var img = FFT.GridIFFT(grid, visibilitiesCount);
+            var img = FFT.GridIFFT(grid);
             FFT.Shift(img);
 
             //remove spheroidal from grid
@@ -32,14 +32,14 @@ namespace Single_Reference.IDG
             for (int i = 0; i < visibilities.GetLength(0); i++)
                 for (int j = 0; j < visibilities.GetLength(1); j++)
                     for (int k = 0; k < visibilities.GetLength(2); k++)
-                        visibilities[i, j, k] = new Complex(1.0, 0);
+                        visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
             
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
             var ftgridded = FFT.SubgridFFT(c, gridded);
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
-            var psf = FFT.GridIFFT(grid, visibilitiesCount);
-            FFT.Shift(psf);
+            var psf = FFT.GridIFFT(grid);
+            //FFT.Shift(psf);
 
             //remove spheroidal from grid
             for (int y = 0; y < psf.GetLength(0); y++)
@@ -64,7 +64,7 @@ namespace Single_Reference.IDG
             return psf;
         }
 
-        public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies)
         {
             //add spheroidal to grid?
             for (int i = 0; i < image.GetLength(0); i++)
@@ -72,7 +72,7 @@ namespace Single_Reference.IDG
                     image[i, j] = image[i, j] / c.GridSpheroidal[i, j];
 
             FFT.Shift(image);
-            var grid = FFT.GridFFT(image, visibilitiesCount);
+            var grid = FFT.GridFFT(image);
             FFT.Shift(grid);
             var ftGridded = Adder.SplitHack(c, metadata, grid);
             var gridded = FFT.SubgridIFFT(c, ftGridded);

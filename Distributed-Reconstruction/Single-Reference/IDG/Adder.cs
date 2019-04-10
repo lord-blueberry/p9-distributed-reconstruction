@@ -38,13 +38,7 @@ namespace Single_Reference.IDG
                                 int ySrc = (y + (c.SubgridSize / 2)) % c.SubgridSize;
                                 double phase = PI * (x + y - c.SubgridSize) / c.SubgridSize;
 
-                                //phase = 0;
-                                if (y == 8)
-                                    Console.Write("");
-
                                 Complex phasor = new Complex(Cos(phase), Sin(phase));
-                                var d = data[ySrc, xSrc];
-                                var tmp = data[ySrc, xSrc] * phasor;
                                 grid[gridY + y, gridX + x] += data[ySrc, xSrc] * phasor;
                             }
                         }
@@ -100,6 +94,7 @@ namespace Single_Reference.IDG
                                 int xDst = (x + (c.SubgridSize / 2)) % c.SubgridSize;
                                 int yDst = (y + (c.SubgridSize / 2)) % c.SubgridSize;
                                 double phase = -PI * (x + y - c.SubgridSize) / c.SubgridSize;
+
                                 var phasor = new Complex(Cos(phase), Sin(phase));
                                 data[yDst, xDst] = grid[gridY + y, gridX + x] * phasor;
                             }

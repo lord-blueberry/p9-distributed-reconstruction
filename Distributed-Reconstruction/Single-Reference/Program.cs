@@ -6,7 +6,11 @@ namespace Single_Reference
     {
         static void Main(string[] args)
         {
-            DebugMethods.DebugForwardBackward();
+            //DebugMethods.debie();
+            //DebugMethods.DebugForwardBackward2();
+            //DebugMethods.DebugForwardBackwardRealWorld();
+
+            //DebugMethods.DebugForwardBackward();
             //DebugMethods.TestConvergence1();
             DebugMethods.DebugFullPipeline();
         }
