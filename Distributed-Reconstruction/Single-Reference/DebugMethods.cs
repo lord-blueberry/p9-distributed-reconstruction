@@ -127,11 +127,11 @@ namespace Single_Reference
             var ftgridded = FFT.SubgridFFT(p, gridded_subgrids);
             var grid = Adder.AddHack(p, metadata, ftgridded);
             FFT.Shift(grid);
-            var img = FFT.GridIFFT(grid, visCount);
+            var img = FFT.GridIFFT(grid);
             FFT.Shift(img);
 
             FFT.Shift(img);
-            var grid2 = FFT.GridFFT(img, visCount);
+            var grid2 = FFT.GridFFT(img);
             FFT.Shift(grid2);
             var ftGridded2 = Adder.SplitHack(p, metadata, grid2);
             var subgrids2 = FFT.SubgridIFFT(p, ftGridded2);
@@ -177,7 +177,7 @@ namespace Single_Reference
             var ftgridded = FFT.SubgridFFT(p, gridded_subgrids);
             var grid = Adder.AddHack(p, metadata, ftgridded);
             FFT.Shift(grid);
-            var img = FFT.GridIFFT(grid, visCount);
+            var img = FFT.GridIFFT(grid);
             FFT.Shift(img);
 
             FFT.Shift(img);
