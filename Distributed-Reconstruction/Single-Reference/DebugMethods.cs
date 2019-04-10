@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Single_Reference.IDG;
+using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
 using System.Numerics;
 using static System.Math;

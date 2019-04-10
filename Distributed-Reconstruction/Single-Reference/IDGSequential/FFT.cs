@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using FFTW.NET;
 using System.Numerics;
 
-namespace Single_Reference.IDG
+namespace Single_Reference.IDGSequential
 {
     class FFT
     {

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Single_Reference.IDG
+namespace Single_Reference.IDGSequential
 {
     /// <summary>
     /// Immutable class holding the gridding parameters

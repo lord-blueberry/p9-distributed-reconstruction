@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Single_Reference.IDG
+namespace Single_Reference.IDGSequential
 {
     public class Partitioner
     {
