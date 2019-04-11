@@ -245,10 +245,10 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
             
             var reconstruction = new double[gridSize, gridSize];
-            CDClean.CoordinateDescent(reconstruction, image, psf2, 2.0, 5);
+            CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 5);
             FitsIO.Write(reconstruction, "reconstruction.fits");
             FitsIO.Write(image, "residual.fits");
-            CDClean.CoordinateDescent(reconstruction, image, psf2, 1.0, 5);
+            CDClean.Deconvolve(reconstruction, image, psf2, 1.0, 5);
             FitsIO.Write(reconstruction, "reconstruction.fits");
             FitsIO.Write(image, "residual.fits");
 
@@ -374,7 +374,7 @@ namespace Single_Reference
 
             var image = Convolve(groundTruth, psf);
             var reconstruction = new double[imSize, imSize];
-            CDClean.CoordinateDescent(reconstruction, image, psf, 0.1);
+            CDClean.Deconvolve(reconstruction, image, psf, 0.1);
 
             var precision = 0.1;
         }
@@ -403,7 +403,7 @@ namespace Single_Reference
             groundTruth[16, 16] = 5.0;
             var convolved = Convolve(groundTruth, psf);
             var reconstruction = new double[imSize, imSize];
-            CDClean.CoordinateDescent(reconstruction, convolved, psf, 0.1);
+            CDClean.Deconvolve(reconstruction, convolved, psf, 0.1);
 
             var precision = 0.1;
         }

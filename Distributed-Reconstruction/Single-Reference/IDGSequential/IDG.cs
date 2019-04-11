@@ -9,7 +9,7 @@ namespace Single_Reference.IDGSequential
 {
     public class IDG
     {
-        public static Complex[,] GridImage(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
+        public static Complex[,] Grid(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
             var ftgridded = FFT.SubgridFFT(c, gridded);
@@ -27,7 +27,7 @@ namespace Single_Reference.IDGSequential
                     for (int k = 0; k < visibilities.GetLength(2); k++)
                         visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
 
-            return GridImage(c, metadata, visibilities, uvw, frequencies);
+            return Grid(c, metadata, visibilities, uvw, frequencies);
         }
 
         public static Complex[,,] DeGrid(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,] grid, double[,,] uvw, double[] frequencies)

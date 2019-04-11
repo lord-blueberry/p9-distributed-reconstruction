@@ -21,7 +21,7 @@ namespace Single_Reference.Deconvolution
         /// <param name="residual">residual image</param>
         /// <param name="psf">point spread function in image space</param>
         /// <param name="lambda">regularization parameter</param>
-        public static void CoordinateDescent(double[,] xImage, double[,] residual, double[,] psf, double lambda, int maxIteration = 100)
+        public static void Deconvolve(double[,] xImage, double[,] residual, double[,] psf, double lambda, int maxIteration = 100)
         {
             int iter = 0;
             bool converged = false;

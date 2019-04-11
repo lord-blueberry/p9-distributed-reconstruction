@@ -56,7 +56,7 @@ namespace Single_Reference_Test
 
             var image = CDTest.Convolve(groundTruth, psf);
             var reconstruction = new double[imSize, imSize];
-            CDClean.CoordinateDescent(reconstruction, image, psf, 0.1);
+            CDClean.Deconvolve(reconstruction, image, psf, 0.1);
 
             var precision = 0.1;
             for (int y = 0; y < image.GetLength(0); y++)
@@ -90,7 +90,7 @@ namespace Single_Reference_Test
             groundTruth[32, 32] = 5.0;
             var convolved = CDTest.Convolve(groundTruth, psf);
             var reconstruction = new double[imSize, imSize];
-            CDClean.CoordinateDescent(reconstruction, convolved, psf, 0.1);
+            CDClean.Deconvolve(reconstruction, convolved, psf, 0.1);
 
             var precision = 0.1;
             for (int y = 0; y < convolved.GetLength(0); y++)

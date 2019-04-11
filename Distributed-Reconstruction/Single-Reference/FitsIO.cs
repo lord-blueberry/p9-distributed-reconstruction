@@ -10,7 +10,7 @@ using nom.tam.util;
 
 namespace Single_Reference
 {
-    class FitsIO
+    public class FitsIO
     {
         #region writing
         public static void Write(Complex[,] img, string file = "Outputfile.fits")
