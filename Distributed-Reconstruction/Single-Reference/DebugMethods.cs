@@ -5,6 +5,7 @@ using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
 using System.Numerics;
 using static System.Math;
+using System.Diagnostics;
 
 
 namespace Single_Reference
@@ -226,25 +227,36 @@ namespace Single_Reference
             frequencies = freqtmp;
 
             int gridSize = 256;
-            int subgridsize = 16;
-            int kernelSize = 4;
+            int subgridsize = 64;
+            int kernelSize = 32;
             //cell = image / grid
             int max_nr_timesteps = 256;
             double cellSize = 0.5 / 3600.0 * PI / 180.0;
+
+            var watch = new Stopwatch();
+            var watchIdg = new Stopwatch();
+            watch.Start();
 
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
             //visibilitiesCount = 1;
+            watchIdg.Start();
             var psf = IDG.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
             var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
+            watchIdg.Stop();
+            Console.WriteLine("IDG time {0}", watchIdg.Elapsed);
             var psfVis = IDG.ToVisibilities(c, metadata, psf, uvw, frequencies);
             var psf2 = CutImg(psf);
-            FitsIO.Write(image, "dirty.fits");
-            FitsIO.Write(psf, "psf.fits");
+            //FitsIO.Write(image, "dirty.fits");
+            //FitsIO.Write(psf, "psf.fits");
             
             var reconstruction = new double[gridSize, gridSize];
             CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 5);
+            watch.Stop();
+            Console.WriteLine("Elapsed {0}", watch.Elapsed);
+            
+
             FitsIO.Write(reconstruction, "reconstruction.fits");
             FitsIO.Write(image, "residual.fits");
             CDClean.Deconvolve(reconstruction, image, psf2, 1.0, 5);

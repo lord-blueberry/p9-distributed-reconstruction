@@ -19,24 +19,9 @@ namespace Distributed_Reference
                 var name = proc.ProcessName;
                 Console.WriteLine(" name: " + name);
                 //System.Threading.Thread.Sleep(17000);
+                
                 Console.WriteLine("Hello World! from rank " + Communicator.world.Rank + " (running on " + MPI.Environment.ProcessorName + ")");
-
                 var comm = Communicator.world;
-                if (comm.Rank == 0)
-                {
-                    comm.Send("Rosie", 1, 0);
-                    var receive = comm.Receive<string>(Communicator.anySource, 0);
-                    Console.WriteLine("Final Message: " + receive);
-                }
-                else
-                {
-                    var receive = comm.Receive<string>(comm.Rank - 1, 0);
-                    Console.WriteLine("Worker: " + comm.Rank + " Received Message: " + receive);
-
-                    comm.Send(receive + " " + comm.Rank, (comm.Rank + 1) % comm.Size, 0);
-                }
-
-                //System.Threading.Thread.Sleep(5000);
 
                 //READ DATA
                 var frequencies = Single_Reference.FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\freq.fits");
@@ -68,23 +53,44 @@ namespace Distributed_Reference
                     freqtmp[i] = frequencies[i];
                 }
 
+                var watch = new Stopwatch();
+                var watchIdg = new Stopwatch();
+                if (comm.Rank == 0)
+                    watch.Start();
+
+
                 uvw = uvwtmp;
                 visibilities = vistmp;
                 frequencies = freqtmp;
 
                 int gridSize = 256;
-                int subgridsize = 16;
-                int kernelSize = 4;
+                int subgridsize = 64;
+                int kernelSize = 32;
                 //cell = image / grid
                 int max_nr_timesteps = 256;
                 double cellSize = 0.5 / 3600.0 * PI / 180.0;
+                if (comm.Rank == 0)
+                    watchIdg.Start();
                 var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
                 var psf = CalculatePSF(comm, c, metadata, uvw, frequencies, visibilities.LongLength * comm.Size);
+
+                
                 var imagePatch = Forward(comm, c, metadata, visibilities, uvw, frequencies);
+                if (comm.Rank == 0)
+                {
+                    watchIdg.Stop();
+                    Console.WriteLine(watchIdg.Elapsed);
+                }
+                    
+
                 var localX = new double[imagePatch.GetLength(0), imagePatch.GetLength(1)];
-                /*
+
+                if (comm.Rank == 0)
+                {
+                    Console.WriteLine("deconvolve");
+                }
                 CDClean.Deconvolve(localX, imagePatch, psf, 1.9, 2);
 
                 comm.Barrier();
@@ -107,8 +113,17 @@ namespace Distributed_Reference
                                     reconstructed[yOffset + y, xOffset + x] = patch[y, x];
                         }
                     }
+
+                    watch.Stop();
+                    Console.WriteLine("");
+                    Console.WriteLine("");
+                    Console.WriteLine(watchIdg.Elapsed);
+                    Console.WriteLine(watch.Elapsed);
+                    Console.WriteLine("");
+                    Console.WriteLine("");
+                    Single_Reference.FitsIO.Write(reconstructed, "xImge.fits");
                 }
-                */
+                
 
             }
         }
@@ -124,8 +139,8 @@ namespace Distributed_Reference
                 psf = FFT.GridIFFT(psf_total);
                 FFT.Shift(psf);
                 psf = CutImg(psf);
-                Single_Reference.FitsIO.Write(psf, "psf.fits");
-                Console.WriteLine("fits Written");
+                //Single_Reference.FitsIO.Write(psf, "psf.fits");
+                //Console.WriteLine("psf Written");
                 
             }
             comm.Broadcast(ref psf, 0);
@@ -137,12 +152,25 @@ namespace Distributed_Reference
         {
             double[][,] patches = null;
 
+            var watchIDG = new Stopwatch();
+            if (comm.Rank == 0)
+                watchIDG.Start();
             var localGrid = IDG.Grid(c, metadata, visibilities, uvw, frequencies);
+            if (comm.Rank == 0)
+            {
+                watchIDG.Stop();
+                Console.WriteLine("IDG Pure");
+                Console.WriteLine(watchIDG.Elapsed);
+            }
+                
             var grid_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
                 var image = FFT.GridIFFT(grid_total);
                 FFT.Shift(image);
+                
+                //Single_Reference.FitsIO.Write(image, "dirty.fits");
+                //Console.WriteLine("fits Written");
 
                 //remove spheroidal
 
