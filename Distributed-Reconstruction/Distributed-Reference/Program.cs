@@ -19,7 +19,7 @@ namespace Distributed_Reference
                 var name = proc.ProcessName;
                 Console.WriteLine(" name: " + name);
                 //System.Threading.Thread.Sleep(17000);
-                
+
                 Console.WriteLine("Hello World! from rank " + Communicator.world.Rank + " (running on " + MPI.Environment.ProcessorName + ")");
                 var comm = Communicator.world;
 
@@ -43,7 +43,7 @@ namespace Distributed_Reference
                             vistmp[i, j, k] = visibilities[blOffset + i, j, k];
                         }
                         uvwtmp[i, j, 0] = uvw[blOffset + i, j, 0];
-                        uvwtmp[i, j, 1] = uvw[blOffset+ i, j, 1];
+                        uvwtmp[i, j, 1] = uvw[blOffset + i, j, 1];
                         uvwtmp[i, j, 2] = uvw[blOffset + i, j, 2];
                     }
                 }
@@ -75,7 +75,7 @@ namespace Distributed_Reference
                 var imageLocal = Forward(comm, c, metadata, visibilities, uvw, frequencies, watchIdg);
 
                 var halfComm = comm.Size / 2;
-                var localX = new double[imageLocal.GetLength(0) / halfComm, imageLocal.GetLength(1)/ halfComm];
+                var localX = new double[imageLocal.GetLength(0) / halfComm, imageLocal.GetLength(1) / halfComm];
 
                 if (comm.Rank == 0)
                     Console.WriteLine("deconvolve");
@@ -107,7 +107,32 @@ namespace Distributed_Reference
                     watchTotal.Stop();
                     Single_Reference.FitsIO.Write(reconstructed, "xImge.fits");
                 }
-                
+
+                ExchangeNonZero(comm, localX, imageLocal, psf, yResOffset, xResOffset);
+                CDClean.Deconvolve(localX, imageLocal, psf, 2.0, 5, yResOffset, xResOffset);
+                comm.Barrier();
+                totalX = null;
+                comm.Gather<double[,]>(localX, 0, ref totalX);
+                if (comm.Rank == 0)
+                {
+                    var reconstructed = new double[gridSize, gridSize];
+                    int patchIdx = 0;
+                    for (int patchRows = 0; patchRows < halfComm; patchRows++)
+                    {
+                        for (int patchColumns = 0; patchColumns < halfComm; patchColumns++)
+                        {
+                            int yOffset = patchRows * (gridSize / halfComm);
+                            int xOffset = patchColumns * (gridSize / halfComm);
+                            var patch = totalX[patchIdx++];
+                            for (int y = 0; y < (gridSize / halfComm); y++)
+                                for (int x = 0; x < (gridSize / halfComm); x++)
+                                    reconstructed[yOffset + y, xOffset + x] = patch[y, x];
+                        }
+                    }
+
+                    watchTotal.Stop();
+                    Single_Reference.FitsIO.Write(reconstructed, "xImage2.fits");
+                }
 
             }
         }
@@ -125,7 +150,7 @@ namespace Distributed_Reference
                 psf = CutImg(psf);
                 //Single_Reference.FitsIO.Write(psf, "psf.fits");
                 //Console.WriteLine("psf Written");
-                
+
             }
             comm.Broadcast(ref psf, 0);
 
@@ -145,7 +170,7 @@ namespace Distributed_Reference
                 image = FFT.GridIFFT(grid_total);
                 FFT.Shift(image);
                 watchIdg.Stop();
-                
+
                 //Single_Reference.FitsIO.Write(image, "dirty.fits");
                 //Console.WriteLine("fits Written");
 
@@ -155,6 +180,34 @@ namespace Distributed_Reference
 
             comm.Broadcast<double[,]>(ref image, 0);
             return image;
+        }
+
+        private static void ExchangeNonZero(Intracommunicator comm, double[,] xImage, double[,] residual, double[,] psf,  int yResOffset, int xResOffset)
+        {
+            var xNonZero = new List<Tuple<int, int, double>>();
+            for(int y = 0; y < xImage.GetLength(0); y++)
+            {
+                for(int x = 0; x < xImage.GetLength(1); x++)
+                {
+                    if(xImage[y, x] > 0.0)
+                    {
+                        xNonZero.Add(new Tuple<int, int, double>(y + yResOffset, x + xResOffset, xImage[y, x]));
+                    }
+                }
+            }
+
+            var globalNonZero = comm.Allgather(xNonZero);
+            for(int i = 0; i < comm.Size; i++)
+            {
+                if(i != comm.Rank)
+                {
+                    var otherNonZero = globalNonZero[i];
+                    foreach(var t in otherNonZero)
+                    {
+                        CDClean.ModifyResidual(residual, psf, t.Item1, t.Item2, t.Item3);
+                    }
+                }
+            }
         }
 
         private static double[,] CutImg(double[,] image)

@@ -50,7 +50,7 @@ namespace Single_Reference.Deconvolution
                         {
                             activeSet.Add(new Tuple<int, int>(y, x));
                             xImage[y, x] = xNew;
-                            ModifyResidual(residual, psf, y, x, xDiff);
+                            ModifyResidual(residual, psf, y + yResOffset, x + xResOffset, xDiff);
                         }
                     }
                 }
@@ -82,14 +82,14 @@ namespace Single_Reference.Deconvolution
                         {
                             activeSetConverged = false;
                             xImage[y, x] = 0.0;
-                            ModifyResidual(residual, psf, y, x, xDiff);
+                            ModifyResidual(residual, psf, y + yResOffset, x + xResOffset, xDiff);
                             delete.Add(pixel);
                         }
                         else if (Math.Abs(xDiff) > precision)
                         {
                             activeSetConverged = false;
                             xImage[y, x] = xNew;
-                            ModifyResidual(residual, psf, y, x, xDiff);
+                            ModifyResidual(residual, psf, y+yResOffset, x + xResOffset, xDiff);
                         }
                     }
 
@@ -154,7 +154,7 @@ namespace Single_Reference.Deconvolution
             return b2;
         }
 
-        private static void ModifyResidual(double[,] residual, double[,] psf, int y, int x, double xDiff)
+        public static void ModifyResidual(double[,] residual, double[,] psf, int y, int x, double xDiff)
         {
             int yOffset = y - psf.GetLength(0) / 2;
             int xOffset = x - psf.GetLength(1) / 2;
