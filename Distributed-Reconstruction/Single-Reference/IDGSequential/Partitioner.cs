@@ -156,8 +156,6 @@ namespace Single_Reference.IDGSequential
             private double vMin;
             private double vMax;
             private double uvWith;
-            
-            private bool finished;
 
             public int UPixel { get; set; }
             public int VPixel { get; set; }
@@ -169,7 +167,6 @@ namespace Single_Reference.IDGSequential
                 this.Reset();
             }
 
-
             public void Reset()
             {
                 uMin = Double.PositiveInfinity;
@@ -178,7 +175,6 @@ namespace Single_Reference.IDGSequential
                 vMax = Double.NegativeInfinity;
                 uvWith = 0;
                 WIndex = 0;
-                finished = false;
 
                 UPixel = 0;
                 VPixel = 0;
@@ -250,7 +246,6 @@ namespace Single_Reference.IDGSequential
 
             public void Finish()
             {
-                finished = true;
                 this.ComputeCoordinates();
             }
         }

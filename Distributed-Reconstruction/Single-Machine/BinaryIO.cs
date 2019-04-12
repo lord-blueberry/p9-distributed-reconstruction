@@ -1,15 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Numerics;
 
-namespace Single_Reference
+namespace Single_Machine
 {
-    public class BinaryIO
+    class BinaryIO
     {
-        public static void WriteImage(string file, double[,] image)
+        public static void WriteImage(string file, double[,]image)
         {
             var stream = File.Create(file);
             var formatter = new BinaryFormatter();

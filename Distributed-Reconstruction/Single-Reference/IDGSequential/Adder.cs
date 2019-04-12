@@ -47,18 +47,6 @@ namespace Single_Reference.IDGSequential
                     else
                     {
                         throw new Exception("invalid grid");
-                        for (int y = 0; y < c.SubgridSize; y++)
-                        {
-                            for (int x = 0; x < c.SubgridSize; x++)
-                            {
-                                int xSrc = (x + (c.SubgridSize / 2)) % c.SubgridSize;
-                                int ySrc = (y + (c.SubgridSize / 2)) % c.SubgridSize;
-                                double phase = PI * (x + y - c.SubgridSize) / c.SubgridSize;
-                                //phase = 0;
-                                Complex phasor = new Complex(Cos(phase), Sin(phase));
-                                grid[gridY + y, gridX + x] += data[ySrc, xSrc] * phasor;
-                            }
-                        }
                     }
 
                 }

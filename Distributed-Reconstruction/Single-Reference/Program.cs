@@ -4,7 +4,7 @@ namespace Single_Reference
 {
     class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             //DebugMethods.debie();
             //DebugMethods.DebugForwardBackward2();

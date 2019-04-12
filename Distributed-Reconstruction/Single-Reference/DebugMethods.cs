@@ -119,7 +119,6 @@ namespace Single_Reference
             uvw[0, 1, 1] = v;
             uvw[0, 1, 2] = 0;
 
-            var visCount = 1;
             var subgridSpheroidal = MathFunctions.CalcIdentitySpheroidal(subgridsize, subgridsize);
             var metadata = Partitioner.CreatePartition(p, uvw, frequency);
 

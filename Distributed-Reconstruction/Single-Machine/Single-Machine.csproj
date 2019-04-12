@@ -142,8 +142,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BinaryIO.cs" />
     <Compile Include="Deconvolution\CDClean.cs" />
     <Compile Include="Debug.cs" />
+    <Compile Include="FitsIO.cs" />
     <Compile Include="IDG\Adder.cs" />
     <Compile Include="IDG\GriddingConstants.cs" />
     <Compile Include="IDG\Math.cs" />
