@@ -53,45 +53,36 @@ namespace Distributed_Reference
                     freqtmp[i] = frequencies[i];
                 }
 
-                var watch = new Stopwatch();
-                var watchIdg = new Stopwatch();
-                if (comm.Rank == 0)
-                    watch.Start();
-
-
                 uvw = uvwtmp;
                 visibilities = vistmp;
                 frequencies = freqtmp;
 
+                var watchTotal = new Stopwatch();
+                var watchNufft = new Stopwatch();
+                var watchIdg = new Stopwatch();
+                if (comm.Rank == 0)
+                    watchTotal.Start();
+
                 int gridSize = 256;
-                int subgridsize = 64;
-                int kernelSize = 32;
+                int subgridsize = 32;
+                int kernelSize = 8;
                 //cell = image / grid
                 int max_nr_timesteps = 256;
                 double cellSize = 0.5 / 3600.0 * PI / 180.0;
-                if (comm.Rank == 0)
-                    watchIdg.Start();
                 var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-
                 var psf = CalculatePSF(comm, c, metadata, uvw, frequencies, visibilities.LongLength * comm.Size);
+                var imageLocal = Forward(comm, c, metadata, visibilities, uvw, frequencies, watchIdg);
 
-                
-                var imagePatch = Forward(comm, c, metadata, visibilities, uvw, frequencies);
-                if (comm.Rank == 0)
-                {
-                    watchIdg.Stop();
-                    Console.WriteLine(watchIdg.Elapsed);
-                }
-                    
-
-                var localX = new double[imagePatch.GetLength(0), imagePatch.GetLength(1)];
+                var halfComm = comm.Size / 2;
+                var localX = new double[imageLocal.GetLength(0) / halfComm, imageLocal.GetLength(1)/ halfComm];
 
                 if (comm.Rank == 0)
-                {
                     Console.WriteLine("deconvolve");
-                }
-                CDClean.Deconvolve(localX, imagePatch, psf, 1.9, 2);
+
+                var yResOffset = comm.Rank / 2 * (gridSize / halfComm);
+                var xResOffset = comm.Rank % 2 * (gridSize / halfComm);
+                CDClean.Deconvolve(localX, imageLocal, psf, 2.0, 5, yResOffset, xResOffset);
 
                 comm.Barrier();
                 double[][,] totalX = null;
@@ -100,27 +91,20 @@ namespace Distributed_Reference
                 {
                     var reconstructed = new double[gridSize, gridSize];
                     int patchIdx = 0;
-                    var oneSide = comm.Size / 2;
-                    for (int patchRows = 0; patchRows < oneSide; patchRows++)
+                    for (int patchRows = 0; patchRows < halfComm; patchRows++)
                     {
-                        for (int patchColumns = 0; patchColumns < oneSide; patchColumns++)
+                        for (int patchColumns = 0; patchColumns < halfComm; patchColumns++)
                         {
-                            int yOffset = patchRows * (gridSize / oneSide);
-                            int xOffset = patchColumns * (gridSize / oneSide);
+                            int yOffset = patchRows * (gridSize / halfComm);
+                            int xOffset = patchColumns * (gridSize / halfComm);
                             var patch = totalX[patchIdx++];
-                            for (int y = 0; y < (gridSize / oneSide); y++)
-                                for (int x = 0; x < (gridSize / oneSide); x++)
+                            for (int y = 0; y < (gridSize / halfComm); y++)
+                                for (int x = 0; x < (gridSize / halfComm); x++)
                                     reconstructed[yOffset + y, xOffset + x] = patch[y, x];
                         }
                     }
 
-                    watch.Stop();
-                    Console.WriteLine("");
-                    Console.WriteLine("");
-                    Console.WriteLine(watchIdg.Elapsed);
-                    Console.WriteLine(watch.Elapsed);
-                    Console.WriteLine("");
-                    Console.WriteLine("");
+                    watchTotal.Stop();
                     Single_Reference.FitsIO.Write(reconstructed, "xImge.fits");
                 }
                 
@@ -148,58 +132,34 @@ namespace Distributed_Reference
             return psf;
         }
 
-        public static double[,] Forward(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
+        public static double[,] Forward(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, Stopwatch watchIdg)
         {
-            double[][,] patches = null;
+            if (comm.Rank == 0)
+                watchIdg.Start();
 
-            var watchIDG = new Stopwatch();
-            if (comm.Rank == 0)
-                watchIDG.Start();
             var localGrid = IDG.Grid(c, metadata, visibilities, uvw, frequencies);
-            if (comm.Rank == 0)
-            {
-                watchIDG.Stop();
-                Console.WriteLine("IDG Pure");
-                Console.WriteLine(watchIDG.Elapsed);
-            }
-                
+            double[,] image = null;
             var grid_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
-                var image = FFT.GridIFFT(grid_total);
+                image = FFT.GridIFFT(grid_total);
                 FFT.Shift(image);
+                watchIdg.Stop();
                 
                 //Single_Reference.FitsIO.Write(image, "dirty.fits");
                 //Console.WriteLine("fits Written");
 
                 //remove spheroidal
 
-                //create patches
-                patches = new double[comm.Size][,];
-                int patchIdx = 0;
-                var oneSide = comm.Size / 2;
-                for (int patchRows = 0; patchRows < oneSide; patchRows++)
-                {
-                    for(int patchColumns = 0; patchColumns < oneSide; patchColumns++)
-                    {
-                        int yOffset = patchRows * (image.GetLength(0) / oneSide);
-                        int xOffset = patchColumns * (image.GetLength(1) / oneSide);
-                        var patch = new double[(image.GetLength(0) / oneSide), (image.GetLength(1) / oneSide)];
-                        patches[patchIdx++] = patch;
-                        for(int y = 0; y < (image.GetLength(0) / oneSide); y++)
-                            for(int x = 0; x < (image.GetLength(1) / oneSide); x++)
-                                patch[y, x] = image[yOffset + y, xOffset + x];
-                    }
-                }
             }
 
-            var localPatch = comm.Scatter<double[,]>(patches, 0);
-            return localPatch;
+            comm.Broadcast<double[,]>(ref image, 0);
+            return image;
         }
 
         private static double[,] CutImg(double[,] image)
         {
-            var output = new double[128, 128];
+            var output = new double[image.GetLength(0) / 2, image.GetLength(1) / 2];
             var yOffset = image.GetLength(0) / 2 - output.GetLength(0) / 2;
             var xOffset = image.GetLength(1) / 2 - output.GetLength(1) / 2;
 

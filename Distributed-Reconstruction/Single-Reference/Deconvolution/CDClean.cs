@@ -21,7 +21,7 @@ namespace Single_Reference.Deconvolution
         /// <param name="residual">residual image</param>
         /// <param name="psf">point spread function in image space</param>
         /// <param name="lambda">regularization parameter</param>
-        public static void Deconvolve(double[,] xImage, double[,] residual, double[,] psf, double lambda, int maxIteration = 100)
+        public static void Deconvolve(double[,] xImage, double[,] residual, double[,] psf, double lambda, int maxIteration = 100, int xResOffset = 0, int yResOffset = 0)
         {
             int iter = 0;
             bool converged = false;
@@ -34,12 +34,12 @@ namespace Single_Reference.Deconvolution
                 iter++;
                 var activeSet = new HashSet<Tuple<int, int>>();
                 
-                for (int y = 0; y < residual.GetLength(0); y++)
+                for (int y = 0; y < xImage.GetLength(0); y++)
                 {
-                    for (int x = 0; x < residual.GetLength(1); x++)
+                    for (int x = 0; x < xImage.GetLength(1); x++)
                     {
                         var xOld = xImage[y, x];
-                        var b = CalculateB(residual, psf, y, x);
+                        var b = CalculateB(residual, psf, y, x, yResOffset, xResOffset);
 
                         //calculate minimum of parabola, eg -2b/a
                         var xNew = xOld + (b / a);
@@ -70,7 +70,7 @@ namespace Single_Reference.Deconvolution
                         var y = pixel.Item1;
                         var x = pixel.Item2;
                         var xOld = xImage[y, x];
-                        var b = CalculateB(residual, psf, y, x);
+                        var b = CalculateB(residual, psf, y, x, yResOffset, xResOffset);
 
                         //calculate minimum of parabola, eg -2b/a
                         var xNew = xOld + (b / a);
@@ -100,7 +100,7 @@ namespace Single_Reference.Deconvolution
             }
         }
 
-        private static double CalculateB(double[,] residual, double[,] psf, int y, int x)
+        private static double CalculateB(double[,] residual, double[,] psf, int y, int x, int yResOffset, int xResOffset)
         {
             int yOffset = y - psf.GetLength(0) / 2;
             int xOffset = x - psf.GetLength(1) / 2;
@@ -110,32 +110,32 @@ namespace Single_Reference.Deconvolution
             {
                 for (int j = 0; j < psf.GetLength(1); j++)
                 {
-                    var ySrc = Math.Abs(yOffset + i);
-                    var xSrc = Math.Abs(xOffset + j);
-                    ySrc = ySrc >= residual.GetLength(0) ? 2 * (residual.GetLength(0) - 1) - ySrc : ySrc;
-                    xSrc = xSrc >= residual.GetLength(1) ? 2 * (residual.GetLength(1) - 1) - xSrc : xSrc;
-
-                    b += residual[ySrc, xSrc] * psf[i, j];
+                    var ySrc = yOffset + i + yResOffset;
+                    var xSrc = xOffset + j + xResOffset;
+                    if (ySrc >= 0 & ySrc < residual.GetLength(0) &
+                        xSrc >= 0 & xSrc < residual.GetLength(1))
+                    {
+                        b += residual[ySrc, xSrc] * psf[i, j];
+                    }
                 }
             }
 
             return b;
         }
 
-        private static double CalculateBParallel(double[,] residual, double[,] psf, int y, int x)
+        private static double CalculateBParallel(double[,] residual, double[,] psf, int y, int x, int yResOffset, int xResOffset)
         {
             int yOffset = y - psf.GetLength(0) / 2;
             int xOffset = x - psf.GetLength(1) / 2;
 
             var lockObj = new Object();
             var b2 = 0.0;
-
             Parallel.For(0, psf.GetLength(0), () => 0.0, (i, loop, b2Local) =>
             {
                 for (int j = 0; j < psf.GetLength(1); j++)
                 {
-                    var ySrc = yOffset + i;
-                    var xSrc = xOffset + j;
+                    var ySrc = yOffset + yResOffset + i;
+                    var xSrc = xOffset + xResOffset + j;
                     if (ySrc >= 0 & ySrc < residual.GetLength(0) &
                         xSrc >= 0 & xSrc < residual.GetLength(1))
                     {
@@ -153,7 +153,6 @@ namespace Single_Reference.Deconvolution
 
             return b2;
         }
-
 
         private static void ModifyResidual(double[,] residual, double[,] psf, int y, int x, double xDiff)
         {
