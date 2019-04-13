@@ -15,7 +15,7 @@ namespace Single_Reference.IDGSequential
         public static List<List<Complex[,]>> ForwardHack(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, Complex[,,] visibilities, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = MathFunctions.FrequencyToWavenumber(frequencies);
-            var imagesize = c.CellSize * c.GridSize;
+            var imagesize = c.ScaleArcSec * c.GridSize;
             var output = new List<List<Complex[,]>>(metadata.Count);
             for (int baseline = 0; baseline < metadata.Count; baseline++)
             {
@@ -85,7 +85,7 @@ namespace Single_Reference.IDGSequential
         public static Complex[,,] BackwardsHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = MathFunctions.FrequencyToWavenumber(frequencies);
-            var imagesize = c.CellSize * c.GridSize;
+            var imagesize = c.ScaleArcSec * c.GridSize;
 
             var outputVis = new Complex[uvw.GetLength(0), uvw.GetLength(1), wavenumbers.Length];
             for (int baseline = 0; baseline < metadata.Count; baseline++)

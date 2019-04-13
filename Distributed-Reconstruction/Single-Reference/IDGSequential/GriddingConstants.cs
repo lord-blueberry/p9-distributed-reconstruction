@@ -18,7 +18,7 @@ namespace Single_Reference.IDGSequential
         
         public int MaxTimestepsPerSubgrid { get; }
 
-        public float CellSize { get; }
+        public float ScaleArcSec { get; }
         public float ImageSize { get; }
 
         public int WLayerCount { get; }
@@ -29,7 +29,7 @@ namespace Single_Reference.IDGSequential
         public float[,] GridSpheroidal { get; }
 
 
-        public GriddingConstants(int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float cellSize, int wLayerCount, float wStep)
+        public GriddingConstants(int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float scale, int wLayerCount, float wStep)
         {
             this.GridSize = gridSize;
             this.SubgridSize = subgridSize;
@@ -37,8 +37,8 @@ namespace Single_Reference.IDGSequential
 
             this.MaxTimestepsPerSubgrid = maxTimesteps;
 
-            this.CellSize = cellSize;
-            this.ImageSize = cellSize * gridSize;
+            this.ScaleArcSec = scale;
+            this.ImageSize = scale * gridSize;
 
             this.WLayerCount = wLayerCount;
             this.WStep = wStep;

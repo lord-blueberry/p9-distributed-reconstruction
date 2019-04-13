@@ -6,6 +6,7 @@ using Single_Reference.Deconvolution;
 using System.Numerics;
 using static System.Math;
 using System.Diagnostics;
+using System.IO;
 
 
 namespace Single_Reference
@@ -191,12 +192,59 @@ namespace Single_Reference
         #endregion
 
         #region full
+        public static void DebugFullMeerKAT()
+        {
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
+            double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            var visibilitiesCount = visibilities.Length;
+
+            int gridSize = 512;
+            int subgridsize = 32;
+            int kernelSize = 8;
+            //cell = image / grid
+            int max_nr_timesteps = 256;
+            double scaleArcSec = 2.5 / 3600.0 * PI / 180.0;
+
+            var watchTotal = new Stopwatch();
+            var watchNufft = new Stopwatch();
+            var watchIdgCore = new Stopwatch();
+            watchTotal.Start();
+            watchNufft.Start();
+            var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+            var psf = IDG.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
+
+            watchIdgCore.Start();
+            var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
+            watchIdgCore.Stop();
+
+            var psf2 = CutImg(psf);
+            watchNufft.Stop();
+            FitsIO.Write(image, "dirty.fits");
+            FitsIO.Write(psf, "psf.fits");
+
+            var reconstruction = new double[gridSize, gridSize];
+            CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 5);
+            watchTotal.Stop();
+
+            Console.WriteLine("Elapsed {0}", watchTotal.Elapsed);
+            FitsIO.Write(reconstruction, "reconstruction.fits");
+            FitsIO.Write(image, "residual.fits");
+            var timetable = "total elapsed: " + watchTotal.Elapsed;
+            timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
+            timetable += "\n" + "idg elapsed: " + watchIdgCore.Elapsed;
+            File.WriteAllText("watches.txt", timetable);
+        }
+
         public static void DebugFullPipeline()
         {
-            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\freq.fits");
-            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\uvw.fits");
-            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-distributed-reconstruction\Distributed-Reconstruction\p9-data\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
-            var visibilitiesCount = visibilities.Length;
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var nrBaselines = uvw.GetLength(0);
             var nrFrequencies = frequencies.Length;
@@ -225,6 +273,7 @@ namespace Single_Reference
             uvw = uvwtmp;
             visibilities = vistmp;
             frequencies = freqtmp;
+            var visibilitiesCount = visibilities.Length;
 
             int gridSize = 256;
             int subgridsize = 32;
@@ -233,41 +282,41 @@ namespace Single_Reference
             int max_nr_timesteps = 256;
             double cellSize = 0.5 / 3600.0 * PI / 180.0;
 
-            var watch = new Stopwatch();
-            var watchIdg = new Stopwatch();
-            watch.Start();
-
+            var watchTotal = new Stopwatch();
+            var watchNufft = new Stopwatch();
+            var watchIdgCore = new Stopwatch();
+            watchTotal.Start();
+            watchNufft.Start();
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-
-            //visibilitiesCount = 1;
-            
             var psf = IDG.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
-            watchIdg.Start();
+
+            watchIdgCore.Start();
             var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
-            watchIdg.Stop();
-            Console.WriteLine("IDG time {0}", watchIdg.Elapsed);
-            //var psfVis = IDG.ToVisibilities(c, metadata, psf, uvw, frequencies);
+            watchIdgCore.Stop();
+
             var psf2 = CutImg(psf);
+            watchNufft.Stop();
             //FitsIO.Write(image, "dirty.fits");
             //FitsIO.Write(psf, "psf.fits");
-            
+
             var reconstruction = new double[gridSize, gridSize];
-            watch.Stop();
-            Console.WriteLine("Elapsed {0}", watch.Elapsed);
-
             CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 5);
-            
-            FitsIO.Write(reconstruction, "reconstruction.fits");
-            FitsIO.Write(image, "residual.fits");
-            CDClean.Deconvolve(reconstruction, image, psf2, 1.0, 5);
-            FitsIO.Write(reconstruction, "reconstruction.fits");
-            FitsIO.Write(image, "residual.fits");
+            watchTotal.Stop();
 
+            Console.WriteLine("Elapsed {0}", watchTotal.Elapsed);
+            FitsIO.Write(reconstruction, "reconstruction.fits");
+            FitsIO.Write(image, "residual.fits");
+            var timetable = "total elapsed: " + watchTotal.Elapsed;
+            timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
+            timetable += "\n" + "idg elapsed: " + watchIdgCore.Elapsed;
+            File.WriteAllText("watches.txt", timetable);
+
+            /*
             var vis2 = IDG.ToVisibilities(c, metadata, image, uvw, frequencies);
             var diffVis = Substract(visibilities, vis2);
             var image2 = IDG.ToImage(c, metadata, diffVis, uvw, frequencies);
-            var vis3 = IDG.ToVisibilities(c, metadata, image2, uvw, frequencies);
+            var vis3 = IDG.ToVisibilities(c, metadata, image2, uvw, frequencies);*/
         }
         #endregion
 

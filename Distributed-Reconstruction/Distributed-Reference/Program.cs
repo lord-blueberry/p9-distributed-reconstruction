@@ -7,6 +7,8 @@ using static System.Math;
 using System.Numerics;
 using System.Collections.Generic;
 
+using System.IO;
+
 namespace Distributed_Reference
 {
     class Program
@@ -57,28 +59,36 @@ namespace Distributed_Reference
                 visibilities = vistmp;
                 frequencies = freqtmp;
 
-                var watchTotal = new Stopwatch();
-                var watchNufft = new Stopwatch();
-                var watchIdg = new Stopwatch();
-                if (comm.Rank == 0)
-                    watchTotal.Start();
-
                 int gridSize = 256;
                 int subgridsize = 32;
                 int kernelSize = 8;
                 //cell = image / grid
                 int max_nr_timesteps = 256;
                 double cellSize = 0.5 / 3600.0 * PI / 180.0;
+
+                var watchTotal = new Stopwatch();
+                var watchNufft = new Stopwatch();
+                var watchIdg = new Stopwatch();
+                if (comm.Rank == 0)
+                {
+                    watchTotal.Start();
+                    watchNufft.Start();
+                }
                 var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psf = CalculatePSF(comm, c, metadata, uvw, frequencies, visibilities.LongLength * comm.Size);
                 var imageLocal = Forward(comm, c, metadata, visibilities, uvw, frequencies, watchIdg);
 
+                if (comm.Rank == 0)
+                {
+                    Console.WriteLine("deconvolve");
+                    watchNufft.Stop();
+                }
+                    
                 var halfComm = comm.Size / 2;
                 var localX = new double[imageLocal.GetLength(0) / halfComm, imageLocal.GetLength(1) / halfComm];
 
-                if (comm.Rank == 0)
-                    Console.WriteLine("deconvolve");
+                
 
                 var yResOffset = comm.Rank / 2 * (gridSize / halfComm);
                 var xResOffset = comm.Rank % 2 * (gridSize / halfComm);
@@ -132,6 +142,10 @@ namespace Distributed_Reference
 
                     watchTotal.Stop();
                     Single_Reference.FitsIO.Write(reconstructed, "xImage2.fits");
+                    var timetable = "total elapsed: " + watchTotal.Elapsed;
+                    timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
+                    timetable += "\n" + "idg elapsed: " + watchIdg.Elapsed;
+                    File.WriteAllText("watches.txt", timetable);
                 }
 
             }

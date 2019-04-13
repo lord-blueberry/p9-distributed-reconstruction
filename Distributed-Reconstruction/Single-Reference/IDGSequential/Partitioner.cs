@@ -19,7 +19,7 @@ namespace Single_Reference.IDGSequential
         /// <returns></returns>
         public static List<List<SubgridHack>> CreatePartition(GriddingConstants c, double[,,] uvw, double[] frequencies)
         {
-            var imagesize = c.CellSize * c.GridSize;
+            var imagesize = c.ScaleArcSec * c.GridSize;
             List<List<SubgridHack>> outputGrids = new List<List<SubgridHack>>(uvw.GetLength(0));
             for(int baseline = 0; baseline < uvw.GetLength(0); baseline++)
             {
@@ -56,6 +56,8 @@ namespace Single_Reference.IDGSequential
                     //this is taken from the original IDG implementation. Here may be room for simplification
                     for (; time < uvw.GetLength(1); time++)
                     {
+                        if (time == 254)
+                            Console.WriteLine("");
                         var dpChannel0 = datapoints[time, 0];
                         var dpChannelMax = datapoints[time, frequencies.Length - 1];
                         var hack = dpChannelMax.Copy();

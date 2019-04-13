@@ -128,14 +128,13 @@ namespace Single_Reference
         /// <param name="timessamplesCount"></param>
         /// <param name="channelsCount"></param>
         /// <returns></returns>
-        public static Complex[,,] ReadVisibilities(string file, int baselinesCount, int timessamplesCount, int channelsCount)
+        public static Complex[,,] ReadVisibilities(string file, int baselinesCount, int timessamplesCount, int channelsCount, double norm)
         {
             var f = new Fits(file);
             var h = (ImageHDU)f.ReadHDU();
             //Double cube Dimensions: baseline, time, channel, pol, complex_component
             var vis_raw = (Array[])h.Kernel;
             var visibilities = new Complex[baselinesCount, timessamplesCount, channelsCount];
-            double norm = 2.0 * baselinesCount * timessamplesCount * channelsCount;
             for (int i = 0; i < baselinesCount; i++)
             {
                 Array[] bl = (Array[])vis_raw[i];
