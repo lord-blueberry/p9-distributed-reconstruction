@@ -258,7 +258,6 @@ namespace Single_Reference
 
             CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 5);
             
-
             FitsIO.Write(reconstruction, "reconstruction.fits");
             FitsIO.Write(image, "residual.fits");
             CDClean.Deconvolve(reconstruction, image, psf2, 1.0, 5);
