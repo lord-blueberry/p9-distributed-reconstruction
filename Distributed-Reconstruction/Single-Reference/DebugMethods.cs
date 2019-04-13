@@ -201,11 +201,11 @@ namespace Single_Reference
 
             var visibilitiesCount = visibilities.Length;
 
-            int gridSize = 512;
-            int subgridsize = 32;
-            int kernelSize = 8;
+            int gridSize = 1024;
+            int subgridsize = 16;
+            int kernelSize = 4;
             //cell = image / grid
-            int max_nr_timesteps = 256;
+            int max_nr_timesteps = 512;
             double scaleArcSec = 2.5 / 3600.0 * PI / 180.0;
 
             var watchTotal = new Stopwatch();
@@ -227,7 +227,7 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
 
             var reconstruction = new double[gridSize, gridSize];
-            CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 5);
+            //CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 5);
             watchTotal.Stop();
 
             Console.WriteLine("Elapsed {0}", watchTotal.Elapsed);

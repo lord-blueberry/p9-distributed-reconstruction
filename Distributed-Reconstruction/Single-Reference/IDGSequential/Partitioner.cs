@@ -56,8 +56,6 @@ namespace Single_Reference.IDGSequential
                     //this is taken from the original IDG implementation. Here may be room for simplification
                     for (; time < uvw.GetLength(1); time++)
                     {
-                        if (time == 254)
-                            Console.WriteLine("");
                         var dpChannel0 = datapoints[time, 0];
                         var dpChannelMax = datapoints[time, frequencies.Length - 1];
                         var hack = dpChannelMax.Copy();
@@ -67,7 +65,10 @@ namespace Single_Reference.IDGSequential
                         {
                             timeSamplePerSubgrid++;
                             if (timeSamplePerSubgrid == c.MaxTimestepsPerSubgrid)
+                            {
+                                time++;
                                 break;
+                            } 
                         }
                         else
                         {
