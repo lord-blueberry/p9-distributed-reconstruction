@@ -156,6 +156,38 @@ namespace Single_Reference
             }
             return visibilities;
         }
+
+        public static bool[,,] ReadFlags(string file, int baselinesCount, int timessamplesCount, int channelsCount)
+        {
+            var output = new bool[baselinesCount, timessamplesCount, channelsCount];
+
+            var f = new Fits(file);
+            var h = (ImageHDU)f.ReadHDU();
+            var flags_raw = (Array[])h.Kernel;
+            for (int i = 0; i < baselinesCount; i++)
+            {
+                Array[] bl = (Array[])flags_raw[i];
+                for (int j = 0; j < timessamplesCount; j++)
+                {
+                    Array[] times = (Array[])bl[j];
+                    for (int k = 0; k < channelsCount; k++)
+                    {
+                        double[] pols = (double[])times[k];
+                        var sum = 0.0;
+                        for (int l = 0; l < pols.Length; l++)
+                            sum += pols[l];
+
+                        //visibilitiy has been flagged                        
+                        if (sum == 0)
+                            output[i, j, k] = false;
+                        else
+                            output[i, j, k] = true;
+                    }
+                }
+            }
+
+            return output;
+        }
         #endregion
     }
 }

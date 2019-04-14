@@ -32,29 +32,76 @@ namespace Single_Reference.Deconvolution
             while (iter < maxIteration & !converged)
             {
                 iter++;
+                //CLEAN-inspired. Add pixels with the maximum residual
                 var activeSet = new HashSet<Tuple<int, int>>();
+                for(int pixels = 0; pixels < 10; pixels++)
+                {
+                    double max = 0.0;
+                    int yMax = 0;
+                    int xMax = 0;
+                    for (int y = 0; y < xImage.GetLength(0); y++)
+                    {
+                        for (int x = 0; x < xImage.GetLength(1); x++)
+                        {
+                            var res = residual[y + yResOffset, x + xResOffset];
+                            if(max < res)
+                            {
+                                max = res;
+                                yMax = y;
+                                xMax = x;
+                            }
+                        }
+                    }
+
+                    var xOld = xImage[yMax, xMax];
+                    var b = CalculateB(residual, psf, yMax, xMax, yResOffset, xResOffset);
+
+                    //calculate minimum of parabola, eg -2b/a
+                    var xNew = xOld + (b / a);
+                    xNew = ShrinkAbsolute(xNew, lambda);
+                    var xDiff = xNew - xOld;
+
+                    if (Math.Abs(xDiff) > precision)
+                    {
+                        Console.WriteLine("added pixel to active set with index: " + yMax + " and " + xMax);
+                        activeSet.Add(new Tuple<int, int>(yMax, xMax));
+                        xImage[yMax, xMax] = xNew;
+                        ModifyResidual(residual, psf, yMax + yResOffset, xMax + xResOffset, xDiff);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
                 
+
+                //re-add old variables that significantly change
                 for (int y = 0; y < xImage.GetLength(0); y++)
                 {
                     for (int x = 0; x < xImage.GetLength(1); x++)
                     {
                         var xOld = xImage[y, x];
-                        var b = CalculateB(residual, psf, y, x, yResOffset, xResOffset);
-
-                        //calculate minimum of parabola, eg -2b/a
-                        var xNew = xOld + (b / a);
-                        xNew = ShrinkAbsolute(xNew, lambda);
-                        var xDiff = xNew - xOld;
-
-                        if (Math.Abs(xDiff) > precision)
+                        if(xOld > 0.0)
                         {
-                            activeSet.Add(new Tuple<int, int>(y, x));
-                            xImage[y, x] = xNew;
-                            ModifyResidual(residual, psf, y + yResOffset, x + xResOffset, xDiff);
+                            var b = CalculateB(residual, psf, y, x, yResOffset, xResOffset);
+
+                            //calculate minimum of parabola, eg -2b/a
+                            var xNew = xOld + (b / a);
+                            xNew = ShrinkAbsolute(xNew, lambda);
+                            var xDiff = xNew - xOld;
+
+                            if (Math.Abs(xDiff) > precision)
+                            {
+                                activeSet.Add(new Tuple<int, int>(y, x));
+                                xImage[y, x] = xNew;
+                                ModifyResidual(residual, psf, y + yResOffset, x + xResOffset, xDiff);
+                            }
                         }
                     }
                 }
 
+                Console.WriteLine("total pixels in active set: " + activeSet.Count);
 
                 converged = activeSet.Count  == 0;
                 bool activeSetConverged = false;
@@ -65,7 +112,7 @@ namespace Single_Reference.Deconvolution
                     activeSetConverged = true;
                     var delete = new List<Tuple<int, int>>();
                     innerIter++;
-                    foreach (var pixel in activeSet)
+                    foreach (var pixel in activeSet.ToArray())
                     {
                         var y = pixel.Item1;
                         var x = pixel.Item2;

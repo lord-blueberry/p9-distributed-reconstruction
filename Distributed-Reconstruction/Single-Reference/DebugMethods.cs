@@ -196,6 +196,8 @@ namespace Single_Reference
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
+            //var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
@@ -215,7 +217,7 @@ namespace Single_Reference
             watchNufft.Start();
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-            var psf = IDG.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
+            var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
 
             watchIdgCore.Start();
             var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
@@ -223,11 +225,11 @@ namespace Single_Reference
 
             var psf2 = CutImg(psf);
             watchNufft.Stop();
-            FitsIO.Write(image, "dirty.fits");
-            FitsIO.Write(psf, "psf.fits");
+            //FitsIO.Write(image, "dirty.fits");
+            //FitsIO.Write(psf, "psf.fits");
 
             var reconstruction = new double[gridSize, gridSize];
-            //CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 5);
+            CDClean.Deconvolve(reconstruction, image, psf2, 0.0, 2);
             watchTotal.Stop();
 
             Console.WriteLine("Elapsed {0}", watchTotal.Elapsed);
@@ -243,6 +245,7 @@ namespace Single_Reference
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
             double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
@@ -289,7 +292,7 @@ namespace Single_Reference
             watchNufft.Start();
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-            var psf = IDG.CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
+            var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
 
             watchIdgCore.Start();
             var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
@@ -323,7 +326,7 @@ namespace Single_Reference
         #region helpers
         private static double[,] CutImg(double[,] image)
         {
-            var output = new double[128, 128];
+            var output = new double[image.GetLength(0) / 2, image.GetLength(1) / 2];
             var yOffset = image.GetLength(0) / 2 - output.GetLength(0) / 2;
             var xOffset = image.GetLength(1) / 2 - output.GetLength(1) / 2;
 

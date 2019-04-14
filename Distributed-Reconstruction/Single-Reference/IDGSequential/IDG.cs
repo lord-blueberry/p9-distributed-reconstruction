@@ -19,13 +19,19 @@ namespace Single_Reference.IDGSequential
             return grid;
         }
 
-        public static Complex[,] GridPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        public static Complex[,] GridPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies, long visibilitiesCount)
         {
             var visibilities = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             for (int i = 0; i < visibilities.GetLength(0); i++)
                 for (int j = 0; j < visibilities.GetLength(1); j++)
                     for (int k = 0; k < visibilities.GetLength(2); k++)
-                        visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
+                    {
+                        if (!flags[i, j, k])
+                            visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
+                        else
+                            visibilities[i, j, k] = new Complex(0, 0);
+                    }
+
 
             return Grid(c, metadata, visibilities, uvw, frequencies);
         }
@@ -58,13 +64,21 @@ namespace Single_Reference.IDGSequential
             return img;
         }
 
-        public static double[,] CalculatePSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        public static double[,] CalculatePSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies, long visibilitiesCount)
         {
             var visibilities = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             for (int i = 0; i < visibilities.GetLength(0); i++)
                 for (int j = 0; j < visibilities.GetLength(1); j++)
                     for (int k = 0; k < visibilities.GetLength(2); k++)
-                        visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
+                    {
+                        if (!flags[i, j, k])
+                        {
+                            visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
+                        }
+                        else
+                            visibilities[i, j, k] = new Complex(0, 0);
+                    }
+                        
             
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
             var ftgridded = FFT.SubgridFFT(c, gridded);
@@ -81,9 +95,9 @@ namespace Single_Reference.IDGSequential
             return psf;
         }
 
-        public static double[,] CalculateNormedPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, double[] frequencies, long visibilitiesCount)
+        public static double[,] CalculateNormedPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies, long visibilitiesCount)
         {
-            var psf = CalculatePSF(c, metadata, uvw, frequencies, visibilitiesCount);
+            var psf = CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
 
             var sum = 0.0;
             for (int y = 0; y < psf.GetLength(0); y++)
