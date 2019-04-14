@@ -74,12 +74,12 @@ namespace Distributed_Reference
                 frequencies = freqtmp;
                 flags = flagstmp;
 
-                int gridSize = 256;
+                int gridSize = 1024;
                 int subgridsize = 16;
                 int kernelSize = 8;
                 //cell = image / grid
                 int max_nr_timesteps = 256;
-                double cellSize = 0.5 / 3600.0 * PI / 180.0;
+                double cellSize = 2.5 / 3600.0 * PI / 180.0;
 
                 comm.Barrier();
                 var watchTotal = new Stopwatch();
@@ -131,11 +131,12 @@ namespace Distributed_Reference
                     }
 
                     watchTotal.Stop();
+                    FitsIO.Write(imageLocal, "residual_0.fits");
                     FitsIO.Write(reconstructed, "xImage.fits");
                     var timetable = "total elapsed: " + watchTotal.Elapsed;
                     timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
                     timetable += "\n" + "idg elapsed: " + watchIdg.Elapsed;
-                    File.WriteAllText("watches.txt", timetable);
+                    File.WriteAllText("watches_mpi.txt", timetable);
                 }
                 /*
                 ExchangeNonZero(comm, localX, imageLocal, psf, yResOffset, xResOffset);

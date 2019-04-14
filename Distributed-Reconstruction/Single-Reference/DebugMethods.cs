@@ -238,7 +238,7 @@ namespace Single_Reference
             var timetable = "total elapsed: " + watchTotal.Elapsed;
             timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
             timetable += "\n" + "idg elapsed: " + watchIdgCore.Elapsed;
-            File.WriteAllText("watches.txt", timetable);
+            File.WriteAllText("watches_single.txt", timetable);
         }
 
         public static void DebugFullPipeline()
