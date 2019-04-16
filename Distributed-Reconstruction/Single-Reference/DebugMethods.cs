@@ -298,6 +298,17 @@ namespace Single_Reference
 
             watchIdgCore.Start();
             var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
+            var vis2 = IDG.ToVisibilities(c, metadata, image, uvw, frequencies, psf);
+            for (int i = 0; i < nrBaselines; i++)
+            {
+                for (int j = 0; j < uvw.GetLength(1); j++)
+                {
+                    for (int k = 0; k < nrFrequencies; k++)
+                    {
+                        vis2[i, j, k] = vis2[i, j, k] / visibilitiesCount;
+                    }
+                }
+            }
             watchIdgCore.Stop();
 
             var psf2 = CutImg(psf);
