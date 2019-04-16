@@ -289,47 +289,38 @@ namespace Single_Reference
             var watchNufft = new Stopwatch();
             var watchIdgCore = new Stopwatch();
             watchTotal.Start();
-            watchNufft.Start();
+
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            watchNufft.Start();
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
             var psf2 = CutImg(psf);
-
-            watchIdgCore.Start();
-            var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
-            watchIdgCore.Stop();
-
-            watchNufft.Stop();
-            FitsIO.Write(image, "dirty.fits");
-            FitsIO.Write(psf2, "psf.fits");
+            //FitsIO.Write(psf2, "psf.fits");
 
             var reconstruction = new double[gridSize, gridSize];
-            CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 2);
-            FitsIO.Write(reconstruction, "reconstruction.fits");
-            watchTotal.Stop();
-            var vis2 = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies);
-            var residualVis = new Complex[nrBaselines, uvw.GetLength(1), nrFrequencies];
-            for (int i = 0; i < nrBaselines; i++)
-                for (int j = 0; j < uvw.GetLength(1); j++)
-                    for (int k = 0; k < nrFrequencies; k++)
-                        residualVis[i, j, k] = visibilities[i, j, k] - vis2[i, j, k];
-         
-            var img2 = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
-            FitsIO.Write(img2, "major_cycle2.fits");
+            var residualVis = visibilities;
+            var majorCycles = 2;
+            for(int cycle = 0; cycle < majorCycles; cycle++)
+            {
+                watchIdgCore.Start();
+                var image = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
+                watchIdgCore.Stop();
+                //FitsIO.Write(image, "dirty"+cycle+".fits");
 
-            Console.WriteLine("Elapsed {0}", watchTotal.Elapsed);
-            FitsIO.Write(reconstruction, "reconstruction.fits");
-            FitsIO.Write(image, "residual.fits");
+                CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 2);
+                FitsIO.Write(reconstruction, "reconstruction"+cycle+".fits");
+
+                var modelVis = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis);
+            }
+            watchNufft.Stop();
+            watchTotal.Stop();
+
             var timetable = "total elapsed: " + watchTotal.Elapsed;
             timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
             timetable += "\n" + "idg elapsed: " + watchIdgCore.Elapsed;
-            File.WriteAllText("watches.txt", timetable);
-
-            /*
-            var vis2 = IDG.ToVisibilities(c, metadata, image, uvw, frequencies);
-            var diffVis = Substract(visibilities, vis2);
-            var image2 = IDG.ToImage(c, metadata, diffVis, uvw, frequencies);
-            var vis3 = IDG.ToVisibilities(c, metadata, image2, uvw, frequencies);*/
+            File.WriteAllText("watches_single.txt", timetable);
         }
         #endregion
 
