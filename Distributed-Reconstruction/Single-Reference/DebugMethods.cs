@@ -293,6 +293,8 @@ namespace Single_Reference
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
+            var psfVis = IDG.ToVisibilities(c, metadata, psf, uvw, frequencies, psf);
+
 
             watchIdgCore.Start();
             var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);

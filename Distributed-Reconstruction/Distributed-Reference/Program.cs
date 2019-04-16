@@ -98,7 +98,7 @@ namespace Distributed_Reference
 
                 if (comm.Rank == 0)
                 {
-                    //Single_Reference.FitsIO.Write(imageLocal, "0_dirty.fits");
+                    Single_Reference.FitsIO.Write(imageLocal, "0_dirty.fits");
                     watchNufft.Stop();
                     Console.WriteLine("deconvolve");
                 }
@@ -133,6 +133,7 @@ namespace Distributed_Reference
                     watchTotal.Stop();
                     FitsIO.Write(imageLocal, "residual_0.fits");
                     FitsIO.Write(reconstructed, "xImage.fits");
+                    FitsIO.Write(psf, "psf.fits");
                     var timetable = "total elapsed: " + watchTotal.Elapsed;
                     timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
                     timetable += "\n" + "idg elapsed: " + watchIdg.Elapsed;

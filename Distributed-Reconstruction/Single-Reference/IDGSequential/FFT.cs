@@ -142,6 +142,27 @@ namespace Single_Reference.IDGSequential
             return output;
         }
 
+
+        public static Complex[,] GridFFTNoNorm(double[,] image, long visibilityCount = 1)
+        {
+            Complex[,] output = new Complex[image.GetLength(0), image.GetLength(1)];
+            using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))
+            using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
+            {
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        imageSpace[y, x] = image[y, x];
+
+                DFT.FFT(imageSpace, fourierSpace);
+
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        output[y, x] = fourierSpace[y, x];
+            }
+
+            return output;
+        }
+
         /// <summary>
         /// Just here for debug purposes
         /// </summary>

@@ -110,8 +110,14 @@ namespace Single_Reference.IDGSequential
             return psf;
         }
 
-        public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies)
+        public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies, double[,] psf)
         {
+            FFT.Shift(psf);
+            var FTpsf = FFT.GridFFT(psf);
+            FFT.Shift(psf);
+
+            
+
             //add spheroidal to grid?
             for (int i = 0; i < image.GetLength(0); i++)
                 for (int j = 0; j < image.GetLength(1); j++)
@@ -119,6 +125,14 @@ namespace Single_Reference.IDGSequential
 
             FFT.Shift(image);
             var grid = FFT.GridFFT(image);
+            for(int y = 0; y < grid.GetLength(0); y++)
+            {
+                for(int x = 0; x < grid.GetLength(1); x++)
+                {
+                    grid[y, x] = grid[y, x] / FTpsf[y, x];
+                }
+            }
+
             FFT.Shift(grid);
             var ftGridded = Adder.SplitHack(c, metadata, grid);
             var gridded = FFT.SubgridIFFT(c, ftGridded);
