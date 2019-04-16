@@ -293,32 +293,29 @@ namespace Single_Reference
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
-            var psfVis = IDG.ToVisibilities(c, metadata, psf, uvw, frequencies, psf);
-
+            var psf2 = CutImg(psf);
 
             watchIdgCore.Start();
             var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
-            var vis2 = IDG.ToVisibilities(c, metadata, image, uvw, frequencies, psf);
-            for (int i = 0; i < nrBaselines; i++)
-            {
-                for (int j = 0; j < uvw.GetLength(1); j++)
-                {
-                    for (int k = 0; k < nrFrequencies; k++)
-                    {
-                        vis2[i, j, k] = vis2[i, j, k] / visibilitiesCount;
-                    }
-                }
-            }
             watchIdgCore.Stop();
 
-            var psf2 = CutImg(psf);
             watchNufft.Stop();
-            //FitsIO.Write(image, "dirty.fits");
-            //FitsIO.Write(psf, "psf.fits");
+            FitsIO.Write(image, "dirty.fits");
+            FitsIO.Write(psf2, "psf.fits");
 
             var reconstruction = new double[gridSize, gridSize];
-            CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 5);
+            CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 2);
+            FitsIO.Write(reconstruction, "reconstruction.fits");
             watchTotal.Stop();
+            var vis2 = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies);
+            var residualVis = new Complex[nrBaselines, uvw.GetLength(1), nrFrequencies];
+            for (int i = 0; i < nrBaselines; i++)
+                for (int j = 0; j < uvw.GetLength(1); j++)
+                    for (int k = 0; k < nrFrequencies; k++)
+                        residualVis[i, j, k] = visibilities[i, j, k] - vis2[i, j, k];
+         
+            var img2 = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
+            FitsIO.Write(img2, "major_cycle2.fits");
 
             Console.WriteLine("Elapsed {0}", watchTotal.Elapsed);
             FitsIO.Write(reconstruction, "reconstruction.fits");
