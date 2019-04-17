@@ -9,6 +9,7 @@ namespace Single_Reference.IDGSequential
 {
     public class IDG
     {
+
         public static Complex[,] Grid(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
@@ -119,6 +120,7 @@ namespace Single_Reference.IDGSequential
 
             FFT.Shift(image);
             var grid = FFT.GridFFT(image);
+            FFT.Shift(image);
 
             FFT.Shift(grid);
             var ftGridded = Adder.SplitHack(c, metadata, grid);
@@ -128,13 +130,16 @@ namespace Single_Reference.IDGSequential
             return visibilities;
         }
 
-        public static Complex[,,] Substract(Complex[,,] vis0, Complex[,,] vis1)
+        public static Complex[,,] Substract(Complex[,,] vis0, Complex[,,] vis1, bool[,,] flag)
         {
             var residualVis = new Complex[vis0.GetLength(0), vis0.GetLength(1), vis0.GetLength(2)];
             for (int i = 0; i < vis0.GetLength(0); i++)
                 for (int j = 0; j < vis0.GetLength(1); j++)
                     for (int k = 0; k < vis0.GetLength(2); k++)
-                        residualVis[i, j, k] = vis0[i, j, k] - vis1[i, j, k];
+                        if (!flag[i, j, k])
+                            residualVis[i, j, k] = vis0[i, j, k] - vis1[i, j, k];
+                        else
+                            residualVis[i, j, k] = 0;
 
             return residualVis;
         }
