@@ -196,8 +196,8 @@ namespace Single_Reference
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
-            var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
-            var flags2 = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
+            //var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
             var visCount2 = 0;
@@ -219,9 +219,9 @@ namespace Single_Reference
                         } 
                     }
 
-            var visibilitiesCount = visCount2;//visibilities.Length;
+            var visibilitiesCount = visibilities.Length;
 
-            int gridSize = 1024;
+            int gridSize = 512;
             int subgridsize = 16;
             int kernelSize = 4;
             //cell = image / grid
@@ -237,6 +237,19 @@ namespace Single_Reference
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
+            var visPSF = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
+            for (int i = 0; i < visibilities.GetLength(0); i++)
+                for (int j = 0; j < visibilities.GetLength(1); j++)
+                    for (int k = 0; k < visibilities.GetLength(2); k++)
+                    {
+                        if (!flags[i, j, k])
+                        {
+                            visPSF[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
+                        }
+                        else
+                            visPSF[i, j, k] = new Complex(0, 0);
+                    }
+
             FitsIO.Write(psf, "psf.fits");
             var psf2 = CutImg(psf);
 
@@ -246,12 +259,13 @@ namespace Single_Reference
             for (int cycle = 0; cycle < majorCycles; cycle++)
             {
                 watchForward.Start();
-                var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
+                //var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
                 watchForward.Stop();
-                FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
+                //FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
 
                 watchDeconv.Start();
-                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.2 / (cycle + 1), 2);
+                //CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.2 / (cycle + 1), 2);
+                reconstruction[256, 256] = 1.0;
                 int nonzero = CountNonZero(reconstruction);
                 Console.WriteLine("number of nonzeros in reconstruction: " + nonzero);
                 watchDeconv.Stop();

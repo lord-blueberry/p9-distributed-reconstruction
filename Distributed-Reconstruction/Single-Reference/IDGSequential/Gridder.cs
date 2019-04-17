@@ -156,7 +156,7 @@ namespace Single_Reference.IDGSequential
 
         private static float ComputeL(int x, int subgridSize, float imageSize)
         {
-            return (x - (subgridSize / 2)) * imageSize / subgridSize;
+            return (x - (subgridSize / 2)+ 0.5f) * imageSize / subgridSize;
         }
 
         private static float ComputeN(float l, float m)

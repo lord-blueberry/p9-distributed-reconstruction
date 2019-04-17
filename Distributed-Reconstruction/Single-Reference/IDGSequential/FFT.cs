@@ -132,7 +132,7 @@ namespace Single_Reference.IDGSequential
                         imageSpace[y, x] = image[y, x];
 
                 DFT.FFT(imageSpace, fourierSpace);
-                var norm = (2.0* visibilityCount) / (image.GetLength(0) * image.GetLength(1));
+                var norm = (1.0* visibilityCount) / (image.GetLength(0) * image.GetLength(1));
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
