@@ -196,12 +196,30 @@ namespace Single_Reference
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
-            //var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
-            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
+            var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+            var flags2 = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+            var visCount2 = 0;
+            for (int i = 0; i < flags.GetLength(0); i++)
+                for (int j = 0; j < flags.GetLength(1); j++)
+                    for (int k = 0; k < flags.GetLength(2); k++)
+                        if (!flags[i, j, k])
+                            visCount2++;
 
-            var visibilitiesCount = visibilities.Length;
+            bool constraint = true;
+            var zero = new Complex(0, 0);
+            for (int i = 0; i < flags.GetLength(0); i++)
+                for (int j = 0; j < flags.GetLength(1); j++)
+                    for (int k = 0; k < flags.GetLength(2); k++)
+                    { 
+                        if (!flags[i, j, k] && constraint)
+                        {
+                            constraint = visibilities[i, j, k] != zero;
+                        } 
+                    }
+
+            var visibilitiesCount = visCount2;//visibilities.Length;
 
             int gridSize = 1024;
             int subgridsize = 16;
@@ -211,33 +229,49 @@ namespace Single_Reference
             double scaleArcSec = 2.5 / 3600.0 * PI / 180.0;
 
             var watchTotal = new Stopwatch();
-            var watchNufft = new Stopwatch();
-            var watchIdgCore = new Stopwatch();
+            var watchForward = new Stopwatch();
+            var watchBackwards = new Stopwatch();
+            var watchDeconv = new Stopwatch();
             watchTotal.Start();
-            watchNufft.Start();
+
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
-
-            watchIdgCore.Start();
-            var image = IDG.ToImage(c, metadata, visibilities, uvw, frequencies);
-            watchIdgCore.Stop();
-
+            FitsIO.Write(psf, "psf.fits");
             var psf2 = CutImg(psf);
-            watchNufft.Stop();
-            //FitsIO.Write(image, "dirty.fits");
-            //FitsIO.Write(psf, "psf.fits");
 
             var reconstruction = new double[gridSize, gridSize];
-            CDClean.Deconvolve(reconstruction, image, psf2, 0.0, 2);
+            var residualVis = visibilities;
+            var majorCycles = 1;
+            for (int cycle = 0; cycle < majorCycles; cycle++)
+            {
+                watchForward.Start();
+                var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
+                watchForward.Stop();
+                FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
+
+                watchDeconv.Start();
+                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.2 / (cycle + 1), 2);
+                int nonzero = CountNonZero(reconstruction);
+                Console.WriteLine("number of nonzeros in reconstruction: " + nonzero);
+                watchDeconv.Stop();
+                FitsIO.Write(reconstruction, "reconstruction" + cycle + ".fits");
+
+                watchBackwards.Start();
+                var modelVis = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                watchBackwards.Stop();
+
+                var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
+                FitsIO.Write(imgRec, "model" + cycle + ".fits");
+            }
+            watchBackwards.Stop();
             watchTotal.Stop();
 
-            Console.WriteLine("Elapsed {0}", watchTotal.Elapsed);
-            FitsIO.Write(reconstruction, "reconstruction.fits");
-            FitsIO.Write(image, "residual.fits");
             var timetable = "total elapsed: " + watchTotal.Elapsed;
-            timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
-            timetable += "\n" + "idg elapsed: " + watchIdgCore.Elapsed;
+            timetable += "\n" + "idg forward elapsed: " + watchForward.Elapsed;
+            timetable += "\n" + "idg backwards elapsed: " + watchBackwards.Elapsed;
+            timetable += "\n" + "devonvolution: " + watchDeconv.Elapsed;
             File.WriteAllText("watches_single.txt", timetable);
         }
 
@@ -286,40 +320,51 @@ namespace Single_Reference
             double cellSize = 0.5 / 3600.0 * PI / 180.0;
 
             var watchTotal = new Stopwatch();
-            var watchNufft = new Stopwatch();
-            var watchIdgCore = new Stopwatch();
+            var watchForward = new Stopwatch();
+            var watchBackwards = new Stopwatch();
+            var watchDeconv = new Stopwatch();
             watchTotal.Start();
 
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
-            watchNufft.Start();
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
             var psf2 = CutImg(psf);
             //FitsIO.Write(psf2, "psf.fits");
 
             var reconstruction = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            var majorCycles = 2;
+            var majorCycles = 4;
             for(int cycle = 0; cycle < majorCycles; cycle++)
             {
-                watchIdgCore.Start();
-                var image = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
-                watchIdgCore.Stop();
-                //FitsIO.Write(image, "dirty"+cycle+".fits");
+                watchForward.Start();
+                var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
+                watchForward.Stop();
+                FitsIO.Write(dirtyImage, "dirty"+cycle+".fits");
 
-                CDClean.Deconvolve(reconstruction, image, psf2, 2.0, 2);
+                FitsIO.Write(reconstruction, "reconstruction_before" + cycle + ".fits");
+                watchDeconv.Start();
+                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 1.0/(cycle+1), 4);
+                FitsIO.Write(dirtyImage, "residualDirty" + cycle + ".fits");
+                int nonzero = CountNonZero(reconstruction);
+                watchDeconv.Stop();
                 FitsIO.Write(reconstruction, "reconstruction"+cycle+".fits");
 
+                watchBackwards.Start();
                 var modelVis = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies);
-                residualVis = IDG.Substract(visibilities, modelVis);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                watchBackwards.Stop();
+
+                var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
+                FitsIO.Write(imgRec, "model" + cycle + ".fits");
             }
-            watchNufft.Stop();
+            watchBackwards.Stop();
             watchTotal.Stop();
 
             var timetable = "total elapsed: " + watchTotal.Elapsed;
-            timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
-            timetable += "\n" + "idg elapsed: " + watchIdgCore.Elapsed;
+            timetable += "\n" + "idg forward elapsed: " + watchForward.Elapsed;
+            timetable += "\n" + "idg backwards elapsed: " + watchBackwards.Elapsed;
+            timetable += "\n" + "devonvolution: " + watchDeconv.Elapsed;
             File.WriteAllText("watches_single.txt", timetable);
         }
         #endregion
@@ -339,6 +384,7 @@ namespace Single_Reference
 
         private static double[,] Convolve(double[,] image, double[,] kernel)
         {
+
             var output = new double[image.GetLength(0), image.GetLength(1)];
             for (int y = 0; y < image.GetLength(0); y++)
             {
@@ -364,19 +410,23 @@ namespace Single_Reference
             return output;
         }
 
-        private static Complex[,,] Substract(Complex[,,] vis0, Complex[,,] vis1)
+        private static Complex[,,] Substract(Complex[,,] vis0, Complex[,,] vis1, bool[,,] flags)
         {
             var output = new Complex[vis0.GetLength(0), vis0.GetLength(1), vis0.GetLength(2)];
             for (int i = 0; i < vis0.GetLength(0); i++)
                 for (int j = 0; j < vis0.GetLength(1); j++)
                     for (int k = 0; k < vis0.GetLength(2); k++)
-                        output[i, j, k] = vis0[i, j, k] - vis1[i, j, k];
+                        if (!flags[i, j, k])
+                            output[i, j, k] = vis0[i, j, k] - vis1[i, j, k];
+                        else
+                            output[i, j, k] = 0;
             return output;
         }
 
         private static Complex[,,] Add(Complex[,,] vis0, Complex[,,] vis1)
         {
             var output = new Complex[vis0.GetLength(0), vis0.GetLength(1), vis0.GetLength(2)];
+
             for (int i = 0; i < vis0.GetLength(0); i++)
                 for (int j = 0; j < vis0.GetLength(1); j++)
                     for (int k = 0; k < vis0.GetLength(2); k++)
@@ -414,6 +464,16 @@ namespace Single_Reference
                 }
             }
             return output;
+        }
+
+        private static int CountNonZero(double[,] image)
+        {
+            int count = 0;
+            for(int y = 0; y < image.GetLength(0); y++)
+                for (int x = 0; x < image.GetLength(1); x++)
+                    if (image[y, x] > 0.0)
+                        count++;
+            return count;
         }
         #endregion
 
