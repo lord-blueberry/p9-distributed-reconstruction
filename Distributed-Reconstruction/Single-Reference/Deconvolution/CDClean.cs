@@ -32,9 +32,40 @@ namespace Single_Reference.Deconvolution
             while (iter < maxIteration & !converged)
             {
                 iter++;
-                //CLEAN-inspired. Add pixels with the maximum residual
                 var activeSet = new HashSet<Tuple<int, int>>();
-                for(int pixels = 0; pixels < 10; pixels++)
+
+                //re-add old variables that significantly change
+                for (int y = 0; y < xImage.GetLength(0); y++)
+                {
+                    for (int x = 0; x < xImage.GetLength(1); x++)
+                    {
+                        var xOld = xImage[y, x];
+                        if (xOld > 0.0)
+                        {
+                            var b = CalculateB(residual, psf, y, x, yResOffset, xResOffset);
+
+                            //calculate minimum of parabola, eg -2b/a
+                            var xNew = xOld + (b / a);
+                            xNew = ShrinkAbsolute(xNew, lambda);
+                            var xDiff = xNew - xOld;
+                            if (xNew == 0.0)
+                            {
+                                xImage[y, x] = 0.0;
+                                ModifyResidual(residual, psf, y + yResOffset, x + xResOffset, xDiff);
+                                activeSet.Remove(new Tuple<int, int>(y, x));
+                            }
+                            if (Math.Abs(xDiff) > precision)
+                            {
+                                activeSet.Add(new Tuple<int, int>(y, x));
+                                xImage[y, x] = xNew;
+                                ModifyResidual(residual, psf, y + yResOffset, x + xResOffset, xDiff);
+                            }
+                        }
+                    }
+                }
+
+                //CLEAN-inspired. Add pixels with the maximum residual
+                for (int pixels = 0; pixels < 10; pixels++)
                 {
                     double max = 0.0;
                     int yMax = 0;
@@ -60,7 +91,6 @@ namespace Single_Reference.Deconvolution
                     var xNew = xOld + (b / a);
                     xNew = ShrinkAbsolute(xNew, lambda);
                     var xDiff = xNew - xOld;
-
                     if (Math.Abs(xDiff) > precision)
                     {
                         Console.WriteLine("added pixel to active set with index: " + yMax + " and " + xMax);
@@ -74,40 +104,13 @@ namespace Single_Reference.Deconvolution
                     }
                 }
 
-                
-
-                //re-add old variables that significantly change
-                for (int y = 0; y < xImage.GetLength(0); y++)
-                {
-                    for (int x = 0; x < xImage.GetLength(1); x++)
-                    {
-                        var xOld = xImage[y, x];
-                        if(xOld > 0.0)
-                        {
-                            var b = CalculateB(residual, psf, y, x, yResOffset, xResOffset);
-
-                            //calculate minimum of parabola, eg -2b/a
-                            var xNew = xOld + (b / a);
-                            xNew = ShrinkAbsolute(xNew, lambda);
-                            var xDiff = xNew - xOld;
-
-                            if (Math.Abs(xDiff) > precision)
-                            {
-                                activeSet.Add(new Tuple<int, int>(y, x));
-                                xImage[y, x] = xNew;
-                                ModifyResidual(residual, psf, y + yResOffset, x + xResOffset, xDiff);
-                            }
-                        }
-                    }
-                }
-
                 Console.WriteLine("total pixels in active set: " + activeSet.Count);
 
                 converged = activeSet.Count  == 0;
                 bool activeSetConverged = false;
                 var innerMax = 1000;
                 var innerIter = 0;
-                while (!activeSetConverged | innerIter <= innerMax)
+                while (!activeSetConverged & innerIter <= innerMax)
                 {
                     activeSetConverged = true;
                     var delete = new List<Tuple<int, int>>();
@@ -137,12 +140,13 @@ namespace Single_Reference.Deconvolution
                             activeSetConverged = false;
                             xImage[y, x] = xNew;
                             ModifyResidual(residual, psf, y+yResOffset, x + xResOffset, xDiff);
-                        }
+                        } 
                     }
 
                     foreach (var pixel in delete)
                         activeSet.Remove(pixel);
                 }
+                activeSet.Count();
                 //converged = true;
             }
         }
