@@ -74,7 +74,7 @@ namespace Single_Reference.IDGSequential
                     {
                         if (!flags[i, j, k])
                         {
-                            visibilities[i, j, k] = new Complex(1.0, 0);
+                            visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
                         }
                         else
                             visibilities[i, j, k] = new Complex(0, 0);

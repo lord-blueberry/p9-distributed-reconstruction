@@ -221,8 +221,8 @@ namespace Single_Reference
 
             var visibilitiesCount = visibilities.Length;
 
-            int gridSize = 512;
-            int subgridsize = 16;
+            int gridSize = 256;
+            int subgridsize = 12;
             int kernelSize = 4;
             //cell = image / grid
             int max_nr_timesteps = 512;
@@ -237,19 +237,6 @@ namespace Single_Reference
             var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
-            var visPSF = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
-            for (int i = 0; i < visibilities.GetLength(0); i++)
-                for (int j = 0; j < visibilities.GetLength(1); j++)
-                    for (int k = 0; k < visibilities.GetLength(2); k++)
-                    {
-                        if (!flags[i, j, k])
-                        {
-                            visPSF[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
-                        }
-                        else
-                            visPSF[i, j, k] = new Complex(0, 0);
-                    }
-
             FitsIO.Write(psf, "psf.fits");
             var psf2 = CutImg(psf);
 
@@ -265,7 +252,7 @@ namespace Single_Reference
 
                 watchDeconv.Start();
                 //CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.2 / (cycle + 1), 2);
-                reconstruction[256, 256] = 1.0;
+                reconstruction[128, 128] = 1.0;
                 int nonzero = CountNonZero(reconstruction);
                 Console.WriteLine("number of nonzeros in reconstruction: " + nonzero);
                 watchDeconv.Stop();
@@ -326,8 +313,8 @@ namespace Single_Reference
             frequencies = freqtmp;
             var visibilitiesCount = visibilities.Length;
 
-            int gridSize = 256;
-            int subgridsize = 32;
+            int gridSize = 512;
+            int subgridsize = 16;
             int kernelSize = 8;
             //cell = image / grid
             int max_nr_timesteps = 256;
@@ -348,17 +335,17 @@ namespace Single_Reference
 
             var reconstruction = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            var majorCycles = 10;
+            var majorCycles = 1;
             for(int cycle = 0; cycle < majorCycles; cycle++)
             {
                 watchForward.Start();
-                var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
+                //var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
                 watchForward.Stop();
-                FitsIO.Write(dirtyImage, "dirty"+cycle+".fits");
+                //FitsIO.Write(dirtyImage, "dirty"+cycle+".fits");
 
                 watchDeconv.Start();
-                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.02/(cycle+1), 4);
-      
+                //CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.02/(cycle+1), 4);
+                reconstruction[gridSize/2, gridSize / 2] = 1.0;
                 //FitsIO.Write(dirtyImage, "residualDirty" + cycle + ".fits");
                 watchDeconv.Stop();
                 FitsIO.Write(reconstruction, "reconstruction"+cycle+".fits");
