@@ -31,7 +31,7 @@ namespace Distributed_Reference
                 var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
                 //var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
                 var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
-                double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
+                double norm = 2.0;
                 var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
                 /*
                 var frequencies = Single_Reference.FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");

@@ -96,7 +96,7 @@ namespace Single_Reference
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
             //var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
             var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
-            double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
+            double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
             var visCount2 = 0;
             for (int i = 0; i < flags.GetLength(0); i++)
@@ -157,7 +157,7 @@ namespace Single_Reference
                 FitsIO.Write(reconstruction, "reconstruction" + cycle + ".fits");
 
                 watchBackwards.Start();
-                var modelVis = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies, visibilitiesCount);
+                var modelVis = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies);
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
 
@@ -179,7 +179,7 @@ namespace Single_Reference
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
             var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
-            double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
+            double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var nrBaselines = uvw.GetLength(0);
@@ -211,7 +211,7 @@ namespace Single_Reference
             frequencies = freqtmp;
             var visibilitiesCount = visibilities.Length;
 
-            int gridSize = 512;
+            int gridSize = 256;
             int subgridsize = 16;
             int kernelSize = 8;
             //cell = image / grid
@@ -233,17 +233,17 @@ namespace Single_Reference
 
             var reconstruction = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            var majorCycles = 1;
+            var majorCycles = 5;
             for(int cycle = 0; cycle < majorCycles; cycle++)
             {
                 watchForward.Start();
-                //var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
+                var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
                 watchForward.Stop();
-                //FitsIO.Write(dirtyImage, "dirty"+cycle+".fits");
+                FitsIO.Write(dirtyImage, "dirty"+cycle+".fits");
 
                 watchDeconv.Start();
-                //CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.02/(cycle+1), 4);
-                reconstruction[gridSize/2, gridSize / 2] = 1.0;
+                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.02/(cycle+1), 4);
+                //reconstruction[gridSize / 2, gridSize / 2] = 1.0;
                 //FitsIO.Write(dirtyImage, "residualDirty" + cycle + ".fits");
                 watchDeconv.Stop();
                 FitsIO.Write(reconstruction, "reconstruction"+cycle+".fits");
@@ -254,7 +254,7 @@ namespace Single_Reference
                 watchBackwards.Stop();
 
                 var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
-                FitsIO.Write(imgRec, "model" + cycle + ".fits");
+                FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
             }
             watchBackwards.Stop();
             watchTotal.Stop();

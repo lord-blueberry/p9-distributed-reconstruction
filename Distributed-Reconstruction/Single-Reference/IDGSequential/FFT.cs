@@ -121,7 +121,7 @@ namespace Single_Reference.IDGSequential
         }
 
 
-        public static Complex[,] GridFFT(double[,] image, long visibilityCount)
+        public static Complex[,] GridFFT(double[,] image)
         {
             Complex[,] output = new Complex[image.GetLength(0), image.GetLength(1)];
             using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))
@@ -135,7 +135,7 @@ namespace Single_Reference.IDGSequential
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
-                        output[y, x] = fourierSpace[y, x] / visibilityCount;
+                        output[y, x] = fourierSpace[y, x];
             }
 
             return output;

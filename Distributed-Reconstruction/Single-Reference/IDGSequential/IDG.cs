@@ -104,7 +104,7 @@ namespace Single_Reference.IDGSequential
                     image[i, j] = image[i, j] / c.GridSpheroidal[i, j];
 
             FFT.Shift(image);
-            var grid = FFT.GridFFT(image, c.VisibilitiesCount);
+            var grid = FFT.GridFFT(image);
             FFT.Shift(image);
 
             FFT.Shift(grid);
