@@ -91,7 +91,7 @@ namespace Single_Reference.IDGSequential
             return output;
         }
 
-        public static double[,] GridIFFT(Complex[,] grid)
+        public static double[,] GridIFFT(Complex[,] grid, long visibilityCount)
         {
             double[,] output = new double[grid.GetLength(0), grid.GetLength(1)];
             using (var imageSpace = new AlignedArrayComplex(16, grid.GetLength(0), grid.GetLength(1)))
@@ -111,7 +111,7 @@ namespace Single_Reference.IDGSequential
                 {
                     for (int x = 0; x < grid.GetLength(1); x++)
                     {
-                        output[y, x] = imageSpace[y, x].Real;
+                        output[y, x] = imageSpace[y, x].Real / visibilityCount;
                     }
                 }
 
@@ -121,7 +121,7 @@ namespace Single_Reference.IDGSequential
         }
 
 
-        public static Complex[,] GridFFT(double[,] image, long visibilityCount = 1)
+        public static Complex[,] GridFFT(double[,] image, long visibilityCount)
         {
             Complex[,] output = new Complex[image.GetLength(0), image.GetLength(1)];
             using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))
@@ -132,11 +132,10 @@ namespace Single_Reference.IDGSequential
                         imageSpace[y, x] = image[y, x];
 
                 DFT.FFT(imageSpace, fourierSpace);
-                var norm = (1.0* visibilityCount) / (image.GetLength(0) * image.GetLength(1));
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
-                        output[y, x] = fourierSpace[y, x] * norm;
+                        output[y, x] = fourierSpace[y, x] / visibilityCount;
             }
 
             return output;

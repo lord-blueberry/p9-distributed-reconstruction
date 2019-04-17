@@ -22,7 +22,7 @@ namespace Single_Reference
             int kernelSize = 2;
             float imageSize = 0.0025f;
             float cellSize = imageSize / gridSize;
-            var p = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
+            var p = new GriddingConstants(1, gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
 
             double v = -50;
             double wavelength = -4 / imageSize / v;
@@ -87,108 +87,6 @@ namespace Single_Reference
             for (int i = 0; i < visibilities.GetLength(1); i++)
                 visi2[i] = visi2[i] * norm;
         }
-
-        public static void DebugForwardBackward2()
-        {
-            int max_nr_timesteps = 256;
-            int gridSize = 32;
-            int subgridsize = 8;
-            int kernelSize = 2;
-            float imageSize = 0.0025f;
-            float cellSize = imageSize / gridSize;
-            var p = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
-
-            double v = -50;
-            double wavelength = -4 / imageSize / v;
-            double u = 4 / imageSize / wavelength;
-            double freq = wavelength * MathFunctions.SPEED_OF_LIGHT;
-            double[] frequency = { freq };
-            double u1 = 10 / imageSize / wavelength;
-            double u2 = 9 / imageSize / wavelength;
-
-            double visR0 = 3.9;
-            double visR1 = 4.0;
-
-            var visibilities = new Complex[1, 2, 1];
-            visibilities[0, 0, 0] = new Complex(visR0, 0);
-            visibilities[0, 1, 0] = new Complex(visR1, 0);
-
-            var uvw = new double[1, 2, 3];
-            uvw[0, 0, 0] = u;
-            uvw[0, 0, 1] = v;
-            uvw[0, 0, 2] = 0;
-            uvw[0, 1, 0] = u1;
-            uvw[0, 1, 1] = v;
-            uvw[0, 1, 2] = 0;
-
-            var subgridSpheroidal = MathFunctions.CalcIdentitySpheroidal(subgridsize, subgridsize);
-            var metadata = Partitioner.CreatePartition(p, uvw, frequency);
-
-            var gridded_subgrids = Gridder.ForwardHack(p, metadata, uvw, visibilities, frequency, subgridSpheroidal);
-            var ftgridded = FFT.SubgridFFT(p, gridded_subgrids);
-            var grid = Adder.AddHack(p, metadata, ftgridded);
-            FFT.Shift(grid);
-            var img = FFT.GridIFFT(grid);
-            FFT.Shift(img);
-
-            FFT.Shift(img);
-            var grid2 = FFT.GridFFT(img);
-            FFT.Shift(grid2);
-            var ftGridded2 = Adder.SplitHack(p, metadata, grid2);
-            var subgrids2 = FFT.SubgridIFFT(p, ftGridded2);
-            var visibilities2 = Gridder.BackwardsHack(p, metadata, subgrids2, uvw, frequency, subgridSpheroidal);
-        }
-
-        public static void DebugForwardBackwardRealWorld()
-        {
-            int max_nr_timesteps = 256;
-            int gridSize = 16;
-            int subgridsize = 8;
-            int kernelSize = 6;
-            float imageSize = 0.0025f;
-            float cellSize = imageSize / gridSize;
-            var p = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, cellSize, 1, 0.0f);
-  
-            double[] frequency = { 857000000 };
-            var visibilities = new Complex[1, 4, 1];
-            visibilities[0, 0, 0] = new Complex(3.9, 0);
-            visibilities[0, 1, 0] = new Complex(5.2, 0);
-            visibilities[0, 2, 0] = new Complex(2.3, 0);
-            visibilities[0, 3, 0] = new Complex(1.8, 0);
-            var uvw = new double[1, 4, 3];
-            uvw[0, 0, 0] = -9.3063146568965749;
-            uvw[0, 0, 1] = 35.529046011622995;
-            uvw[0, 0, 2] = -0.36853532493114471;
-            uvw[0, 1, 0] = -9.308945244341885;
-            uvw[0, 1, 1] = 35.528369050938636;
-            uvw[0, 1, 2] = -0.36735843494534492;
-            uvw[0, 2, 0] = -9.3063146568965749;
-            uvw[0, 2, 1] = 30.529046011622995;
-            uvw[0, 2, 2] = -0.36735843494534492;
-            uvw[0, 3, 0] = -9.308945244341885;
-            uvw[0, 3, 1] = 30.528369050938636;
-            uvw[0, 3, 2] = -0.36735843494534492;
-
-            var visCount = 1;
-            var subgridSpheroidal = MathFunctions.CalcIdentitySpheroidal(subgridsize, subgridsize);
-            var metadata = Partitioner.CreatePartition(p, uvw, frequency);
-
-            var gridded_subgrids = Gridder.ForwardHack(p, metadata, uvw, visibilities, frequency, subgridSpheroidal);
-            
-            var ftgridded = FFT.SubgridFFT(p, gridded_subgrids);
-            var grid = Adder.AddHack(p, metadata, ftgridded);
-            FFT.Shift(grid);
-            var img = FFT.GridIFFT(grid);
-            FFT.Shift(img);
-
-            FFT.Shift(img);
-            var grid2 = FFT.GridFFT(img, visCount);
-            FFT.Shift(grid2);
-            var ftGridded2 = Adder.SplitHack(p, metadata, grid2);
-            var subgrids2 = FFT.SubgridIFFT(p, ftGridded2);
-            
-            var visibilities2 = Gridder.BackwardsHack(p, metadata, subgrids2, uvw, frequency, subgridSpheroidal);
-        }
         #endregion
 
         #region full
@@ -234,9 +132,9 @@ namespace Single_Reference
             var watchDeconv = new Stopwatch();
             watchTotal.Start();
 
-            var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-            var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
+            var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies);
             FitsIO.Write(psf, "psf.fits");
             var psf2 = CutImg(psf);
 
@@ -259,7 +157,7 @@ namespace Single_Reference
                 FitsIO.Write(reconstruction, "reconstruction" + cycle + ".fits");
 
                 watchBackwards.Start();
-                var modelVis = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies);
+                var modelVis = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies, visibilitiesCount);
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
 
@@ -326,10 +224,10 @@ namespace Single_Reference
             var watchDeconv = new Stopwatch();
             watchTotal.Start();
 
-            var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
-            var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
+            var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies);
             var psf2 = psf;//CutImg(psf);
             FitsIO.Write(psf2, "psf.fits");
 

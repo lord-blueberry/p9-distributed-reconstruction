@@ -20,7 +20,7 @@ namespace Single_Reference.IDGSequential
             return grid;
         }
 
-        public static Complex[,] GridPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies, long visibilitiesCount)
+        public static Complex[,] GridPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             var visibilities = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             for (int i = 0; i < visibilities.GetLength(0); i++)
@@ -28,7 +28,7 @@ namespace Single_Reference.IDGSequential
                     for (int k = 0; k < visibilities.GetLength(2); k++)
                     {
                         if (!flags[i, j, k])
-                            visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
+                            visibilities[i, j, k] = new Complex(1.0, 0);
                         else
                             visibilities[i, j, k] = new Complex(0, 0);
                     }
@@ -54,7 +54,7 @@ namespace Single_Reference.IDGSequential
             var ftgridded = FFT.SubgridFFT(c, gridded);
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
-            var img = FFT.GridIFFT(grid);
+            var img = FFT.GridIFFT(grid, c.VisibilitiesCount);
             FFT.Shift(img);
 
             //remove spheroidal from grid
@@ -65,7 +65,7 @@ namespace Single_Reference.IDGSequential
             return img;
         }
 
-        public static double[,] CalculatePSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies, long visibilitiesCount)
+        public static double[,] CalculatePSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             var visibilities = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             for (int i = 0; i < visibilities.GetLength(0); i++)
@@ -74,7 +74,7 @@ namespace Single_Reference.IDGSequential
                     {
                         if (!flags[i, j, k])
                         {
-                            visibilities[i, j, k] = new Complex(1.0 / visibilitiesCount, 0);
+                            visibilities[i, j, k] = new Complex(1.0, 0);
                         }
                         else
                             visibilities[i, j, k] = new Complex(0, 0);
@@ -85,7 +85,7 @@ namespace Single_Reference.IDGSequential
             var ftgridded = FFT.SubgridFFT(c, gridded);
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
-            var psf = FFT.GridIFFT(grid);
+            var psf = FFT.GridIFFT(grid, c.VisibilitiesCount);
             FFT.Shift(psf);
 
             //remove spheroidal from grid
@@ -93,21 +93,6 @@ namespace Single_Reference.IDGSequential
                 for (int x = 0; x < psf.GetLength(1); x++)
                     psf[y, x] = psf[y, x] / c.GridSpheroidal[y, x];
 
-            return psf;
-        }
-
-        public static double[,] CalculateNormedPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies, long visibilitiesCount)
-        {
-            var psf = CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
-
-            var sum = 0.0;
-            for (int y = 0; y < psf.GetLength(0); y++)
-                for (int x = 0; x < psf.GetLength(1); x++)
-                    sum += psf[y, x];
-
-            for (int y = 0; y < psf.GetLength(0); y++)
-                for (int x = 0; x < psf.GetLength(1); x++)
-                    psf[y, x] = psf[y, x] / sum;
             return psf;
         }
 
@@ -119,7 +104,7 @@ namespace Single_Reference.IDGSequential
                     image[i, j] = image[i, j] / c.GridSpheroidal[i, j];
 
             FFT.Shift(image);
-            var grid = FFT.GridFFT(image);
+            var grid = FFT.GridFFT(image, c.VisibilitiesCount);
             FFT.Shift(image);
 
             FFT.Shift(grid);

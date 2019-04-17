@@ -91,9 +91,9 @@ namespace Distributed_Reference
                     watchTotal.Start();
                     watchNufft.Start();
                 }
-                var c = new GriddingConstants(gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+                var c = new GriddingConstants(visibilities.LongLength * comm.Size, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-                var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies, visibilities.LongLength * comm.Size);
+                var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
                 var imageLocal = Forward(comm, c, metadata, visibilities, uvw, frequencies, watchIdg);
 
                 if (comm.Rank == 0)
@@ -173,15 +173,15 @@ namespace Distributed_Reference
             }
         }
 
-        public static double[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies, long visibilitiesCount)
+        public static double[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             double[,] psf = null;
 
-            var localGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
+            var localGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
             var psf_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
-                psf = FFT.GridIFFT(psf_total);
+                psf = FFT.GridIFFT(psf_total, c.VisibilitiesCount);
                 FFT.Shift(psf);
                 psf = CutImg(psf);
                 //Single_Reference.FitsIO.Write(psf, "psf.fits");
@@ -203,7 +203,7 @@ namespace Distributed_Reference
             var grid_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
-                image = FFT.GridIFFT(grid_total);
+                image = FFT.GridIFFT(grid_total, c.VisibilitiesCount);
                 FFT.Shift(image);
                 watchIdg.Stop();
 

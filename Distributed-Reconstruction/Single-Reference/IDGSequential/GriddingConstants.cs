@@ -28,9 +28,12 @@ namespace Single_Reference.IDGSequential
         public float[,] SubgridSpheroidal { get; }
         public float[,] GridSpheroidal { get; }
 
+        public long VisibilitiesCount { get; }
 
-        public GriddingConstants(int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float scale, int wLayerCount, float wStep)
+
+        public GriddingConstants(long visCount, int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float scale, int wLayerCount, float wStep)
         {
+            this.VisibilitiesCount = visCount;
             this.GridSize = gridSize;
             this.SubgridSize = subgridSize;
             this.KernelSize = kernelSize;
