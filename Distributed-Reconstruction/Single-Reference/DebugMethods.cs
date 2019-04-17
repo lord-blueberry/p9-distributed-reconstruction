@@ -329,12 +329,12 @@ namespace Single_Reference
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies, visibilitiesCount);
-            var psf2 = CutImg(psf);
-            //FitsIO.Write(psf2, "psf.fits");
+            var psf2 = psf;//CutImg(psf);
+            FitsIO.Write(psf2, "psf.fits");
 
             var reconstruction = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            var majorCycles = 4;
+            var majorCycles = 10;
             for(int cycle = 0; cycle < majorCycles; cycle++)
             {
                 watchForward.Start();
@@ -342,11 +342,10 @@ namespace Single_Reference
                 watchForward.Stop();
                 FitsIO.Write(dirtyImage, "dirty"+cycle+".fits");
 
-                FitsIO.Write(reconstruction, "reconstruction_before" + cycle + ".fits");
                 watchDeconv.Start();
-                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 1.0/(cycle+1), 4);
-                FitsIO.Write(dirtyImage, "residualDirty" + cycle + ".fits");
-                int nonzero = CountNonZero(reconstruction);
+                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.02/(cycle+1), 4);
+      
+                //FitsIO.Write(dirtyImage, "residualDirty" + cycle + ".fits");
                 watchDeconv.Stop();
                 FitsIO.Write(reconstruction, "reconstruction"+cycle+".fits");
 
