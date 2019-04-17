@@ -94,8 +94,8 @@ namespace Single_Reference
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
-            //var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
-            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
+            var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+            //var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
             var visCount2 = 0;
@@ -117,10 +117,10 @@ namespace Single_Reference
                         } 
                     }
 
-            var visibilitiesCount = visibilities.Length;
+            var visibilitiesCount = visCount2;
 
-            int gridSize = 256;
-            int subgridsize = 12;
+            int gridSize = 1024;
+            int subgridsize = 16;
             int kernelSize = 4;
             //cell = image / grid
             int max_nr_timesteps = 512;
@@ -140,17 +140,16 @@ namespace Single_Reference
 
             var reconstruction = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            var majorCycles = 1;
+            var majorCycles = 3;
             for (int cycle = 0; cycle < majorCycles; cycle++)
             {
                 watchForward.Start();
-                //var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
+                var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
                 watchForward.Stop();
-                //FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
+                FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
 
                 watchDeconv.Start();
-                //CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.2 / (cycle + 1), 2);
-                reconstruction[128, 128] = 1.0;
+                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.05 / (cycle + 1), 4);
                 int nonzero = CountNonZero(reconstruction);
                 Console.WriteLine("number of nonzeros in reconstruction: " + nonzero);
                 watchDeconv.Stop();
