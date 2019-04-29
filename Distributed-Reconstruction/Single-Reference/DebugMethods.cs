@@ -104,19 +104,6 @@ namespace Single_Reference
                     for (int k = 0; k < flags.GetLength(2); k++)
                         if (!flags[i, j, k])
                             visCount2++;
-
-            bool constraint = true;
-            var zero = new Complex(0, 0);
-            for (int i = 0; i < flags.GetLength(0); i++)
-                for (int j = 0; j < flags.GetLength(1); j++)
-                    for (int k = 0; k < flags.GetLength(2); k++)
-                    { 
-                        if (!flags[i, j, k] && constraint)
-                        {
-                            constraint = visibilities[i, j, k] != zero;
-                        } 
-                    }
-
             var visibilitiesCount = visCount2;
 
             int gridSize = 1024;
@@ -140,7 +127,7 @@ namespace Single_Reference
 
             var reconstruction = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            var majorCycles = 3;
+            var majorCycles = 7;
             for (int cycle = 0; cycle < majorCycles; cycle++)
             {
                 watchForward.Start();
@@ -149,7 +136,7 @@ namespace Single_Reference
                 FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
 
                 watchDeconv.Start();
-                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.05 / (cycle + 1), 4);
+                CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.1 / (10*(cycle + 1)), 5);
                 int nonzero = CountNonZero(reconstruction);
                 Console.WriteLine("number of nonzeros in reconstruction: " + nonzero);
                 watchDeconv.Stop();

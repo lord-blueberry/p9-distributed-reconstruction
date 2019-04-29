@@ -94,51 +94,50 @@ namespace Distributed_Reference
                 var c = new GriddingConstants(visibilities.LongLength * comm.Size, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
-                var imageLocal = Forward(comm, c, metadata, visibilities, uvw, frequencies, watchIdg);
 
-                if (comm.Rank == 0)
-                {
-                    Single_Reference.FitsIO.Write(imageLocal, "0_dirty.fits");
-                    watchNufft.Stop();
-                    Console.WriteLine("deconvolve");
-                }
-                    
                 var halfComm = comm.Size / 2;
-                var localX = new double[imageLocal.GetLength(0) / halfComm, imageLocal.GetLength(1) / halfComm];
-
                 var yResOffset = comm.Rank % 2 * (gridSize / halfComm);
                 var xResOffset = comm.Rank / 2 * (gridSize / halfComm);
-                CDClean.Deconvolve(localX, imageLocal, psf, 1.0, 2, yResOffset, xResOffset);
 
-                comm.Barrier();
-                double[][,] totalX = null;
-                comm.Gather<double[,]>(localX, 0, ref totalX);
+                var residualVis = visibilities;
+                var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
+                for (int cycle=0; cycle < 5; cycle++)
+                {
+                    var imageLocal = Forward(comm, c, metadata, visibilities, uvw, frequencies, watchIdg);
+                    if (comm.Rank == 0)
+                        FitsIO.Write(imageLocal, "residual_0.fits");
+                    
+                    CDClean.Deconvolve(xLocal, imageLocal, psf, 1.0, 2, yResOffset, xResOffset);
+                    comm.Barrier();
+
+                    double[][,] totalX = null;
+                    comm.Gather<double[,]>(xLocal, 0, ref totalX);
+                    Complex[,] modelGrid = null;
+                    if (comm.Rank == 0)
+                    {
+                        var x = StitchX(comm, c, totalX);
+                        FitsIO.Write(x, "xImage.fits");
+
+                        FFT.Shift(x);
+                        modelGrid = FFT.GridFFT(x);
+                    }
+                    comm.Broadcast(ref modelGrid, 0);
+
+                    var modelVis = IDG.DeGrid(c, metadata, modelGrid, uvw, frequencies);
+                    residualVis = IDG.Substract(visibilities, modelVis, flags);
+                }
+
                 if (comm.Rank == 0)
                 {
-                    var reconstructed = new double[gridSize, gridSize];
-                    int patchIdx = 0;
-                    for (int patchRows = 0; patchRows < halfComm; patchRows++)
-                    {
-                        for (int patchColumns = 0; patchColumns < halfComm; patchColumns++)
-                        {
-                            int yOffset = patchRows * (gridSize / halfComm);
-                            int xOffset = patchColumns * (gridSize / halfComm);
-                            var patch = totalX[patchIdx++];
-                            for (int y = 0; y < (gridSize / halfComm); y++)
-                                for (int x = 0; x < (gridSize / halfComm); x++)
-                                    reconstructed[yOffset + y, xOffset + x] = patch[y, x];
-                        }
-                    }
-
                     watchTotal.Stop();
-                    FitsIO.Write(imageLocal, "residual_0.fits");
-                    FitsIO.Write(reconstructed, "xImage.fits");
+                    
                     FitsIO.Write(psf, "psf.fits");
                     var timetable = "total elapsed: " + watchTotal.Elapsed;
                     timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
                     timetable += "\n" + "idg elapsed: " + watchIdg.Elapsed;
                     File.WriteAllText("watches_mpi.txt", timetable);
                 }
+
                 /*
                 ExchangeNonZero(comm, localX, imageLocal, psf, yResOffset, xResOffset);
                 CDClean.Deconvolve(localX, imageLocal, psf, 2.0, 5, yResOffset, xResOffset);
@@ -211,11 +210,31 @@ namespace Distributed_Reference
                 //Console.WriteLine("fits Written");
 
                 //remove spheroidal
-
             }
 
             comm.Broadcast<double[,]>(ref image, 0);
             return image;
+        }
+
+        public static double[,] StitchX(Intracommunicator comm, GriddingConstants c, double[][,] totalX)
+        {
+            var halfComm = comm.Size / 2;
+            var stitched = new double[c.GridSize, c.GridSize];
+            int patchIdx = 0;
+            for (int patchRows = 0; patchRows < halfComm; patchRows++)
+            {
+                for (int patchColumns = 0; patchColumns < halfComm; patchColumns++)
+                {
+                    int yOffset = patchRows * (c.GridSize / halfComm);
+                    int xOffset = patchColumns * (c.GridSize / halfComm);
+                    var patch = totalX[patchIdx++];
+                    for (int y = 0; y < (c.GridSize / halfComm); y++)
+                        for (int x = 0; x < (c.GridSize / halfComm); x++)
+                            stitched[yOffset + y, xOffset + x] = patch[y, x];
+                }
+            }
+            
+            return stitched;
         }
 
         private static void ExchangeNonZero(Intracommunicator comm, double[,] xImage, double[,] residual, double[,] psf,  int yResOffset, int xResOffset)
