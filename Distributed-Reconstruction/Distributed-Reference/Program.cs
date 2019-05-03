@@ -23,23 +23,22 @@ namespace Distributed_Reference
                 Console.WriteLine(" name: " + name);
                 //System.Threading.Thread.Sleep(17000);
 
-                Console.WriteLine("Hello World! from rank " + Communicator.world.Rank + " (running on " + MPI.Environment.ProcessorName + ")");
                 var comm = Communicator.world;
 
                 //READ DATA
                 var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
                 var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
-                //var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
-                var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
+                var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+                //var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
                 double norm = 2.0;
                 var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
-                /*
-                var frequencies = Single_Reference.FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
-                var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
-                var uvw = Single_Reference.FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
-                double norm = 2.0 * uvw.GetLength(0) * uvw.GetLength(1) * frequencies.Length;
-                var visibilities = Single_Reference.FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
-                */
+                var visCount2 = 0;
+                for (int i = 0; i < flags.GetLength(0); i++)
+                    for (int j = 0; j < flags.GetLength(1); j++)
+                        for (int k = 0; k < flags.GetLength(2); k++)
+                            if (!flags[i, j, k])
+                                visCount2++;
+                var visibilitiesCount = visCount2;
 
                 var nrBaselines = uvw.GetLength(0) / comm.Size;
                 var nrFrequencies = frequencies.Length;
@@ -55,12 +54,11 @@ namespace Distributed_Reference
                         for (int k = 0; k < nrFrequencies; k++)
                         {
                             vistmp[i, j, k] = visibilities[blOffset + i, j, k];
+                            flagstmp[i, j, k] = flags[blOffset + i, j, k];
                         }
                         uvwtmp[i, j, 0] = uvw[blOffset + i, j, 0];
                         uvwtmp[i, j, 1] = uvw[blOffset + i, j, 1];
                         uvwtmp[i, j, 2] = uvw[blOffset + i, j, 2];
-
-                        //flags
                     }
                 }
 
@@ -78,20 +76,20 @@ namespace Distributed_Reference
                 int subgridsize = 16;
                 int kernelSize = 8;
                 //cell = image / grid
-                int max_nr_timesteps = 256;
+                int max_nr_timesteps = 512;
                 double cellSize = 2.5 / 3600.0 * PI / 180.0;
 
                 comm.Barrier();
                 var watchTotal = new Stopwatch();
-                var watchNufft = new Stopwatch();
-                var watchIdg = new Stopwatch();
+                var watchForward = new Stopwatch();
+                var watchBackward = new Stopwatch();
+                var watchDeconv = new Stopwatch();
                 if (comm.Rank == 0)
                 {
                     Console.WriteLine("Done Reading, Start Gridding");
                     watchTotal.Start();
-                    watchNufft.Start();
                 }
-                var c = new GriddingConstants(visibilities.LongLength * comm.Size, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+                var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
 
@@ -101,22 +99,29 @@ namespace Distributed_Reference
 
                 var residualVis = visibilities;
                 var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
-                for (int cycle=0; cycle < 5; cycle++)
+                for (int cycle=0; cycle < 7; cycle++)
                 {
-                    var imageLocal = Forward(comm, c, metadata, visibilities, uvw, frequencies, watchIdg);
+                    var imageLocal = Forward(comm, c, metadata, residualVis, uvw, frequencies, watchForward);
                     if (comm.Rank == 0)
-                        FitsIO.Write(imageLocal, "residual_0.fits");
-                    
-                    CDClean.Deconvolve(xLocal, imageLocal, psf, 1.0, 2, yResOffset, xResOffset);
+                    {
+                        watchDeconv.Start();
+                        FitsIO.Write(imageLocal, "residual"+cycle+".fits");
+                    }
+                    CDClean.Deconvolve(xLocal, imageLocal, psf, 0.1 / (10 * (cycle + 1)), 5, yResOffset, xResOffset);
                     comm.Barrier();
+                    if (comm.Rank == 0)
+                    {
+                        watchDeconv.Stop();
+                    }
 
                     double[][,] totalX = null;
                     comm.Gather<double[,]>(xLocal, 0, ref totalX);
                     Complex[,] modelGrid = null;
                     if (comm.Rank == 0)
                     {
+                        watchBackward.Start();
                         var x = StitchX(comm, c, totalX);
-                        FitsIO.Write(x, "xImage.fits");
+                        FitsIO.Write(x, "xImage_"+cycle+".fits");
 
                         FFT.Shift(x);
                         modelGrid = FFT.GridFFT(x);
@@ -125,6 +130,14 @@ namespace Distributed_Reference
 
                     var modelVis = IDG.DeGrid(c, metadata, modelGrid, uvw, frequencies);
                     residualVis = IDG.Substract(visibilities, modelVis, flags);
+                    if (comm.Rank == 0)
+                        watchBackward.Stop();
+
+                    var modelImg = Forward(comm, c, metadata, modelVis, uvw, frequencies, watchForward);
+                    if(comm.Rank == 0)
+                    {
+                        FitsIO.Write(modelImg, "model_" + cycle + ".fits");
+                    }
                 }
 
                 if (comm.Rank == 0)
@@ -133,8 +146,9 @@ namespace Distributed_Reference
                     
                     FitsIO.Write(psf, "psf.fits");
                     var timetable = "total elapsed: " + watchTotal.Elapsed;
-                    timetable += "\n" + "nufft elapsed: " + watchNufft.Elapsed;
-                    timetable += "\n" + "idg elapsed: " + watchIdg.Elapsed;
+                    timetable += "\n" + "idg forward elapsed: " + watchForward.Elapsed;
+                    timetable += "\n" + "idg backwards elapsed: " + watchBackward.Elapsed;
+                    timetable += "\n" + "devonvolution: " + watchDeconv.Elapsed;
                     File.WriteAllText("watches_mpi.txt", timetable);
                 }
 
