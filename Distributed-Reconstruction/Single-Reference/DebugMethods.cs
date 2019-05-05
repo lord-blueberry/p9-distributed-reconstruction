@@ -161,11 +161,11 @@ namespace Single_Reference
 
         public static void DebugFullPipeline()
         {
-            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
-            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var frequencies = FitsIO.ReadFrequencies(@"freq.fits");
+            var uvw = FitsIO.ReadUVW(@"uvw.fits");
             var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
             double norm = 2.0;
-            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+            var visibilities = FitsIO.ReadVisibilities(@"vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var nrBaselines = uvw.GetLength(0);
             var nrFrequencies = frequencies.Length;
@@ -228,8 +228,6 @@ namespace Single_Reference
 
                 watchDeconv.Start();
                 CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.02/(cycle+1), 4);
-                //reconstruction[gridSize / 2, gridSize / 2] = 1.0;
-                //FitsIO.Write(dirtyImage, "residualDirty" + cycle + ".fits");
                 watchDeconv.Stop();
                 FitsIO.Write(reconstruction, "reconstruction"+cycle+".fits");
 

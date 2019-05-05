@@ -12,8 +12,8 @@ namespace Single_Reference
 
             //DebugMethods.DebugForwardBackward();
             //DebugMethods.TestConvergence1();
-            //DebugMethods.DebugFullPipeline();
-            DebugMethods.DebugFullMeerKAT();
+            DebugMethods.DebugFullPipeline();
+            //DebugMethods.DebugFullMeerKAT();
         }
     }
 }
