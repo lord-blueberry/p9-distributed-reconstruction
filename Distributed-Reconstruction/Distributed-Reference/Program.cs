@@ -105,7 +105,7 @@ namespace Distributed_Reference
                     if (comm.Rank == 0)
                     {
                         watchDeconv.Start();
-                        FitsIO.Write(imageLocal, "residual"+cycle+".fits");
+                        //FitsIO.Write(imageLocal, "residual"+cycle+".fits");
                     }
                     CDClean.Deconvolve(xLocal, imageLocal, psf, 0.1 / (10 * (cycle + 1)), 5, yResOffset, xResOffset);
                     comm.Barrier();
@@ -121,7 +121,7 @@ namespace Distributed_Reference
                     {
                         watchBackward.Start();
                         var x = StitchX(comm, c, totalX);
-                        FitsIO.Write(x, "xImage_"+cycle+".fits");
+                        //FitsIO.Write(x, "xImage_"+cycle+".fits");
 
                         FFT.Shift(x);
                         modelGrid = FFT.GridFFT(x);
@@ -136,7 +136,7 @@ namespace Distributed_Reference
                     var modelImg = Forward(comm, c, metadata, modelVis, uvw, frequencies, watchForward);
                     if(comm.Rank == 0)
                     {
-                        FitsIO.Write(modelImg, "model_" + cycle + ".fits");
+                        //FitsIO.Write(modelImg, "model_" + cycle + ".fits");
                     }
                 }
 
