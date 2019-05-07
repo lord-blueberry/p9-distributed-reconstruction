@@ -26,12 +26,17 @@ namespace Distributed_Reference
                 var comm = Communicator.world;
 
                 //READ DATA
+                /*
                 var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
                 var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
                 var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
-                //var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
-                double norm = 2.0;
-                var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+                var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, 2.0);
+                */
+                var frequencies = FitsIO.ReadFrequencies(@"freq.fits");
+                var uvw = FitsIO.ReadUVW(@"uvw.fits");
+                var flags = FitsIO.ReadFlags("flags.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+                var visibilities = FitsIO.ReadVisibilities(@"vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, 2.0);
+
                 var visCount2 = 0;
                 for (int i = 0; i < flags.GetLength(0); i++)
                     for (int j = 0; j < flags.GetLength(1); j++)

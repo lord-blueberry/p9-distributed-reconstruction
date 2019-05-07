@@ -12,8 +12,11 @@ namespace Single_Reference
 
             //DebugMethods.DebugForwardBackward();
             //DebugMethods.TestConvergence1();
-            DebugMethods.DebugFullPipeline();
+            //DebugMethods.DebugFullPipeline();
             //DebugMethods.DebugFullMeerKAT();
+
+            //DebugMethods.GetCleanBeam
+            DebugMethods.CleanBeam2();
         }
     }
 }

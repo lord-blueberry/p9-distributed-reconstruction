@@ -358,6 +358,44 @@ namespace Single_Reference
         }
         #endregion
 
+        public static void GetCleanBeam()
+        {
+            var res = FitsIO.ReadImage("hello.res.fits");
+            var img = FitsIO.ReadImage("hello.img.fits");
+
+            var max = 0.0;
+            var pix = new Tuple<int, int>(-1, -1);
+            for(int i = 0; i < res.GetLength(0); i++)
+            {
+                for(int j = 0; j < res.GetLength(1); j++)
+                {
+                    img[i, j] -= res[i, j];
+                    if(img[i, j] > max)
+                    {
+                        max = img[i, j];
+                        pix = new Tuple<int, int>(i, j);
+                    }
+                }
+            }
+
+            var cut = new double[32, 32];
+            for(int i = -16; i < 16; i++)
+            {
+                for(int j = -16; j < 16; j++)
+                {
+                    cut[i + 16, j + 16] = img[pix.Item1 + i, pix.Item2 + j] / max;
+                }
+            }
+            FitsIO.Write(cut, "hello.clean.fits");
+        }
+
+        public static void CleanBeam2()
+        {
+            var img = FitsIO.ReadBeam("reconstruction6.fits");
+            var output = CleanBeam.ConvolveCleanBeam(img);
+            FitsIO.Write(output, "cleanedImage.fits");
+        }
+
         public static void TestConvergence0()
         {
             var imSize = 64;

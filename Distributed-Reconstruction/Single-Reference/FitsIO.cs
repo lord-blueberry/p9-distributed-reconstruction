@@ -58,6 +58,46 @@ namespace Single_Reference
             }
         }
 
+        public static double[,] ReadImage(string file)
+        {
+            var f = new Fits(file);
+            var h = (ImageHDU)f.ReadHDU();
+
+            var raw = (Array[])h.Kernel;
+            raw = (Array[])raw[0];
+            raw = (Array[])raw[0];
+            var img = new double[raw.Length, raw.Length];
+            for(int i = 0; i < raw.Length; i++)
+            {
+                var col = (float[])raw[i];
+                for(int j = 0; j < col.Length; j++)
+                {
+                    img[i, j] = col[j];
+                }
+            }
+
+            return img;
+        }
+
+        public static double[,] ReadBeam(string file)
+        {
+            var f = new Fits(file);
+            var h = (ImageHDU)f.ReadHDU();
+
+            var raw = (Array[])h.Kernel;
+            var img = new double[raw.Length, raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+            {
+                var col = (double[])raw[i];
+                for (int j = 0; j < col.Length; j++)
+                {
+                    img[i, j] = col[j];
+                }
+            }
+
+            return img;
+        }
+
         public static void WriteImag(Complex[,] img, string file = "Outputfile_imag.fits")
         {
             var img2 = new double[img.GetLength(0)][];
