@@ -12,13 +12,9 @@ namespace Single_Reference.IDGSequential
 
         public static Complex[,] Grid(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
-            Console.WriteLine("In Grid");
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
-            Console.WriteLine("After Forward Hack");
             var ftgridded = FFT.SubgridFFT(c, gridded);
-            Console.WriteLine("After Subgrid Hack");
             var grid = Adder.AddHack(c, metadata, ftgridded);
-            Console.WriteLine("After Grid Hack");
             FFT.Shift(grid);
 
             return grid;
@@ -26,7 +22,6 @@ namespace Single_Reference.IDGSequential
 
         public static Complex[,] GridPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
-            Console.WriteLine("In Grid PSF");
             var visibilities = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             for (int i = 0; i < visibilities.GetLength(0); i++)
                 for (int j = 0; j < visibilities.GetLength(1); j++)

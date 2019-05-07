@@ -93,7 +93,6 @@ namespace Single_Reference.Deconvolution
                     var xDiff = xNew - xOld;
                     if (Math.Abs(xDiff) > precision)
                     {
-                        Console.WriteLine("added pixel to active set with index: " + yMax + " and " + xMax);
                         activeSet.Add(new Tuple<int, int>(yMax, xMax));
                         xImage[yMax, xMax] = xNew;
                         ModifyResidual(residual, psf, yMax + yResOffset, xMax + xResOffset, xDiff);

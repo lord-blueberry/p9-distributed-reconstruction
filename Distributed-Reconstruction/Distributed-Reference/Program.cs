@@ -86,12 +86,8 @@ namespace Distributed_Reference
                 int gridSize = 1024;
                 int subgridsize = 16;
                 int kernelSize = 8;
-                //cell = image / grid
                 int max_nr_timesteps = 512;
                 double cellSize = 2.5 / 3600.0 * PI / 180.0;
-
-                if (comm.Rank == 0)
-                    Console.WriteLine("still alive");
 
                 comm.Barrier();
                 var watchTotal = new Stopwatch();
@@ -101,31 +97,12 @@ namespace Distributed_Reference
                 if (comm.Rank == 0)
                 {
                     Console.WriteLine("Done Reading, Start Gridding");
-                    //watchTotal.Start();
+                    watchTotal.Start();
                 }
-                if (comm.Rank == 0)
-                    Console.WriteLine("gridding constants before");
+
                 var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
-                if (comm.Rank == 0)
-                    Console.WriteLine("gridding constants done");
-                
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-                if (comm.Rank == 0)
-                    Console.WriteLine("done partition");
-
-                sum = comm.Rank;
-                total = comm.Reduce(sum, (a, b) => a + b, 0);
-                if (comm.Rank == 0)
-                {
-                    Console.WriteLine("testing mpi again");
-                    Console.WriteLine(total);
-                }
-
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
-                if (comm.Rank == 0)
-                {
-                    Console.WriteLine("Done  PSF");
-                }
 
                 var halfComm = comm.Size / 2;
                 var yResOffset = comm.Rank % 2 * (gridSize / halfComm);
@@ -156,7 +133,7 @@ namespace Distributed_Reference
                     {
                         watchBackward.Start();
                         var x = StitchX(comm, c, totalX);
-                        //FitsIO.Write(x, "xImage_"+cycle+".fits");
+                        FitsIO.Write(x, "xImage_"+cycle+".fits");
                         FFT.Shift(x);
                         modelGrid = FFT.GridFFT(x);
                     }
@@ -168,10 +145,6 @@ namespace Distributed_Reference
                         watchBackward.Stop();
 
                     var modelImg = Forward(comm, c, metadata, modelVis, uvw, frequencies, watchForward);
-                    if(comm.Rank == 0)
-                    {
-                        //FitsIO.Write(modelImg, "model_" + cycle + ".fits");
-                    }
                 }
 
                 if (comm.Rank == 0)
@@ -223,23 +196,15 @@ namespace Distributed_Reference
         public static double[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             double[,] psf = null;
-
-            Console.WriteLine("In calculate PSF");
             var localGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            if (comm.Rank == 0)
-            {
-                Console.WriteLine("done local stuff");
-            }
-
             var psf_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
                 psf = FFT.GridIFFT(psf_total, c.VisibilitiesCount);
                 FFT.Shift(psf);
                 psf = CutImg(psf);
-                //Single_Reference.FitsIO.Write(psf, "psf.fits");
-                //Console.WriteLine("psf Written");
-
+                Single_Reference.FitsIO.Write(psf, "psf.fits");
+                Console.WriteLine("psf Written");
             }
             comm.Broadcast(ref psf, 0);
 
@@ -259,9 +224,6 @@ namespace Distributed_Reference
                 image = FFT.GridIFFT(grid_total, c.VisibilitiesCount);
                 FFT.Shift(image);
                 watchIdg.Stop();
-
-                //Single_Reference.FitsIO.Write(image, "dirty.fits");
-                //Console.WriteLine("fits Written");
 
                 //remove spheroidal
             }
