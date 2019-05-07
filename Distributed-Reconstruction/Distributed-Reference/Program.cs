@@ -207,6 +207,11 @@ namespace Distributed_Reference
             double[,] psf = null;
 
             var localGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            if (comm.Rank == 0)
+            {
+                Console.WriteLine("done local stuff");
+            }
+
             var psf_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
