@@ -24,7 +24,13 @@ namespace Distributed_Reference
                 //System.Threading.Thread.Sleep(17000);
 
                 var comm = Communicator.world;
-
+                int sum = comm.Rank;
+                var total = comm.Reduce(sum, (a, b) => a + b, 0);
+                if(comm.Rank == 0)
+                {
+                    Console.WriteLine("testing mpi");
+                    Console.WriteLine(total);
+                }
                 //READ DATA
                 /*
                 var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
@@ -97,6 +103,10 @@ namespace Distributed_Reference
                 var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
+                if (comm.Rank == 0)
+                {
+                    Console.WriteLine("Done  PSF");
+                }
 
                 var halfComm = comm.Size / 2;
                 var yResOffset = comm.Rank % 2 * (gridSize / halfComm);
@@ -109,6 +119,7 @@ namespace Distributed_Reference
                     var imageLocal = Forward(comm, c, metadata, residualVis, uvw, frequencies, watchForward);
                     if (comm.Rank == 0)
                     {
+                        Console.WriteLine("Done  forward part of Cycle "+cycle);
                         watchDeconv.Start();
                         //FitsIO.Write(imageLocal, "residual"+cycle+".fits");
                     }
