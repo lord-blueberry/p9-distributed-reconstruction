@@ -31,7 +31,6 @@ namespace Distributed_Reference
                     Console.WriteLine("testing mpi");
                     Console.WriteLine(total);
                 }
-                Console.WriteLine("0what " + comm.Rank);
                 //READ DATA
                 /*
                 var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
@@ -103,9 +102,21 @@ namespace Distributed_Reference
                 }
                 Console.WriteLine("what "+ comm.Rank);
                 var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
-                Console.WriteLine("done gridding constants");
+                if (comm.Rank == 0)
+                    Console.WriteLine("gridding constants done");
+                
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-                Console.WriteLine("done partition");
+                if (comm.Rank == 0)
+                    Console.WriteLine("done partition");
+
+                sum = comm.Rank;
+                total = comm.Reduce(sum, (a, b) => a + b, 0);
+                if (comm.Rank == 0)
+                {
+                    Console.WriteLine("testing mpi again");
+                    Console.WriteLine(total);
+                }
+
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
                 if (comm.Rank == 0)
                 {
