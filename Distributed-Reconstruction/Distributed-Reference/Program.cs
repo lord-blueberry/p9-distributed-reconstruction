@@ -32,7 +32,7 @@ namespace Distributed_Reference
                     Console.WriteLine(total);
                 }
                 //READ DATA
-                /*
+                
                 var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
                 var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
                 var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
@@ -44,12 +44,7 @@ namespace Distributed_Reference
                         for (int k = 0; k < flags.GetLength(2); k++)
                             if (!flags[i, j, k])
                                 visCount2++;
-                */
-                var frequencies = FitsIO.ReadFrequencies(@"freq.fits");
-                var uvw = FitsIO.ReadUVW(@"uvw.fits");
-                var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
-                var visibilities = FitsIO.ReadVisibilities(@"vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, 2.0);
-                var visibilitiesCount = visibilities.Length;
+                var visibilitiesCount = visCount2;
 
                 var nrBaselines = uvw.GetLength(0) / comm.Size;
                 var nrFrequencies = frequencies.Length;
@@ -115,16 +110,14 @@ namespace Distributed_Reference
                     var imageLocal = Forward(comm, c, metadata, residualVis, uvw, frequencies, watchForward);
                     if (comm.Rank == 0)
                     {
-                        Console.WriteLine("Done  forward part of Cycle "+cycle);
                         watchDeconv.Start();
-                        //FitsIO.Write(imageLocal, "residual"+cycle+".fits");
+                        FitsIO.Write(imageLocal, "residual"+cycle+".fits");
                     }
                     CDClean.Deconvolve(xLocal, imageLocal, psf, 0.1 / (10 * (cycle + 1)), 5, yResOffset, xResOffset);
                     comm.Barrier();
                     if (comm.Rank == 0)
-                    {
                         watchDeconv.Stop();
-                    }
+                    
 
                     double[][,] totalX = null;
                     comm.Gather<double[,]>(xLocal, 0, ref totalX);
@@ -134,6 +127,7 @@ namespace Distributed_Reference
                         watchBackward.Start();
                         var x = StitchX(comm, c, totalX);
                         FitsIO.Write(x, "xImage_"+cycle+".fits");
+                        x = CleanBeam.ConvolveCleanBeam(x);
                         FFT.Shift(x);
                         modelGrid = FFT.GridFFT(x);
                     }
@@ -151,7 +145,6 @@ namespace Distributed_Reference
                 {
                     watchTotal.Stop();
                     
-                    FitsIO.Write(psf, "psf.fits");
                     var timetable = "total elapsed: " + watchTotal.Elapsed;
                     timetable += "\n" + "idg forward elapsed: " + watchForward.Elapsed;
                     timetable += "\n" + "idg backwards elapsed: " + watchBackward.Elapsed;
