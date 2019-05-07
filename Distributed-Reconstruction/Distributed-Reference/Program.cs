@@ -101,7 +101,9 @@ namespace Distributed_Reference
                     watchTotal.Start();
                 }
                 var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+                Console.WriteLine("done gridding constants");
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+                Console.WriteLine("done partition");
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
                 if (comm.Rank == 0)
                 {
@@ -138,7 +140,6 @@ namespace Distributed_Reference
                         watchBackward.Start();
                         var x = StitchX(comm, c, totalX);
                         //FitsIO.Write(x, "xImage_"+cycle+".fits");
-
                         FFT.Shift(x);
                         modelGrid = FFT.GridFFT(x);
                     }
@@ -206,6 +207,7 @@ namespace Distributed_Reference
         {
             double[,] psf = null;
 
+            Console.WriteLine("In calculate PSF");
             var localGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
             if (comm.Rank == 0)
             {
