@@ -90,6 +90,9 @@ namespace Distributed_Reference
                 int max_nr_timesteps = 512;
                 double cellSize = 2.5 / 3600.0 * PI / 180.0;
 
+                if (comm.Rank == 0)
+                    Console.WriteLine("still alive");
+
                 comm.Barrier();
                 var watchTotal = new Stopwatch();
                 var watchForward = new Stopwatch();
@@ -98,9 +101,10 @@ namespace Distributed_Reference
                 if (comm.Rank == 0)
                 {
                     Console.WriteLine("Done Reading, Start Gridding");
-                    watchTotal.Start();
+                    //watchTotal.Start();
                 }
-                Console.WriteLine("what "+ comm.Rank);
+                if (comm.Rank == 0)
+                    Console.WriteLine("gridding constants before");
                 var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 if (comm.Rank == 0)
                     Console.WriteLine("gridding constants done");
