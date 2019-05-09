@@ -113,12 +113,11 @@ namespace Distributed_Reference
                         watchDeconv.Start();
                         FitsIO.Write(imageLocal, "residual"+cycle+".fits");
                     }
-                    CDClean.Deconvolve(xLocal, imageLocal, psf, 0.1 / (10 * (cycle + 1)), 5, yResOffset, xResOffset);
+                    CDClean.Deconvolve(xLocal, imageLocal, psf, 1.0 / (10 * (cycle + 1)), 5, yResOffset, xResOffset);
                     comm.Barrier();
                     if (comm.Rank == 0)
                         watchDeconv.Stop();
                     
-
                     double[][,] totalX = null;
                     comm.Gather<double[,]>(xLocal, 0, ref totalX);
                     Complex[,] modelGrid = null;
@@ -128,6 +127,7 @@ namespace Distributed_Reference
                         var x = StitchX(comm, c, totalX);
                         FitsIO.Write(x, "xImage_"+cycle+".fits");
                         x = CleanBeam.ConvolveCleanBeam(x);
+                        FitsIO.Write(x, "convXImage_" + cycle + ".fits");
                         FFT.Shift(x);
                         modelGrid = FFT.GridFFT(x);
                     }
@@ -137,8 +137,6 @@ namespace Distributed_Reference
                     residualVis = IDG.Substract(visibilities, modelVis, flags);
                     if (comm.Rank == 0)
                         watchBackward.Stop();
-
-                    var modelImg = Forward(comm, c, metadata, modelVis, uvw, frequencies, watchForward);
                 }
 
                 if (comm.Rank == 0)
