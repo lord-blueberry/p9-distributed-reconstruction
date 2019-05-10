@@ -6,17 +6,12 @@ namespace Single_Reference
     {
         static void Main()
         {
-            //DebugMethods.debie();
-            //DebugMethods.DebugForwardBackward2();
-            //DebugMethods.DebugForwardBackwardRealWorld();
-
-            //DebugMethods.DebugForwardBackward();
-            //DebugMethods.TestConvergence1();
+            DebugMethods.DebugSimulated2();
             //DebugMethods.DebugFullPipeline();
             //DebugMethods.DebugFullMeerKAT();
 
             //DebugMethods.GetCleanBeam
-            DebugMethods.CleanBeam2();
+            //DebugMethods.CleanBeam2();
         }
     }
 }

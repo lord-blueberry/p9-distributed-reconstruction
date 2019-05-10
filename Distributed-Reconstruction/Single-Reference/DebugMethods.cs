@@ -14,7 +14,7 @@ namespace Single_Reference
     class DebugMethods
     {
         #region IDG test
-        public static void debie()
+        public static void DebugIDG()
         {
             int max_nr_timesteps = 256;
             int gridSize = 16;
@@ -159,6 +159,56 @@ namespace Single_Reference
             File.WriteAllText("watches_single.txt", timetable);
         }
 
+        public static void DebugSimulated2()
+        {
+            /*var frequencies = FitsIO.ReadFrequencies(@"freq.fits");
+            var uvw = FitsIO.ReadUVW(@"uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+            double norm = 2.0;
+            var visibilities = FitsIO.ReadVisibilities(@"vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            var visibilitiesCount = visibilities.Length;
+            int gridSize = 256;
+            int subgridsize = 16;
+            int kernelSize = 8;
+            //cell = image / grid
+            int max_nr_timesteps = 256;
+            double cellSize = 0.5 / 3600.0 * PI / 180.0;
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+
+            var watchTotal = new Stopwatch();
+            var watchForward = new Stopwatch();
+            var watchBackwards = new Stopwatch();
+            var watchDeconv = new Stopwatch();
+            watchTotal.Start();
+
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies);
+            var psf2 = psf;//CutImg(psf);
+            FitsIO.Write(psf2, "psf.fits");*/
+
+            var psf = new double[4, 4];
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                    psf[i, j] = 1 / 32.0;
+            psf[2, 2] = 17 / 32.0;
+
+            var b = new double[16, 16];
+            var resTmp = new double[4, 4];
+            GreedyCD.UpdateB(b, resTmp, psf, 14, 2, 0.5);
+            FitsIO.Write(b, "bOutput.fits");
+            FitsIO.Write(resTmp, "resTmp.fits");
+
+            var convTest = new double[16, 16];
+            convTest[14, 2] = 0.5;
+            var conv1 = Convolve(convTest, psf);
+            FitsIO.Write(conv1, "conv1Output.fits");
+            var conv2 = Convolve(conv1, psf);
+            FitsIO.Write(conv2, "conv2Output.fits");
+        }
+
         public static void DebugFullPipeline()
         {
             var frequencies = FitsIO.ReadFrequencies(@"freq.fits");
@@ -218,8 +268,7 @@ namespace Single_Reference
 
             var reconstruction = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            var majorCycles = 5;
-            for(int cycle = 0; cycle < majorCycles; cycle++)
+            for(int cycle = 0; cycle < 7; cycle++)
             {
                 watchForward.Start();
                 var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
@@ -358,70 +407,6 @@ namespace Single_Reference
         }
         #endregion
 
-        public static void GetCleanBeam()
-        {
-            var res = FitsIO.ReadImage("hello.res.fits");
-            var img = FitsIO.ReadImage("hello.img.fits");
-
-            var max = 0.0;
-            var pix = new Tuple<int, int>(-1, -1);
-            for(int i = 0; i < res.GetLength(0); i++)
-            {
-                for(int j = 0; j < res.GetLength(1); j++)
-                {
-                    img[i, j] -= res[i, j];
-                    if(img[i, j] > max)
-                    {
-                        max = img[i, j];
-                        pix = new Tuple<int, int>(i, j);
-                    }
-                }
-            }
-
-            var cut = new double[32, 32];
-            for(int i = -16; i < 16; i++)
-            {
-                for(int j = -16; j < 16; j++)
-                {
-                    cut[i + 16, j + 16] = img[pix.Item1 + i, pix.Item2 + j] / max;
-                }
-            }
-            FitsIO.Write(cut, "hello.clean.fits");
-        }
-
-        public static void CleanBeam2()
-        {
-            var img = FitsIO.ReadBeam("reconstruction6.fits");
-            var output = CleanBeam.ConvolveCleanBeam(img);
-            FitsIO.Write(output, "cleanedImage.fits");
-        }
-
-        public static void TestConvergence0()
-        {
-            var imSize = 64;
-            var psfSize = 4;
-            var psf = new double[psfSize, psfSize];
-
-            var psfSum = 8.0;
-            psf[1, 1] = 1 / psfSum;
-            psf[1, 2] = 2 / psfSum;
-            psf[1, 3] = 3 / psfSum;
-            psf[2, 1] = 3 / psfSum;
-            psf[2, 2] = 8 / psfSum;
-            psf[2, 3] = 2 / psfSum;
-            psf[3, 1] = 5 / psfSum;
-            psf[3, 2] = 3 / psfSum;
-            psf[3, 3] = 2 / psfSum;
-
-            var groundTruth = new double[imSize, imSize];
-            groundTruth[33, 33] = 15.0;
-
-            var image = Convolve(groundTruth, psf);
-            var reconstruction = new double[imSize, imSize];
-            CDClean.Deconvolve(reconstruction, image, psf, 0.1);
-
-            var precision = 0.1;
-        }
 
         public static void TestConvergence1()
         {
@@ -448,8 +433,6 @@ namespace Single_Reference
             var convolved = Convolve(groundTruth, psf);
             var reconstruction = new double[imSize, imSize];
             CDClean.Deconvolve(reconstruction, convolved, psf, 0.1);
-
-            var precision = 0.1;
         }
 
         private static double ComputeL(int x, int subgridSize, float imageSize)
