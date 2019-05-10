@@ -37,11 +37,19 @@ namespace Single_Reference.Deconvolution
                     currentLambda = xDiff;
                     var xNew = ShrinkAbsolute(xOld + xDiff, lambda);
                     xImage[yPixel, xPixel] = xNew;
-                    UpdateB(b, residualTmp, psf, yPixel, xPixel, xOld - xNew);
+                    UpdateB(b, residualTmp, psf2, yPixel, xPixel, xOld - xNew);
                 }
 
                 converged = currentLambda < lambda;
                 iter++;
+            }
+        }
+
+        private static void UpdateB2(double[,] b, double[,] psf2, int yPixel, int xPixel)
+        {
+            for (int i = 0; i < b.GetLength(0); i++)
+            {
+                for (int j = 0; j < b.GetLength(1); j++);
             }
         }
 
@@ -67,7 +75,7 @@ namespace Single_Reference.Deconvolution
                     for (int resY = resYOffset; resY < resYCount; resY++)
                         for(int resX = resXOffset; resX < resXCount; resX++)
                             bDiff += psf[resY, resX] * residualTmp[resY, resX];
-                    b[y, x] += bDiff;
+                    b[y, x] = bDiff;
                 }
             }
         }

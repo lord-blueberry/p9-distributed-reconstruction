@@ -129,5 +129,14 @@ namespace Single_Reference.IDGSequential
             return residualVis;
         }
 
+        public static Complex[,] Multiply(Complex[,] visGrid0, Complex[,] visGrid1)
+        {
+            var outputVis = new Complex[visGrid0.GetLength(0), visGrid0.GetLength(1)];
+            for (int i = 0; i < visGrid0.GetLength(0); i++)
+                for (int j = 0; j < visGrid0.GetLength(1); j++)
+                            outputVis[i, j] = visGrid0[i, j] * visGrid1[i, j];
+
+            return outputVis;
+        }
     }
 }

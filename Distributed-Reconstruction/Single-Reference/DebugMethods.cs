@@ -161,17 +161,16 @@ namespace Single_Reference
 
         public static void DebugSimulated2()
         {
-            /*var frequencies = FitsIO.ReadFrequencies(@"freq.fits");
-            var uvw = FitsIO.ReadUVW(@"uvw.fits");
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
             var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
             double norm = 2.0;
-            var visibilities = FitsIO.ReadVisibilities(@"vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
             int gridSize = 256;
             int subgridsize = 16;
             int kernelSize = 8;
-            //cell = image / grid
             int max_nr_timesteps = 256;
             double cellSize = 0.5 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
@@ -180,33 +179,55 @@ namespace Single_Reference
             var watchForward = new Stopwatch();
             var watchBackwards = new Stopwatch();
             var watchDeconv = new Stopwatch();
-            watchTotal.Start();
 
-            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+            watchTotal.Start();
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
-            var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies);
-            var psf2 = psf;//CutImg(psf);
-            FitsIO.Write(psf2, "psf.fits");*/
+            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+            //psf = CutImg(psf);
+            FitsIO.Write(psf, "psf.fits");
 
-            var psf = new double[4, 4];
-            for (int i = 0; i < 4; i++)
-                for (int j = 0; j < 4; j++)
-                    psf[i, j] = 1 / 32.0;
-            psf[2, 2] = 17 / 32.0;
+            var xImage = new double[gridSize, gridSize];
+            var residualVis = visibilities;
+            for(int cycle = 0; cycle < 1; cycle++)
+            {
+                //FORWARD
+                watchForward.Start();
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
+                var dirtyImage = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
+                
+                var bGrid = IDG.Multiply(dirtyGrid, psfGrid);
+                var b = FFT.GridIFFT(bGrid, c.VisibilitiesCount);
+                FFT.Shift(b);
+                FitsIO.Write(b, "b_" + cycle + ".fits");
 
-            var b = new double[16, 16];
-            var resTmp = new double[4, 4];
-            GreedyCD.UpdateB(b, resTmp, psf, 14, 2, 0.5);
-            FitsIO.Write(b, "bOutput.fits");
-            FitsIO.Write(resTmp, "resTmp.fits");
+                
+                watchForward.Stop();
 
-            var convTest = new double[16, 16];
-            convTest[14, 2] = 0.5;
-            var conv1 = Convolve(convTest, psf);
-            FitsIO.Write(conv1, "conv1Output.fits");
-            var conv2 = Convolve(conv1, psf);
-            FitsIO.Write(conv2, "conv2Output.fits");
+                //DECONVOLVE
+                watchDeconv.Start();
+                GreedyCD.Deconvolve(xImage, b, psf, 0.4, 1);
+                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
+                FitsIO.Write(b, "bDebug_" + cycle + ".fits");
+                watchDeconv.Stop();
+
+                //BACKWARDS
+                watchBackwards.Start();
+                FFT.Shift(xImage);
+                var xGrid = FFT.GridFFT(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                watchBackwards.Stop();
+
+                var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
+                FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
+            }
+
         }
 
         public static void DebugFullPipeline()
