@@ -7,11 +7,13 @@ namespace Single_Reference
         static void Main()
         {
             //DebugMethods.DebugFullPipeline();
-            DebugMethods.DebugSimulated2();
+            //DebugMethods.DebugSimulated2();
             //DeconvTest.TestMore();
 
             //DebugMethods.DebugFullMeerKAT();
             //DebugMethods.MeerKATFull2();
+
+            IdiotCD.Run();
         }
     }
 }
