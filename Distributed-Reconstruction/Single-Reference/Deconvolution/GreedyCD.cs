@@ -44,16 +44,12 @@ namespace Single_Reference.Deconvolution
                 Console.WriteLine(xDiff + "\t" + yPixel + "\t" + xPixel);
                 var xNew = xOld + xDiff;
                 //xNew = Math.Max(Math.Max(0, (xNew * xNew) - lambda) * xNew / (xNew * xNew) , 0);
-                xNew = ShrinkAbsolute(xNew, lambda * alpha) / (1 + lambda * (1 - alpha));
                 //xNew = xNew / (1 + lambda * (1 - alpha));
+                xNew = ShrinkAbsolute(xNew, lambda * alpha) / (1 + lambda * (1 - alpha));
                 xImage[yPixel, xPixel] = xNew;
-                if (Math.Abs(xOld - xNew) < precision & xNew > 0.0)
-                    b[yPixel, xPixel] = 0.0;
                 UpdateB2(b, psf2, yPixel, xPixel, xOld - xNew);
                 iter++;
-                //converged = Math.Abs(xOld-xNew) < precision;
-
-                //CDClean.ModifyResidual(residual, psf, yPixel, xPixel, xNew - xOld);
+                converged = Math.Abs(xOld-xNew) < precision;
             }
 
             return converged;
