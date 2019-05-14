@@ -90,7 +90,7 @@ namespace Single_Reference
         #endregion
 
         #region full
-        public static void DebugFullMeerKAT()
+        public static void MeerKATFull()
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
@@ -220,7 +220,8 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = GreedyCD.Deconvolve(xImage, b, psf2, 2.0, 0.0, 2000);
+                var precision = Math.Pow(0.1, 3);
+                var converged = CyclicCD.Deconvolve(xImage, b, psf2, 0.5, 0.1, 1000, precision);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
@@ -312,11 +313,11 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 128;
+            int gridSize = 256;
             int subgridsize = 16;
             int kernelSize = 8;
             int max_nr_timesteps = 64;
-            double cellSize = 1.0 / 3600.0 * PI / 180.0;
+            double cellSize = 0.5 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
             var watchTotal = new Stopwatch();
@@ -357,7 +358,8 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = CyclicCD.Deconvolve(xImage, b, psf2, 1.0, 0.0, 1000);
+                var precision = Math.Pow(0.1, (cycle + 3));
+                var converged = CyclicCD.Deconvolve(xImage, b, psf2, 2.0, 0.2, 1000, precision);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
