@@ -7,80 +7,76 @@ namespace Single_Reference.Deconvolution
     public class GreedyCD
     {
 
-        public static void Deconvolve(double[,] xImage, double[,] b, double[,] psf, double lambda, int maxIteration = 100)
+        public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf2, double lambda, double alpha, int maxIteration = 100)
         {
             int iter = 0;
             bool converged = false;
+            double precision = 1e-12;
 
-            // the "a" of the parabola equation a* x*x + b*x + c
-            var currentLambda = Double.PositiveInfinity;
-            var a = CalcPSFSquared(psf);
-            var residualTmp = new double[psf.GetLength(0), psf.GetLength(1)];
+            var aa = psf2[psf2.GetLength(0) / 2, psf2.GetLength(1) / 2];
+            //var a2 = CDClean.CalcPSFSquared(psf);
             while (!converged & iter < maxIteration)
             {
                 var maxB = Double.NegativeInfinity;
+                var maxAbsB = Double.NegativeInfinity;
                 var yPixel = -1;
                 var xPixel = -1;
                 for (int i = 0; i < b.GetLength(0); i++)
                     for (int j = 0; j < b.GetLength(1); j++)
-                        if (b[i, j] > maxB)
+                    {
+                        var currentB = b[i, j];
+                        if (xImage[i, j] > 0.0)
+                            currentB = Math.Abs(currentB);
+
+                        if (currentB > maxAbsB)
                         {
                             maxB = b[i, j];
+                            maxAbsB = currentB;
                             yPixel = i;
                             xPixel = j;
                         }
 
+                    }
+
                 var xOld = xImage[yPixel, xPixel];
-                var xDiff = (maxB / a);             //calculate minimum of parabola, e.g -b/2a. Simplifications led rise to this line
-                if(xDiff < currentLambda)
-                {
-                    currentLambda = xDiff;
-                    var xNew = ShrinkAbsolute(xOld + xDiff, lambda);
-                    xImage[yPixel, xPixel] = xNew;
-                    UpdateB(b, residualTmp, psf2, yPixel, xPixel, xOld - xNew);
-                }
+                var xDiff = (maxB / aa);             //calculate minimum of parabola, e.g -b/2a. Simplifications led rise to this line
 
-                converged = currentLambda < lambda;
+                Console.WriteLine(xDiff + "\t" + yPixel + "\t" + xPixel);
+                var xNew = xOld + xDiff;
+                //xNew = Math.Max(Math.Max(0, (xNew * xNew) - lambda) * xNew / (xNew * xNew) , 0);
+                xNew = ShrinkAbsolute(xNew, lambda * alpha) / (1 + lambda * (1 - alpha));
+                //xNew = xNew / (1 + lambda * (1 - alpha));
+                xImage[yPixel, xPixel] = xNew;
+                if (Math.Abs(xOld - xNew) < precision & xNew > 0.0)
+                    b[yPixel, xPixel] = 0.0;
+                UpdateB2(b, psf2, yPixel, xPixel, xOld - xNew);
                 iter++;
+                //converged = Math.Abs(xOld-xNew) < precision;
+
+                //CDClean.ModifyResidual(residual, psf, yPixel, xPixel, xNew - xOld);
             }
+
+            return converged;
         }
 
-        private static void UpdateB2(double[,] b, double[,] psf2, int yPixel, int xPixel)
+        private static void UpdateB2(double[,] b, double[,] psf2, int yPixel, int xPixel, double xDiff)
         {
-            for (int i = 0; i < b.GetLength(0); i++)
+            var yPsfHalf = (int)Math.Ceiling(psf2.GetLength(0) / 2.0);
+            var xPsfHalf = (int)Math.Ceiling(psf2.GetLength(1) / 2.0);
+            for (int i = 0; i < psf2.GetLength(0); i++)
             {
-                for (int j = 0; j < b.GetLength(1); j++);
-            }
-        }
-
-        public static void UpdateB(double[,] b, double[,] residualTmp, double[,] psf, int yPixel, int xPixel, double xDiff)
-        {
-            for (int i = 0; i < residualTmp.GetLength(0); i++)
-                for (int j = 0; j < residualTmp.GetLength(1); j++)
-                    residualTmp[i , j] = xDiff * psf[i, j];
-
-            var bYMin = Math.Max(yPixel - psf.GetLength(0), 0);
-            var bYMax = Math.Min(yPixel + psf.GetLength(0), b.GetLength(0));
-            var bXMin = Math.Max(xPixel - psf.GetLength(1), 0);
-            var bXMax = Math.Min(xPixel + psf.GetLength(1), b.GetLength(1));
-            for (int y = bYMin; y < bYMax; y++)
-            {
-                for(int x = bXMin; x < bXMax; x++)
+                for (int j = 0; j < psf2.GetLength(1); j++)
                 {
-                    var resYOffset = Math.Max(0, y - yPixel + 1);
-                    var resYCount = Math.Min(psf.GetLength(0), psf.GetLength(0) - (yPixel - y) + 1);
-                    var resXOffset = Math.Max(0, x - xPixel + 1);
-                    var resXCount = Math.Min(psf.GetLength(1), psf.GetLength(1) - (xPixel- x) + 1);
-                    var bDiff = 0.0;
-                    for (int resY = resYOffset; resY < resYCount; resY++)
-                        for(int resX = resXOffset; resX < resXCount; resX++)
-                            bDiff += psf[resY, resX] * residualTmp[resY, resX];
-                    b[y, x] = bDiff;
+                    var y = (yPixel + i) % b.GetLength(0);
+                    var x = (xPixel + j) % b.GetLength(1);
+                    var yPsf = (i + yPsfHalf) % psf2.GetLength(0);
+                    var xPsf = (j + xPsfHalf) % psf2.GetLength(1);
+                    b[y, x] += psf2[yPsf, xPsf] * xDiff;
                 }
             }
         }
 
-        private static double CalcPSFSquared(double[,] psf)
+        public static double CalcPSFSquared(double[,] psf)
         {
             double squared = 0;
             for (int y = 0; y < psf.GetLength(0); y++)

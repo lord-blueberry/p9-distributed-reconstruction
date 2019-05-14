@@ -29,6 +29,8 @@ namespace Single_Reference.Deconvolution
       
             // the "a" of the parabola equation a* x*x + b*x + c
             var a = CalcPSFSquared(psf);
+            Console.WriteLine("psf squared");
+            Console.WriteLine(a);
             while (iter < maxIteration & !converged)
             {
                 iter++;
@@ -63,7 +65,7 @@ namespace Single_Reference.Deconvolution
                         }
                     }
                 }
-
+                Console.WriteLine("Adding pixels");
                 //CLEAN-inspired. Add pixels with the maximum residual
                 for (int pixels = 0; pixels < 10; pixels++)
                 {
@@ -86,7 +88,7 @@ namespace Single_Reference.Deconvolution
 
                     var xOld = xImage[yMax, xMax];
                     var b = CalculateB(residual, psf, yMax, xMax, yResOffset, xResOffset);
-
+                    Console.WriteLine(b + "\t" + yMax + "\t" + xMax);
                     //calculate minimum of parabola, eg -2b/a
                     var xNew = xOld + (b / a);
                     xNew = ShrinkAbsolute(xNew, lambda);
@@ -150,7 +152,7 @@ namespace Single_Reference.Deconvolution
             }
         }
 
-        private static double CalculateB(double[,] residual, double[,] psf, int y, int x, int yResOffset, int xResOffset)
+        public static double CalculateB(double[,] residual, double[,] psf, int y, int x, int yResOffset, int xResOffset)
         {
             int yOffset = y - psf.GetLength(0) / 2;
             int xOffset = x - psf.GetLength(1) / 2;
@@ -245,7 +247,7 @@ namespace Single_Reference.Deconvolution
             
         }
 
-        private static double CalcPSFSquared(double[,] psf)
+        public static double CalcPSFSquared(double[,] psf)
         {
             double squared = 0;
             for (int y = 0; y < psf.GetLength(0); y++)

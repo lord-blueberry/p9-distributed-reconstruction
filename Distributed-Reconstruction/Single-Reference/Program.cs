@@ -6,12 +6,12 @@ namespace Single_Reference
     {
         static void Main()
         {
-            DebugMethods.DebugSimulated2();
             //DebugMethods.DebugFullPipeline();
-            //DebugMethods.DebugFullMeerKAT();
+            DebugMethods.DebugSimulated2();
+            //DeconvTest.TestMore();
 
-            //DebugMethods.GetCleanBeam
-            //DebugMethods.CleanBeam2();
+            //DebugMethods.DebugFullMeerKAT();
+            //DebugMethods.MeerKATFull2();
         }
     }
 }

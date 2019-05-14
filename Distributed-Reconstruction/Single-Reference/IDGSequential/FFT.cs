@@ -114,7 +114,6 @@ namespace Single_Reference.IDGSequential
                         output[y, x] = imageSpace[y, x].Real / visibilityCount;
                     }
                 }
-
             }
 
             return output;
@@ -167,7 +166,7 @@ namespace Single_Reference.IDGSequential
         /// </summary>
         /// <param name="image"></param>
         /// <returns></returns>
-        public static Complex[,] GridFFTDebug(Complex[,] image)
+        public static Complex[,] ForwardFFTDebug(double[,] image, double norm)
         {
             Complex[,] output = new Complex[image.GetLength(0), image.GetLength(1)];
             using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))
@@ -178,11 +177,30 @@ namespace Single_Reference.IDGSequential
                         imageSpace[y, x] = image[y, x];
 
                 DFT.FFT(imageSpace, fourierSpace);
-                double norm = 1.0 / (image.GetLength(0) * image.GetLength(1));
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
-                        output[y, x] = fourierSpace[y, x] * norm;
+                        output[y, x] = fourierSpace[y, x] / norm;
+            }
+
+            return output;
+        }
+
+        public static double[,] ForwardIFFTDebug(Complex[,] image, double norm)
+        {
+            double[,] output = new double[image.GetLength(0), image.GetLength(1)];
+            using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))
+            using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
+            {
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        imageSpace[y, x] = image[y, x];
+
+                DFT.IFFT(imageSpace, fourierSpace);
+
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        output[y, x] = fourierSpace[y, x].Real / norm;
             }
 
             return output;

@@ -9,7 +9,6 @@ namespace Single_Reference.IDGSequential
 {
     public class IDG
     {
-
         public static Complex[,] Grid(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
@@ -46,7 +45,6 @@ namespace Single_Reference.IDGSequential
 
             return visibilities;
         }
-
 
         public static double[,] ToImage(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {

@@ -79,6 +79,7 @@ namespace Single_Reference
             return img;
         }
 
+
         public static double[,] ReadBeam(string file)
         {
             var f = new Fits(file);
