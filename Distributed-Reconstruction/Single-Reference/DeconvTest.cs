@@ -36,10 +36,7 @@ namespace Single_Reference
             FitsIO.Write(pfsImg2, "psf_img2.fits");
 
             var xImage = new double[dirty.GetLength(0), dirty.GetLength(0)];
-            var xImg2 = ISTA.Deconvolution(dGrid, psfGrid, 0.5, 0.0);
             var converged = GreedyCD.Deconvolve(xImage, b, pfsImg2, 0.4, 0.0, 200000);
-
-            FitsIO.Write(xImg2, "xImg2.fits");
             FitsIO.Write(xImage, "xImage.fits");
 
             var hello = FFT.ForwardFFTDebug(xImage, 1.0);

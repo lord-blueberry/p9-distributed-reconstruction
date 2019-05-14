@@ -357,7 +357,7 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = GreedyCD.Deconvolve(xImage, b, psf2, 1.0, 0.0, 1000);
+                var converged = CyclicCD.Deconvolve(xImage, b, psf2, 1.0, 0.0, 1000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
