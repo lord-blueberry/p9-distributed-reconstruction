@@ -8,13 +8,13 @@ namespace Single_Reference
         {
             //DebugMethods.DebugFullPipeline();
             //DebugMethods.DebugSimulated2();
-            DebugMethods.DebugSimulated3();
+            //DebugMethods.DebugSimulated3();
             //DeconvTest.TestMore();
 
             //DebugMethods.DebugFullMeerKAT();
             //DebugMethods.MeerKATFull2();
 
-            IdiotCD.Run();
+            IdiotCD.Run2();
         }
     }
 }

@@ -443,6 +443,11 @@ namespace Single_Reference
                 FFT.Shift(dirtyImage);
                 FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
 
+                var dCopy = new double[gridSize, gridSize];
+                for (int i = 0; i < dCopy.GetLength(0); i++)
+                    for (int j = 0; j < dCopy.GetLength(1); j++)
+                        dCopy[i, j] = dirtyImage[i, j];
+
                 var bGrid = IDG.Multiply(dirtyGrid, psfGrid);
                 var b = FFT.GridIFFT(bGrid, c.VisibilitiesCount);
                 FFT.Shift(b);
@@ -454,7 +459,7 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, b, psf, psf2, 0.5);
+                var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, b, psf, psf2, 0.0, dCopy);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else

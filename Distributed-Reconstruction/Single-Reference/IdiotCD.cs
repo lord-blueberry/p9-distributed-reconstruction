@@ -14,8 +14,10 @@ namespace Single_Reference
     {
         public static void Run()
         {
-            var frequencies = FitsIO.ReadFrequencies(@"C:\Users\Jon\github\p9-data\small\fits\simulation_point\freq.fits");
-            var uvw = FitsIO.ReadUVW(@"C:\Users\Jon\github\p9-data\small\fits\simulation_point\uvw.fits");
+            //var frequencies = FitsIO.ReadFrequencies(@"C:\Users\Jon\github\p9-data\small\fits\simulation_point\freq.fits");
+            //var uvw = FitsIO.ReadUVW(@"C:\Users\Jon\github\p9-data\small\fits\simulation_point\uvw.fits");
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
             var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
 
             var visibilitiesCount = flags.Length;
@@ -36,55 +38,175 @@ namespace Single_Reference
             var truth = new double[64, 64];
             truth[40, 25] = 1.5;
             truth[25, 35] = 2.5;
-            var dirty = Convolve(truth, psf);
+            var dirty = ConvolveFFT(truth, psf);
             FitsIO.Write(truth, "truth.fits");
             FitsIO.Write(dirty, "dirty.fits");
 
             var x = new double[gridSize, gridSize];
             Deconv(x, dirty, psf);
+
+            var psf2 = ConvolveFFT(psf, psf);
+            var b = ConvolveFFT(dirty, psf);
+            var a = psf2[gridSize / 2, gridSize / 2];
+            for (int i = 0; i < b.GetLength(0); i++)
+                for (int j = 0; j < b.GetLength(1); j++)
+                {
+                    b[i, j] = b[i, j] / a;
+                    psf2[i, j] = psf2[i, j] / a;
+                }
+                    
+            var dCopy = new double[gridSize, gridSize];
+            for (int i = 0; i < b.GetLength(0); i++)
+                for (int j = 0; j < b.GetLength(1); j++)
+                    dCopy[i, j] = dirty[i, j];
+            var x2 = new double[gridSize, gridSize];
+            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.0, dCopy, 8);
         }
 
-        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf)
+        public static void Run2()
+        {
+            //var frequencies = FitsIO.ReadFrequencies(@"C:\Users\Jon\github\p9-data\small\fits\simulation_point\freq.fits");
+            //var uvw = FitsIO.ReadUVW(@"C:\Users\Jon\github\p9-data\small\fits\simulation_point\uvw.fits");
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+
+            var visibilitiesCount = flags.Length;
+            int gridSize = 64;
+            int subgridsize = 16;
+            int kernelSize = 8;
+            int max_nr_timesteps = 64;
+            double cellSize = 2.0 / 3600.0 * PI / 180.0;
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+            FitsIO.Write(psf, "psf.fits");
+
+            var truth = new double[64, 64];
+            truth[40, 26] = 1.4;
+            truth[23, 32] = 2.5;
+            var tGrid = FFT.ForwardFFTDebug(truth, 1.0);
+            var dGrid = IDG.Multiply(tGrid, psfGrid);
+            var dirty = FFT.ForwardIFFTDebug(dGrid, c.VisibilitiesCount);
+            FitsIO.Write(truth, "truth.fits");
+            FitsIO.Write(dirty, "dirty.fits");
+
+            var x = new double[gridSize, gridSize];
+            Deconv(x, dirty, psf);
+
+            var psf2 = ConvolveFFT(psf, psf);
+            var b = ConvolveFFT(dirty, psf);
+            var a = psf2[gridSize / 2, gridSize / 2];
+            for (int i = 0; i < b.GetLength(0); i++)
+                for (int j = 0; j < b.GetLength(1); j++)
+                {
+                    b[i, j] = b[i, j] / a;
+                    psf2[i, j] = psf2[i, j] / a;
+                }
+
+            var dCopy = new double[gridSize, gridSize];
+            for (int i = 0; i < b.GetLength(0); i++)
+                for (int j = 0; j < b.GetLength(1); j++)
+                    dCopy[i, j] = dirty[i, j];
+            var x2 = new double[gridSize, gridSize];
+            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.0, dCopy, 8);
+        }
+
+        public static void Run3()
+        {
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+            double norm = 2.0;
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            var visibilitiesCount = visibilities.Length;
+            int gridSize = 64;
+            int subgridsize = 8;
+            int kernelSize = 4;
+            int max_nr_timesteps = 64;
+            double cellSize = 2.0 / 3600.0 * PI / 180.0;
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+            FitsIO.Write(psf, "psf.fits");
+
+            var dirtyGrid = IDG.Grid(c, metadata, visibilities, uvw, frequencies);
+            var dirty = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
+            FFT.Shift(dirty);
+            FitsIO.Write(dirty, "dirty.fits");
+
+            var x = new double[gridSize, gridSize];
+            Deconv(x, dirty, psf);
+
+            var psf2 = ConvolveFFT(psf, psf);
+            var b = ConvolveFFT(dirty, psf);
+            var a = psf2[gridSize / 2, gridSize / 2];
+            for (int i = 0; i < b.GetLength(0); i++)
+                for (int j = 0; j < b.GetLength(1); j++)
+                {
+                    b[i, j] = b[i, j] / a;
+                    psf2[i, j] = psf2[i, j] / a;
+                }
+
+            var dCopy = new double[gridSize, gridSize];
+            for (int i = 0; i < b.GetLength(0); i++)
+                for (int j = 0; j < b.GetLength(1); j++)
+                    dCopy[i, j] = dirty[i, j];
+            var x2 = new double[gridSize, gridSize];
+            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.0, dCopy, 100);
+        }
+
+
+        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, int maxIter = 8)
         {
             var iter = 0;
-            var maxIter = 10;
             var converged = false;
-            var lambda = 0.0;
+            var lambda = 0.5 * 208.79197047849283* 2;
             var fuckingA = CalcPSFSquared(psf);
             var FO = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var XO = new double[xImage.GetLength(0), xImage.GetLength(1)];
+            
             while (iter < maxIter & !converged)
             {
-                var convolved = Convolve(xImage, psf);
+                var convolved = ConvolveFFT(xImage, psf);
                 var residuals = Subtract(dirty, convolved);
                 FitsIO.Write(residuals, "residuals_" + iter + ".fits");
-                var bMAP = Convolve(residuals, psf);
-                FitsIO.Write(bMAP, "bMap_" + iter + ".fits");
-                var currentO = CalcDataObjective(residuals);
-                currentO += CalcL1Objective(xImage, lambda);
-                var fuckingMIN = Double.MaxValue;
+                var bMap = ConvolveFFT(residuals, psf);
+                FitsIO.Write(bMap, "bMap_" + iter + ".fits");
+                var objectiveVal = CalcDataObjective(residuals);
+                objectiveVal += CalcL1Objective(xImage, lambda);
+                var minVal = Double.MaxValue;
                 var yPixel = -1;
                 var xPixel = -1;
                 var xNew = 0.0;
                 for (int i = 0; i < xImage.GetLength(0); i++)
                     for (int j = 0; j < xImage.GetLength(1); j++)
                     {
-                        if (i == 25 & j == 35)
-                            Console.Write("");
-                        if (i == 40 & j == 25)
-                            Console.Write("");
-                        var fuckingB = bMAP[i, j];
+                        //var fuckingB = bMap[i, j] - lambda/2;
+                        var fuckingB = bMap[i, j];
                         var xDiff = fuckingB / fuckingA;
                         var x = xImage[i, j] + xDiff;
-                        x = ShrinkAbsolute(x, lambda);
-                        if (x < xImage[i, j])
-                            Console.Write("OI");
+                        x = ShrinkAbsolute(x, lambda / fuckingA / 2);
+                        x = Math.Max(x, 0);
                         XO[i, j] = x;
-                        var fuckingO = EstimateObjective(xImage, dirty, psf, i, j, x, lambda);
+                        var fuckingO = EstimateObjective(xImage, dirty, psf, i, j, x, lambda, fuckingA);
+                        if (Math.Abs(x - xImage[i, j]) > 1e-6)
+                            if (fuckingO <= objectiveVal + 1e-6)
+                                Console.Write("");
+                            else
+                                Console.Write("ERROR");
                         FO[i, j] = fuckingO;
-                        if(fuckingMIN > fuckingO)
+                        if(minVal > fuckingO)
                         {
-                            fuckingMIN = fuckingO;
+                            minVal = fuckingO;
                             xNew = x;
                             yPixel = i;
                             xPixel = j;
@@ -103,14 +225,15 @@ namespace Single_Reference
             }
         }
 
-        public static double EstimateObjective(double[,] xImage, double[,] dirty, double[,] psf, int yPixel, int xPixel, double fuckingX, double fuckingLambda)
+        public static double EstimateObjective(double[,] xImage, double[,] dirty, double[,] psf, int yPixel, int xPixel, double fuckingX, double fuckingLambda, double fuckingA)
         {
             var xOld = xImage[yPixel, xPixel];
 
             xImage[yPixel, xPixel] = fuckingX;
-            var convolved = Convolve(xImage, psf);
+            var convolved = ConvolveFFT(xImage, psf);
             var residuals = Subtract(dirty, convolved);
             var currentO = CalcDataObjective(residuals);
+            //currentO += CalcL1Objective(xImage, fuckingLambda * fuckingA);
             currentO += CalcL1Objective(xImage, fuckingLambda);
 
             xImage[yPixel, xPixel] = xOld;
@@ -128,7 +251,7 @@ namespace Single_Reference
         }
 
 
-        public static double[,] Convolve(double[,] img, double[,] psf)
+        public static double[,] ConvolveFFT(double[,] img, double[,] psf)
         {
             var IMG = FFT.ForwardFFTDebug(img, 1.0);
             var PSF = FFT.ForwardFFTDebug(psf, 1.0);
