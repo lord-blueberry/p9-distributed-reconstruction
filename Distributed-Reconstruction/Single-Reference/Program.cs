@@ -13,6 +13,8 @@ namespace Single_Reference
 
             //DebugMethods.DebugFullMeerKAT();
             //DebugMethods.MeerKATFull2();
+
+            IdiotCD.Run();
         }
     }
 }
