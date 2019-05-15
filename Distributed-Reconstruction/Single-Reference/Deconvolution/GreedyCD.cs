@@ -6,6 +6,129 @@ namespace Single_Reference.Deconvolution
 {
     public class GreedyCD
     {
+        public static bool Deconvolve2(double[,] xImage, double[,] res, double[,]b, double[,]psf, double[,] psf2, double lambda, int maxIteration=100)
+        {
+            double objective = 0;
+            objective += CalcL1Objective(xImage, lambda);
+            objective += CalcDataObjective(res);
+
+            int iter = 0;
+            bool converged = false;
+            double epsilon = 1e-4;
+            while (!converged & iter < maxIteration)
+            {
+                var yPixel = -1;
+                var xPixel = -1;
+                var maxObjective = 0.0;
+                var xNew = 0.0;
+                var totO = 0.0;
+                for (int i = 0; i < b.GetLength(0); i++)
+                    for (int j = 0; j < b.GetLength(1); j++)
+                    {
+                        if (i == 24 & j == 31)
+                            Console.Write("");
+                        var old = xImage[i, j];
+                        var xTmp = old + b[i, j];
+                        xTmp = ShrinkAbsolute(xTmp, lambda);
+                        var xDiff = old - xTmp;
+                        if (Math.Abs(xDiff) > epsilon)
+                        {
+                            var oImprov = CalcResImprovement(res, psf, i, j, xDiff);
+                            var oImprovN0 = CalcResImprovement(res, psf, i, j, xDiff-0.5);
+                            var oImprovN1 = CalcResImprovement(res, psf, i, j, xDiff + 0.5);
+                            if (oImprov < 0.0)
+                                Console.Write("");
+                            oImprov = oImprov + lambda * Math.Abs(old) - lambda * Math.Abs(xTmp);
+                            if (oImprov > maxObjective)
+                            {
+                                yPixel = i;
+                                xPixel = j;
+                                maxObjective = oImprov;
+                                xNew = xTmp;
+                            }
+                        }
+                    }
+
+                converged = yPixel == -1;
+                if(!converged)
+                {
+                    var xOld = xImage[yPixel, xPixel];
+                    xImage[yPixel, xPixel] = xNew;
+                    UpdateResidual(res, psf, yPixel, xPixel, xOld - xNew);
+                    UpdateB2(b, psf2, yPixel, xPixel, xOld - xNew);
+                    var objective2 = CalcL1Objective(xImage, lambda);
+                    objective2 += CalcDataObjective(res);
+                    objective -= maxObjective;
+
+                    Console.WriteLine(Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel);
+                    iter++;
+                }
+            }
+
+            return converged;
+        }
+
+        private static double CalcResImprovement(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
+        {
+            var yPsfHalf = psf.GetLength(0) / 2;
+            var xPsfHalf = psf.GetLength(1) / 2;
+            var totalDiff = 0.0;
+            var resOld = 0.0;
+            for (int i = 0; i < psf.GetLength(0); i++)
+            {
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var y = (yPixel + i) % residual.GetLength(0);
+                    var x = (xPixel + j) % residual.GetLength(1);
+                    var yPsf = (i + yPsfHalf) % psf.GetLength(0);
+                    var xPsf = (j + xPsfHalf) % psf.GetLength(1);
+
+                    var diff = residual[y, x] + psf[yPsf, xPsf] * xDiff;
+
+                    resOld += (residual[y, x] * residual[y, x]);
+                    totalDiff += (diff * diff);
+                }
+            }
+
+            return resOld - totalDiff;
+        }
+
+        private static void UpdateResidual(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
+        {
+            var yPsfHalf = psf.GetLength(0) / 2;
+            var xPsfHalf = psf.GetLength(1) / 2;
+            for (int i = 0; i < psf.GetLength(0); i++)
+            {
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var y = (yPixel + i) % residual.GetLength(0);
+                    var x = (xPixel + j) % residual.GetLength(1);
+                    var yPsf = (i + yPsfHalf) % psf.GetLength(0);
+                    var xPsf = (j + xPsfHalf) % psf.GetLength(1);
+                    var diff = psf[yPsf, xPsf] * xDiff;
+                    residual[y, x] += psf[yPsf, xPsf] * xDiff;
+                }
+            }
+
+        }
+
+        private static double CalcDataObjective(double[,] res)
+        {
+            double objective = 0;
+            for (int i = 0; i < res.GetLength(0); i++)
+                for (int j = 0; j < res.GetLength(1); j++)
+                    objective += res[i, j] * res[i, j];
+            return objective;
+        }
+
+        private static double CalcL1Objective(double[,] xImage, double lambda)
+        {
+            double objective = 0;
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                    objective += Math.Abs(xImage[i, j]) * lambda;
+            return objective;
+        }
 
         public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf2, double lambda, double alpha, int maxIteration = 100)
         {
@@ -35,7 +158,6 @@ namespace Single_Reference.Deconvolution
                             yPixel = i;
                             xPixel = j;
                         }
-
                     }
 
                 var xOld = xImage[yPixel, xPixel];
