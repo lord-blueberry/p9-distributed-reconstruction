@@ -33,21 +33,28 @@ namespace Single_Reference
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
             var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
+            var maxPsf = psf[gridSize / 2, gridSize / 2];
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                    psf[i, j] = psf[i, j] / maxPsf;
             FitsIO.Write(psf, "psf.fits");
 
             var truth = new double[64, 64];
-            truth[40, 25] = 1.5;
+            //truth[40, 25] = 1.5;
             truth[25, 35] = 2.5;
-            var dirty = ConvolveFFT(truth, psf);
+            var dirty = Convolve(truth, psf);
             FitsIO.Write(truth, "truth.fits");
             FitsIO.Write(dirty, "dirty.fits");
 
-            var x = new double[gridSize, gridSize];
-            Deconv(x, dirty, psf);
-
             var psf2 = ConvolveFFT(psf, psf);
+            FitsIO.Write(psf2, "psf2.fits");
             var b = ConvolveFFT(dirty, psf);
             var a = psf2[gridSize / 2, gridSize / 2];
+            var a2 = GreedyCD.CalcPSFSquared(psf);
+
+            var x = new double[gridSize, gridSize];
+            //Deconv(x, dirty, psf, a);
+
             for (int i = 0; i < b.GetLength(0); i++)
                 for (int j = 0; j < b.GetLength(1); j++)
                 {
@@ -60,7 +67,8 @@ namespace Single_Reference
                 for (int j = 0; j < b.GetLength(1); j++)
                     dCopy[i, j] = dirty[i, j];
             var x2 = new double[gridSize, gridSize];
-            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.0, dCopy, 8);
+            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.00, a, dCopy, 100);
+            FitsIO.Write(x2, "xxxxx.fits");
         }
 
         public static void Run2()
@@ -95,12 +103,14 @@ namespace Single_Reference
             FitsIO.Write(truth, "truth.fits");
             FitsIO.Write(dirty, "dirty.fits");
 
-            var x = new double[gridSize, gridSize];
-            Deconv(x, dirty, psf);
-
             var psf2 = ConvolveFFT(psf, psf);
             var b = ConvolveFFT(dirty, psf);
             var a = psf2[gridSize / 2, gridSize / 2];
+
+            var x = new double[gridSize, gridSize];
+            //Deconv(x, dirty, psf, a);
+
+            
             for (int i = 0; i < b.GetLength(0); i++)
                 for (int j = 0; j < b.GetLength(1); j++)
                 {
@@ -113,7 +123,8 @@ namespace Single_Reference
                 for (int j = 0; j < b.GetLength(1); j++)
                     dCopy[i, j] = dirty[i, j];
             var x2 = new double[gridSize, gridSize];
-            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.0, dCopy, 8);
+            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.01, a, dCopy, 200);
+            FitsIO.Write(x2, "xxxxx.fits");
         }
 
         public static void Run3()
@@ -143,12 +154,14 @@ namespace Single_Reference
             FFT.Shift(dirty);
             FitsIO.Write(dirty, "dirty.fits");
 
-            var x = new double[gridSize, gridSize];
-            Deconv(x, dirty, psf);
-
             var psf2 = ConvolveFFT(psf, psf);
             var b = ConvolveFFT(dirty, psf);
             var a = psf2[gridSize / 2, gridSize / 2];
+
+            var x = new double[gridSize, gridSize];
+            //Deconv(x, dirty, psf, a);
+
+            
             for (int i = 0; i < b.GetLength(0); i++)
                 for (int j = 0; j < b.GetLength(1); j++)
                 {
@@ -161,15 +174,17 @@ namespace Single_Reference
                 for (int j = 0; j < b.GetLength(1); j++)
                     dCopy[i, j] = dirty[i, j];
             var x2 = new double[gridSize, gridSize];
-            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.0, dCopy, 100);
+            //CyclicCD.Deconvolve(x2, b, psf2, 0.01, 1.0, 100, 0.0001);
+            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.01, a, dCopy, 100);
+            FitsIO.Write(x2, "xxxxx.fits");
         }
 
 
-        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, int maxIter = 8)
+        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, double a, int maxIter = 8)
         {
             var iter = 0;
             var converged = false;
-            var lambda = 0.5 * 208.79197047849283* 2;
+            var lambda = 0.1 * a* 2;
             var fuckingA = CalcPSFSquared(psf);
             var FO = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var XO = new double[xImage.GetLength(0), xImage.GetLength(1)];
@@ -260,6 +275,34 @@ namespace Single_Reference
             FFT.Shift(conv);
             return conv;
         }
+
+        public static double[,] Convolve(double[,] image, double[,] kernel)
+        {
+            var output = new double[image.GetLength(0), image.GetLength(1)];
+            for (int y = 0; y < image.GetLength(0); y++)
+            {
+                for (int x = 0; x < image.GetLength(1); x++)
+                {
+                    double sum = 0;
+                    for (int yk = 0; yk < kernel.GetLength(0); yk++)
+                    {
+                        for (int xk = 0; xk < kernel.GetLength(1); xk++)
+                        {
+                            int ySrc = y + yk - ((kernel.GetLength(0) - 1) - kernel.GetLength(0) / 2);
+                            int xSrc = x + xk - ((kernel.GetLength(1) - 1) - kernel.GetLength(1) / 2);
+                            if (ySrc >= 0 & ySrc < image.GetLength(0) &
+                                xSrc >= 0 & xSrc < image.GetLength(1))
+                            {
+                                sum += image[ySrc, xSrc] * kernel[kernel.GetLength(0) - 1 - yk, kernel.GetLength(1) - 1 - xk];
+                            }
+                        }
+                    }
+                    output[y, x] = sum;
+                }
+            }
+            return output;
+        }
+
         public static double CalcDataObjective(double[,] res)
         {
             var objective = 0.0;

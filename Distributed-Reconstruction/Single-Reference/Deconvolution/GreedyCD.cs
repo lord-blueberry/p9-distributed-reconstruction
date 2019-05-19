@@ -6,93 +6,160 @@ namespace Single_Reference.Deconvolution
 {
     public class GreedyCD
     {
-        public static bool Deconvolve2(double[,] xImage, double[,] res, double[,]b, double[,]psf, double[,] psf2, double lambda, double[,] dirtyCopy, int maxIteration=100)
+        public static bool Deconvolve2(double[,] xImage, double[,] res, double[,]b, double[,]psf, double[,] psf2, double lambda, double a, double[,] dirtyCopy, int maxIteration=100)
         {
+            double LambdaA = lambda * a * 2;
             double objective = 0;
-            objective += CalcL1Objective(xImage, lambda);
+            objective += CalcL1Objective(xImage, LambdaA);
             objective += CalcDataObjective(res);
+
+            var objective2 = 0.0;
+
+            var O2 = new double[b.GetLength(0), b.GetLength(1)];
 
             int iter = 0;
             bool converged = false;
             double epsilon = 1e-4;
             while (!converged & iter < maxIteration)
             {
-                FitsIO.Write(b, "greedyB.fits");
                 var yPixel = -1;
                 var xPixel = -1;
-                var minObjective = objective;
+                var maxImprov = 0.0;
                 var xNew = 0.0;
-                var totO = 0.0;
-                var FO = new double[xImage.GetLength(0), xImage.GetLength(1)];
-                var XO = new double[xImage.GetLength(0), xImage.GetLength(1)];
                 for (int i = 0; i < b.GetLength(0); i++)
                     for (int j = 0; j < b.GetLength(1); j++)
                     {
+                        if (i == 25 & j == 35)
+                            Console.Write("");
+                        var dbg = res[i, j];
+                        var dbg2 = b[i, j];
                         var old = xImage[i, j];
                         var xTmp = old + b[i, j];
                         xTmp = ShrinkAbsolute(xTmp, lambda);
                         var xDiff = old - xTmp;
-                        var oImprov = CalcResImprovement(res, psf, i, j, xDiff);
-                        oImprov = oImprov + lambda * Math.Abs(old) - lambda * Math.Abs(xTmp);
-                        FO[i, j] = oImprov;
-                        XO[i, j] = xTmp;
+                        var oImprov = CalcResImprovementNonCD(res, psf, i, j, xDiff);
+                        oImprov += + LambdaA * Math.Abs(old) - LambdaA * Math.Abs(xTmp);
+                        O2[i, j] = oImprov;
 
                         //sanity check
                         if (Math.Abs(xDiff) > 1e-6)
                             if (oImprov <= objective + 1e-6)
                                 Console.Write("");
                             else
+                            {
                                 Console.Write("ERROR");
+                                throw new Exception("Error in CD");
+                            }
+                                
 
-                        if (oImprov < minObjective)
+                        if (oImprov > maxImprov)
                         {
                             yPixel = i;
                             xPixel = j;
-                            minObjective = oImprov;
+                            maxImprov = oImprov;
                             xNew = xTmp;
                         }
                         
                     }
 
-                FitsIO.Write(FO, "greedyFO.fits");
-                FitsIO.Write(XO, "greedyXO.fits");
-                converged = yPixel == -1;
+                FitsIO.Write(O2, "O2.fits");
+
+                converged = maxImprov == 0.0;
                 if(!converged)
                 {
                     var xOld = xImage[yPixel, xPixel];
                     xImage[yPixel, xPixel] = xNew;
-
-                    FitsIO.Write(b, "greedyBBeforeUpdate.fits");
-                    FitsIO.Write(psf2, "psf2.fits");
-                    UpdateResidual(res, psf, yPixel, xPixel, xOld - xNew);
-                    FitsIO.Write(res, "greedyResUpdated.fits");
+                    UpdateResidualNonCD(res, psf, yPixel, xPixel, xOld - xNew);
                     UpdateB2(b, psf2, yPixel, xPixel, xOld - xNew);
-                    FitsIO.Write(b, "greedyBUpdated.fits");
-
-                    var conv = IdiotCD.ConvolveFFT(xImage, psf);
-                    var resReal = IdiotCD.Subtract(dirtyCopy, conv);
-                    FitsIO.Write(resReal, "resReal.fits");
-                    FitsIO.Write(IdiotCD.Subtract(res, resReal), "resdiff.fits");
-                    var bReal = IdiotCD.ConvolveFFT(resReal, psf);
-                    FitsIO.Write(IdiotCD.Subtract(b, bReal), "bDiff.fits");
-                    FitsIO.Write(bReal, "bReal.fits");
-
-                    var objective2 = CalcL1Objective(xImage, lambda);
-                    objective2 += CalcDataObjective(res);
-                    objective = minObjective;
-
-                    var objective3 = CalcL1Objective(xImage, lambda);
-                    objective3 += CalcDataObjective(resReal);
-
-
-                    Console.WriteLine(Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel);
+                    objective -= maxImprov;
+                    Console.WriteLine(Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel +"\t"+objective);
                     iter++;
-                    FitsIO.Write(xImage, "greedyx.fits");
+
+                    FitsIO.Write(res, "residuals"+iter+".fits");
+                    FitsIO.Write(b, "b" + iter + ".fits");
+
+                    var conv = IdiotCD.Convolve(xImage, psf);
+                    var resReal = IdiotCD.Subtract(dirtyCopy, conv);
+                    var bReal = IdiotCD.ConvolveFFT(resReal, psf);
+                    FitsIO.Write(resReal, "resreal" + iter + ".fits");
+                    FitsIO.Write(bReal, "breal" + iter + ".fits");
+
+                    objective2 = CalcL1Objective(xImage, LambdaA);
+                    objective2 += CalcDataObjective(resReal);
+
+                    /*var objective3 = CalcL1Objective(xImage, LambdaA);
+                    objective3 += CalcDataObjective(resReal);*/
                 }
             }
 
+            var conv2 = IdiotCD.ConvolveFFT(xImage, psf);
+            FitsIO.Write(conv2, "reconstruction.fits");
+            FitsIO.Write(res, "residuals.fits");
             return converged;
         }
+
+
+        private static double CalcResImprovementNonCD(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
+        {
+            var yPsfHalf = psf.GetLength(0) / 2;
+            var xPsfHalf = psf.GetLength(1) / 2;
+            var totalDiff = 0.0;
+            var resOld = 0.0;
+            for (int i = 0; i < psf.GetLength(0); i++)
+            {
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    
+                    var y = (yPixel + i) - yPsfHalf;
+                    var x = (xPixel + j) - xPsfHalf;
+                    if (y >= 0 & y < residual.GetLength(0) &
+                        x >= 0 & x < residual.GetLength(1))
+                    {
+                        var newRes = residual[y, x] + psf[i, j] * xDiff;
+                        resOld += (residual[y, x] * residual[y, x]);
+                        totalDiff += (newRes * newRes);
+                    }
+                }
+            }
+
+            return resOld - totalDiff;
+        }
+
+        private static void UpdateResidualNonCD(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
+        {
+            var yPsfHalf = psf.GetLength(0) / 2;
+            var xPsfHalf = psf.GetLength(1) / 2;
+            for (int i = 0; i < psf.GetLength(0); i++)
+            {
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var y = (yPixel + i) - yPsfHalf;
+                    var x = (xPixel + j) - xPsfHalf;
+                    if (y >= 0 & y < residual.GetLength(0) & x >= 0 & x < residual.GetLength(1))
+                        residual[y, x] += psf[i, j] * xDiff;
+                }
+            }
+
+        }
+
+        private static void UpdateB2NonCD(double[,] b, double[,] psf2, int yPixel, int xPixel, double xDiff)
+        {
+            var yPsfHalf = psf2.GetLength(0) / 2;
+            var xPsfHalf = psf2.GetLength(1) / 2;
+            for (int i = 0; i < psf2.GetLength(0); i++)
+            {
+                for (int j = 0; j < psf2.GetLength(1); j++)
+                {
+                    var y = (yPixel + i) - yPsfHalf;
+                    var x = (xPixel + j) - xPsfHalf;
+                    if (y >= 0 & y < b.GetLength(0) & x >= 0 & x < b.GetLength(1))
+                        b[y, x] += psf2[i, j] * xDiff;
+                }
+            }
+        }
+
+
+
 
         private static double CalcResImprovement(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
         {
@@ -116,8 +183,7 @@ namespace Single_Reference.Deconvolution
                 }
             }
 
-            //return resOld - totalDiff;
-            return totalDiff;
+            return resOld - totalDiff;
         }
 
         private static void UpdateResidual(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)

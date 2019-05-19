@@ -459,7 +459,7 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, b, psf, psf2, 0.0, dCopy);
+                var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, b, psf, psf2, 0.0, a, null);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
