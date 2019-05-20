@@ -8,9 +8,10 @@ namespace Single_Reference.Deconvolution
     {
         public static bool Deconvolve2(double[,] xImage, double[,] res, double[,]b, double[,]psf, double[,] psf2, double lambda, double a, double[,] dirtyCopy, int maxIteration=100)
         {
-            double LambdaA = lambda * a * 2;
+            var integral = CalcPSf2Integral(psf);
+
             double objective = 0;
-            objective += CalcL1Objective(xImage, LambdaA);
+            objective += CalcL1Objective(xImage, integral, lambda);
             objective += CalcDataObjective(res);
 
             var objective2 = 0.0;
@@ -29,21 +30,19 @@ namespace Single_Reference.Deconvolution
                 for (int i = 0; i < b.GetLength(0); i++)
                     for (int j = 0; j < b.GetLength(1); j++)
                     {
-                        if (i == 25 & j == 35)
-                            Console.Write("");
-                        var dbg = res[i, j];
-                        var dbg2 = b[i, j];
+                        var currentA = QueryIntegral(integral, i, j);
                         var old = xImage[i, j];
-                        var xTmp = old + b[i, j];
+                        var xTmp = old + b[i, j] / currentA;
                         xTmp = ShrinkAbsolute(xTmp, lambda);
                         var xDiff = old - xTmp;
                         var oImprov = CalcResImprovementNonCD(res, psf, i, j, xDiff);
-                        oImprov += + LambdaA * Math.Abs(old) - LambdaA * Math.Abs(xTmp);
-                        O2[i, j] = oImprov;
+                        var lambdaA = lambda * 2 * currentA;
+                        oImprov += lambdaA * Math.Abs(old) - lambdaA * Math.Abs(xTmp);
+                        O2[i, j] = objective - oImprov;
 
                         //sanity check
                         if (Math.Abs(xDiff) > 1e-6)
-                            if (oImprov <= objective + 1e-6)
+                            if (oImprov <= objective + 1e-2)
                                 Console.Write("");
                             else
                             {
@@ -59,7 +58,6 @@ namespace Single_Reference.Deconvolution
                             maxImprov = oImprov;
                             xNew = xTmp;
                         }
-                        
                     }
 
                 FitsIO.Write(O2, "O2.fits");
@@ -70,25 +68,22 @@ namespace Single_Reference.Deconvolution
                     var xOld = xImage[yPixel, xPixel];
                     xImage[yPixel, xPixel] = xNew;
                     UpdateResidualNonCD(res, psf, yPixel, xPixel, xOld - xNew);
-                    UpdateB2(b, psf2, yPixel, xPixel, xOld - xNew);
+                    UpdateB2NonCD(b, psf2, yPixel, xPixel, xOld - xNew);
                     objective -= maxImprov;
                     Console.WriteLine(Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel +"\t"+objective);
                     iter++;
 
                     FitsIO.Write(res, "residuals"+iter+".fits");
                     FitsIO.Write(b, "b" + iter + ".fits");
-
+                    
                     var conv = IdiotCD.Convolve(xImage, psf);
                     var resReal = IdiotCD.Subtract(dirtyCopy, conv);
-                    var bReal = IdiotCD.ConvolveFFT(resReal, psf);
+                    var bReal = IdiotCD.ConvolveFFTPadded(resReal, psf);
                     FitsIO.Write(resReal, "resreal" + iter + ".fits");
                     FitsIO.Write(bReal, "breal" + iter + ".fits");
 
-                    objective2 = CalcL1Objective(xImage, LambdaA);
+                    objective2 = CalcL1Objective(xImage, integral, lambda);
                     objective2 += CalcDataObjective(resReal);
-
-                    /*var objective3 = CalcL1Objective(xImage, LambdaA);
-                    objective3 += CalcDataObjective(resReal);*/
                 }
             }
 
@@ -205,12 +200,66 @@ namespace Single_Reference.Deconvolution
 
         }
 
+        public static double[,] CalcPSf2Integral(double[,] psf)
+        {
+            var integral = new double[psf.GetLength(0), psf.GetLength(1)];
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var iBefore = i > 0 ? integral[i - 1, j] : 0.0;
+                    var jBefore = j > 0 ? integral[i, j - 1] : 0.0;
+                    var ijBefore = i > 0 & j > 0 ? integral[i - 1, j - 1] : 0.0;
+                    var current = psf[i, j] * psf[i, j];
+                    integral[i, j] = current + iBefore + jBefore - ijBefore;
+                }
+
+            return integral;
+        }
+
+        public static double QueryIntegral(double[,] integral, int yPixel, int xPixel)
+        {
+            var yPsfHalf = 32;
+            var xPsfHalf = 32;
+            var yOverShoot = integral.GetLength(0) * 2 - (yPixel + yPsfHalf) - 1;
+            var xOverShoot = integral.GetLength(1) * 2 - (xPixel + xPsfHalf) - 1;
+
+            var yCorrection = yOverShoot % integral.GetLength(0);
+            var xCorrection = xOverShoot % integral.GetLength(1);
+
+            if (yCorrection == yOverShoot & xCorrection == xOverShoot)
+            {
+                return integral[yCorrection, xCorrection];
+            }
+            else if (yCorrection == yOverShoot | xCorrection == xOverShoot)
+            {
+                var y = Math.Min(yOverShoot, integral.GetLength(0) - 1);
+                var x = Math.Min(xOverShoot, integral.GetLength(1) - 1);
+                return integral[y, x] - integral[yCorrection, xCorrection];
+            }
+            else
+            {
+                return integral[integral.GetLength(0) - 1, integral.GetLength(1) - 1]
+                       - integral[integral.GetLength(0) - 1, xCorrection]
+                       - integral[yCorrection, integral.GetLength(1) - 1]
+                       + integral[yCorrection, xCorrection];
+            }
+        }
+
         private static double CalcDataObjective(double[,] res)
         {
             double objective = 0;
             for (int i = 0; i < res.GetLength(0); i++)
                 for (int j = 0; j < res.GetLength(1); j++)
                     objective += res[i, j] * res[i, j];
+            return objective;
+        }
+
+        private static double CalcL1Objective(double[,] xImage, double[,] aMap, double lambda)
+        {
+            double objective = 0;
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                    objective += Math.Abs(xImage[i, j]) * lambda * 2 * QueryIntegral(aMap, i, j);
             return objective;
         }
 

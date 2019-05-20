@@ -46,20 +46,15 @@ namespace Single_Reference
             FitsIO.Write(truth, "truth.fits");
             FitsIO.Write(dirty, "dirty.fits");
 
-            var psf2 = ConvolveFFT(psf, psf);
+            var psf2 = ConvolveFFTPadded(psf, psf);
             FitsIO.Write(psf2, "psf2.fits");
-            var b = ConvolveFFT(dirty, psf);
+            var b = ConvolveFFTPadded(dirty, psf);
             var a = psf2[gridSize / 2, gridSize / 2];
 
+
             var integral = CalcPSf2Integral(psf);
+            /*
             FitsIO.Write(integral, "psfIntegral.fits");
-
-            var psf3 = ConvolveFFTPadded(psf, psf);
-            FitsIO.Write(psf3, "psf3.fits");
-
-
-
-            //calc a map
             var c0 = new double[64, 64];
             var qY = 0;
             var qX = 0;
@@ -68,147 +63,27 @@ namespace Single_Reference
             FitsIO.Write(c0, "cx0.fits");
             var cx = ConvolveFFT(c0, psf);
             FitsIO.Write(cx, "cx1.fits");
-            var cxSum = 0.0;
-            for (int i = 0; i < psf.GetLength(0); i++)
-                for (int j = 0; j < psf.GetLength(1); j++)
-                    cxSum += cx[i, j];
-
             var a2 = cx[qY, qX];
-            var res = QueryIntegral(integral, qY, qX);
+            var res = QueryIntegral(integral, qY, qX);*/
 
             var x = new double[gridSize, gridSize];
-            Deconv(x, dirty, psf, integral, a);
-
-            for (int i = 0; i < b.GetLength(0); i++)
-                for (int j = 0; j < b.GetLength(1); j++)
-                {
-                    b[i, j] = b[i, j] / a;
-                    psf2[i, j] = psf2[i, j] / a;
-                }
-                    
-            var dCopy = new double[gridSize, gridSize];
-            for (int i = 0; i < b.GetLength(0); i++)
-                for (int j = 0; j < b.GetLength(1); j++)
-                    dCopy[i, j] = dirty[i, j];
-            var x2 = new double[gridSize, gridSize];
-            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.00, a, dCopy, 100);
-            FitsIO.Write(x2, "xxxxx.fits");
-        }
-
-        public static void Run2()
-        {
-            //var frequencies = FitsIO.ReadFrequencies(@"C:\Users\Jon\github\p9-data\small\fits\simulation_point\freq.fits");
-            //var uvw = FitsIO.ReadUVW(@"C:\Users\Jon\github\p9-data\small\fits\simulation_point\uvw.fits");
-            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
-            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
-            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
-
-            var visibilitiesCount = flags.Length;
-            int gridSize = 64;
-            int subgridsize = 16;
-            int kernelSize = 8;
-            int max_nr_timesteps = 64;
-            double cellSize = 2.0 / 3600.0 * PI / 180.0;
-            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
-
-            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-
-            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
-            FFT.Shift(psf);
-            FitsIO.Write(psf, "psf.fits");
-
-            var truth = new double[64, 64];
-            truth[40, 26] = 1.4;
-            truth[23, 32] = 2.5;
-            var tGrid = FFT.ForwardFFTDebug(truth, 1.0);
-            var dGrid = IDG.Multiply(tGrid, psfGrid);
-            var dirty = FFT.ForwardIFFTDebug(dGrid, c.VisibilitiesCount);
-            FitsIO.Write(truth, "truth.fits");
-            FitsIO.Write(dirty, "dirty.fits");
-
-            var psf2 = ConvolveFFT(psf, psf);
-            var b = ConvolveFFT(dirty, psf);
-            var a = psf2[gridSize / 2, gridSize / 2];
-
-            var x = new double[gridSize, gridSize];
-            //Deconv(x, dirty, psf, a);
-
-            
-            for (int i = 0; i < b.GetLength(0); i++)
-                for (int j = 0; j < b.GetLength(1); j++)
-                {
-                    b[i, j] = b[i, j] / a;
-                    psf2[i, j] = psf2[i, j] / a;
-                }
+            //Deconv(x, dirty, psf, integral, a);
 
             var dCopy = new double[gridSize, gridSize];
             for (int i = 0; i < b.GetLength(0); i++)
                 for (int j = 0; j < b.GetLength(1); j++)
                     dCopy[i, j] = dirty[i, j];
             var x2 = new double[gridSize, gridSize];
-            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.01, a, dCopy, 200);
-            FitsIO.Write(x2, "xxxxx.fits");
-        }
-
-        public static void Run3()
-        {
-            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
-            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
-            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
-            double norm = 2.0;
-            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
-
-            var visibilitiesCount = visibilities.Length;
-            int gridSize = 64;
-            int subgridsize = 8;
-            int kernelSize = 4;
-            int max_nr_timesteps = 64;
-            double cellSize = 2.0 / 3600.0 * PI / 180.0;
-            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
-            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-
-            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
-            FFT.Shift(psf);
-            FitsIO.Write(psf, "psf.fits");
-
-            var dirtyGrid = IDG.Grid(c, metadata, visibilities, uvw, frequencies);
-            var dirty = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
-            FFT.Shift(dirty);
-            FitsIO.Write(dirty, "dirty.fits");
-
-            var psf2 = ConvolveFFT(psf, psf);
-            var b = ConvolveFFT(dirty, psf);
-            var a = psf2[gridSize / 2, gridSize / 2];
-
-            var x = new double[gridSize, gridSize];
-            //Deconv(x, dirty, psf, a);
-
-            
-            for (int i = 0; i < b.GetLength(0); i++)
-                for (int j = 0; j < b.GetLength(1); j++)
-                {
-                    b[i, j] = b[i, j] / a;
-                    psf2[i, j] = psf2[i, j] / a;
-                }
-
-            var dCopy = new double[gridSize, gridSize];
-            for (int i = 0; i < b.GetLength(0); i++)
-                for (int j = 0; j < b.GetLength(1); j++)
-                    dCopy[i, j] = dirty[i, j];
-            var x2 = new double[gridSize, gridSize];
-            //CyclicCD.Deconvolve(x2, b, psf2, 0.01, 1.0, 100, 0.0001);
-            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.01, a, dCopy, 100);
+            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.10, a, dCopy, 100);
             FitsIO.Write(x2, "xxxxx.fits");
         }
 
 
-        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, double[,] aMap, double a, int maxIter = 8)
+        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, double[,] aMap, double a, int maxIter = 1)
         {
             var iter = 0;
             var converged = false;
-            var lambda = 0.0;// * a* 2;
+            var lambda = 0.1;// * a* 2;
             var FO = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var XO = new double[xImage.GetLength(0), xImage.GetLength(1)];
             
@@ -230,6 +105,7 @@ namespace Single_Reference
                     {
                         var currentB = bMap[i, j];
                         var currentA = QueryIntegral(aMap, i, j);
+                        //var xDiff = currentB / a;
                         var xDiff = currentB / currentA;
                         var x = xImage[i, j] + xDiff;
                         x = ShrinkAbsolute(x, lambda);
@@ -252,8 +128,8 @@ namespace Single_Reference
                     }
                 FitsIO.Write(FO, "FO_" + iter+".fits");
                 FitsIO.Write(XO, "XO_" + iter + ".fits");
-                var fuckingOld = xImage[yPixel, xPixel];
-                if (Math.Abs(fuckingOld - xNew) > 1e-2)
+                var old = xImage[yPixel, xPixel];
+                if (Math.Abs(old - xNew) > 1e-2)
                     xImage[yPixel, xPixel] = xNew;
                 else
                     converged = true;
@@ -414,6 +290,7 @@ namespace Single_Reference
             for (int y = 0; y < xImage.GetLength(0); y++)
                 for (int x = 0; x < xImage.GetLength(1); x++)
                     objective += Math.Abs(xImage[y, x]) * lambda * 2* QueryIntegral(aMap, y, x);
+                    //objective += Math.Abs(xImage[y, x]) * lambda * 2 * aMap[aMap.GetLength(0) -1, aMap.GetLength(1) -1];
             return objective;
         }
 
