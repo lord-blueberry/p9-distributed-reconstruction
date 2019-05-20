@@ -42,7 +42,7 @@ namespace Single_Reference
             var truth = new double[64, 64];
             //truth[40, 25] = 1.5;
             truth[25, 35] = 2.5;
-            var dirty = Convolve(truth, psf);
+            var dirty = ConvolveFFTPadded(truth, psf);
             FitsIO.Write(truth, "truth.fits");
             FitsIO.Write(dirty, "dirty.fits");
 
@@ -50,10 +50,34 @@ namespace Single_Reference
             FitsIO.Write(psf2, "psf2.fits");
             var b = ConvolveFFT(dirty, psf);
             var a = psf2[gridSize / 2, gridSize / 2];
-            var a2 = GreedyCD.CalcPSFSquared(psf);
+
+            var integral = CalcPSf2Integral(psf);
+            FitsIO.Write(integral, "psfIntegral.fits");
+
+            var psf3 = ConvolveFFTPadded(psf, psf);
+            FitsIO.Write(psf3, "psf3.fits");
+
+
+
+            //calc a map
+            var c0 = new double[64, 64];
+            var qY = 0;
+            var qX = 0;
+            c0[qY, qX] = 1.0;
+            c0 = Convolve(c0, psf);
+            FitsIO.Write(c0, "cx0.fits");
+            var cx = ConvolveFFT(c0, psf);
+            FitsIO.Write(cx, "cx1.fits");
+            var cxSum = 0.0;
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                    cxSum += cx[i, j];
+
+            var a2 = cx[qY, qX];
+            var res = QueryIntegral(integral, qY, qX);
 
             var x = new double[gridSize, gridSize];
-            //Deconv(x, dirty, psf, a);
+            Deconv(x, dirty, psf, integral, a);
 
             for (int i = 0; i < b.GetLength(0); i++)
                 for (int j = 0; j < b.GetLength(1); j++)
@@ -180,24 +204,23 @@ namespace Single_Reference
         }
 
 
-        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, double a, int maxIter = 8)
+        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, double[,] aMap, double a, int maxIter = 8)
         {
             var iter = 0;
             var converged = false;
-            var lambda = 0.1 * a* 2;
-            var fuckingA = CalcPSFSquared(psf);
+            var lambda = 0.0;// * a* 2;
             var FO = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var XO = new double[xImage.GetLength(0), xImage.GetLength(1)];
             
             while (iter < maxIter & !converged)
             {
-                var convolved = ConvolveFFT(xImage, psf);
+                var convolved = ConvolveFFTPadded(xImage, psf);
                 var residuals = Subtract(dirty, convolved);
                 FitsIO.Write(residuals, "residuals_" + iter + ".fits");
-                var bMap = ConvolveFFT(residuals, psf);
+                var bMap = ConvolveFFTPadded(residuals, psf);
                 FitsIO.Write(bMap, "bMap_" + iter + ".fits");
                 var objectiveVal = CalcDataObjective(residuals);
-                objectiveVal += CalcL1Objective(xImage, lambda);
+                objectiveVal += CalcL1Objective(xImage, aMap, lambda);
                 var minVal = Double.MaxValue;
                 var yPixel = -1;
                 var xPixel = -1;
@@ -205,23 +228,23 @@ namespace Single_Reference
                 for (int i = 0; i < xImage.GetLength(0); i++)
                     for (int j = 0; j < xImage.GetLength(1); j++)
                     {
-                        //var fuckingB = bMap[i, j] - lambda/2;
-                        var fuckingB = bMap[i, j];
-                        var xDiff = fuckingB / fuckingA;
+                        var currentB = bMap[i, j];
+                        var currentA = QueryIntegral(aMap, i, j);
+                        var xDiff = currentB / currentA;
                         var x = xImage[i, j] + xDiff;
-                        x = ShrinkAbsolute(x, lambda / fuckingA / 2);
+                        x = ShrinkAbsolute(x, lambda);
                         x = Math.Max(x, 0);
                         XO[i, j] = x;
-                        var fuckingO = EstimateObjective(xImage, dirty, psf, i, j, x, lambda, fuckingA);
+                        var currentO = EstimateObjective(xImage, dirty, psf, i, j, x, aMap, lambda);
                         if (Math.Abs(x - xImage[i, j]) > 1e-6)
-                            if (fuckingO <= objectiveVal + 1e-6)
+                            if (currentO <= objectiveVal + 1e-6)
                                 Console.Write("");
                             else
                                 Console.Write("ERROR");
-                        FO[i, j] = fuckingO;
-                        if(minVal > fuckingO)
+                        FO[i, j] = currentO;
+                        if(minVal > currentO)
                         {
-                            minVal = fuckingO;
+                            minVal = currentO;
                             xNew = x;
                             yPixel = i;
                             xPixel = j;
@@ -240,17 +263,62 @@ namespace Single_Reference
             }
         }
 
-        public static double EstimateObjective(double[,] xImage, double[,] dirty, double[,] psf, int yPixel, int xPixel, double fuckingX, double fuckingLambda, double fuckingA)
+        #region psf Integral
+        public static double[,] CalcPSf2Integral(double[,] psf)
+        {
+            var integral = new double[psf.GetLength(0), psf.GetLength(1)];
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var iBefore = i > 0 ? integral[i - 1, j] : 0.0;
+                    var jBefore = j > 0 ? integral[i, j - 1] : 0.0;
+                    var ijBefore = i > 0 & j > 0 ? integral[i - 1, j - 1] : 0.0;
+                    var current = psf[i, j] * psf[i, j];
+                    integral[i, j] = current + iBefore + jBefore - ijBefore;
+                }
+
+            return integral;
+        }
+
+        public static double QueryIntegral(double[,] integral, int yPixel, int xPixel)
+        {
+            var yPsfHalf = 32;
+            var xPsfHalf = 32;
+            var yOverShoot = integral.GetLength(0) * 2 - (yPixel + yPsfHalf) -1;
+            var xOverShoot = integral.GetLength(1) * 2 - (xPixel + xPsfHalf) -1;
+
+            var yCorrection = yOverShoot % integral.GetLength(0);
+            var xCorrection = xOverShoot % integral.GetLength(1);
+
+            if (yCorrection == yOverShoot & xCorrection == xOverShoot)
+            {
+                return integral[yCorrection, xCorrection];
+            }
+            else if(yCorrection == yOverShoot | xCorrection == xOverShoot)
+            {
+                var y = Math.Min(yOverShoot, integral.GetLength(0) - 1);
+                var x = Math.Min(xOverShoot, integral.GetLength(1) - 1);
+                return integral[y, x] - integral[yCorrection, xCorrection];
+            }
+            else
+            {
+                return integral[integral.GetLength(0) - 1, integral.GetLength(1) - 1]
+                       - integral[integral.GetLength(0) - 1, xCorrection]
+                       - integral[yCorrection, integral.GetLength(1) - 1]
+                       + integral[yCorrection, xCorrection];
+            }
+        }
+        #endregion
+
+        public static double EstimateObjective(double[,] xImage, double[,] dirty, double[,] psf, int yPixel, int xPixel, double newX, double[,] aMap, double lambda)
         {
             var xOld = xImage[yPixel, xPixel];
 
-            xImage[yPixel, xPixel] = fuckingX;
-            var convolved = ConvolveFFT(xImage, psf);
+            xImage[yPixel, xPixel] = newX;
+            var convolved = ConvolveFFTPadded(xImage, psf);
             var residuals = Subtract(dirty, convolved);
             var currentO = CalcDataObjective(residuals);
-            //currentO += CalcL1Objective(xImage, fuckingLambda * fuckingA);
-            currentO += CalcL1Objective(xImage, fuckingLambda);
-
+            currentO += CalcL1Objective(xImage, aMap, lambda);
             xImage[yPixel, xPixel] = xOld;
 
             return currentO;
@@ -265,6 +333,33 @@ namespace Single_Reference
             return output;
         }
 
+        public static double[,] ConvolveFFTPadded(double[,] img, double[,] psf)
+        {
+            var yHalf = img.GetLength(0) / 2;
+            var xHalf = img.GetLength(1) / 2;
+            var img2 = new double[img.GetLength(0) * 2, img.GetLength(1) * 2];
+            var psf2 = new double[img.GetLength(0) * 2, img.GetLength(1) * 2];
+            for (int i = 0; i < img.GetLength(0); i++)
+                for (int j = 0; j < img.GetLength(1); j++)
+                {
+                    img2[i + yHalf, j + xHalf] = img[i, j];
+                    psf2[i + yHalf, j + xHalf] = psf[i, j];
+                }
+            var IMG = FFT.ForwardFFTDebug(img2, 1.0);
+            var PSF = FFT.ForwardFFTDebug(psf2, 1.0);
+            var CONV = IDG.Multiply(IMG, PSF);
+            var conv = FFT.ForwardIFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
+            FFT.Shift(conv);
+
+            var convOut = new double[img.GetLength(0), img.GetLength(1)];
+            for (int i = 0; i < img.GetLength(0); i++)
+                for (int j = 0; j < img.GetLength(1); j++)
+                {
+                    convOut[i, j] = conv[i + yHalf, j + xHalf];
+                }
+
+            return convOut;
+        }
 
         public static double[,] ConvolveFFT(double[,] img, double[,] psf)
         {
@@ -313,12 +408,12 @@ namespace Single_Reference
             return objective;
         }
 
-        public static double CalcL1Objective(double[,] xImage, double lambda)
+        public static double CalcL1Objective(double[,] xImage, double[,] aMap, double lambda)
         {
             var objective = 0.0;
             for (int y = 0; y < xImage.GetLength(0); y++)
                 for (int x = 0; x < xImage.GetLength(1); x++)
-                    objective += Math.Abs(xImage[y, x]) * lambda;
+                    objective += Math.Abs(xImage[y, x]) * lambda * 2* QueryIntegral(aMap, y, x);
             return objective;
         }
 
