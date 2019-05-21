@@ -40,8 +40,8 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
 
             var truth = new double[64, 64];
-            truth[40, 62] = 1.5;
-            truth[0, 0] = 2.5;
+            truth[32, 32] = 1.5;
+            truth[0, 0] = 1.7;
             var dirty = ConvolveFFTPadded(truth, psf);
             FitsIO.Write(truth, "truth.fits");
             FitsIO.Write(dirty, "dirty.fits");
@@ -72,8 +72,7 @@ namespace Single_Reference
                 for (int j = 0; j < b.GetLength(1); j++)
                     dCopy[i, j] = dirty[i, j];
             var x2 = new double[gridSize, gridSize];
-            GreedyCD.Deconvolve2(x2, dirty, b, psf, 0.0, dCopy, 100);
-            FitsIO.Write(x2, "xxxxx.fits");
+            var converged = GreedyCD.Deconvolve2(x2, dirty, psf, 0.0, 1.0, 500, dCopy);
         }
 
 

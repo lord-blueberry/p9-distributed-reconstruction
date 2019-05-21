@@ -1,22 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Single_Reference.IDGSequential;
 
 namespace Single_Reference.Deconvolution
 {
     public class GreedyCD
     {
-        public static bool Deconvolve2(double[,] xImage, double[,] res, double[,]b, double[,]psf, double lambda, double[,] dirtyCopy, int maxIteration=100)
+        public static bool Deconvolve2(double[,] xImage, double[,] res, double[,]psf, double lambda, double alpha, int maxIteration=100, double[,] dirtyCopy=null)
         {
             var integral = CalcPSf2Integral(psf);
             var resUpdate = new double[res.GetLength(0), res.GetLength(1)];
+            var b = ConvolveFFTPadded(res, psf);
 
             double objective = 0;
             objective += CalcL1Objective(xImage, integral, lambda);
             objective += CalcDataObjective(res);
-
-            var objective2 = 0.0;
-            var O2 = new double[b.GetLength(0), b.GetLength(1)];
 
             int iter = 0;
             bool converged = false;
@@ -33,24 +32,22 @@ namespace Single_Reference.Deconvolution
                         var currentA = QueryIntegral(integral, y, j);
                         var old = xImage[y, j];
                         var xTmp = old + b[y, j] / currentA;
-                        xTmp = ShrinkAbsolute(xTmp, lambda);
+                        //xTmp = ShrinkAbsolute(xTmp, lambda);
+                        xTmp = ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
+
                         var xDiff = old - xTmp;
                         var oImprov = EstimateObjectiveImprovement(res, psf, y, j, xDiff);
                         var lambdaA = lambda * 2 * currentA;
-                        oImprov += lambdaA * Math.Abs(old) - lambdaA * Math.Abs(xTmp);
-                        O2[y, j] = objective - oImprov;
+                        oImprov += lambdaA * ElasticNetRegularization(old, alpha);
+                        oImprov -= lambdaA * ElasticNetRegularization(xTmp, alpha);
 
                         //sanity check
-                        if (Math.Abs(xDiff) > 1e-6)
-                            if (oImprov <= objective + 1e-2)
-                                Console.Write("");
-                            else
-                            {
-                                Console.Write("ERROR");
-                                throw new Exception("Error in CD");
-                            }
-                                
-
+                        if (Math.Abs(xDiff) > 1e-6 & oImprov > objective + 1e-2)
+                        {
+                            Console.Write("ERROR");
+                            throw new Exception("Error in CD");
+                        }
+                        
                         if (oImprov > maxImprov)
                         {
                             yPixel = y;
@@ -60,29 +57,24 @@ namespace Single_Reference.Deconvolution
                         }
                     }
 
-                FitsIO.Write(O2, "greedy_FOO.fits");
-                converged = maxImprov == 0.0;
+                //FitsIO.Write(O2, "greedy_FOO.fits");
+                converged = maxImprov < epsilon;
                 if(!converged)
                 {
                     var xOld = xImage[yPixel, xPixel];
                     xImage[yPixel, xPixel] = xNew;
-
+                    UpdateResiduals(res, resUpdate, psf, yPixel, xPixel, xOld - xNew);
+                    UpdateB(b, resUpdate, psf, yPixel, xPixel);
+                    objective -= maxImprov;
+                    Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel +"\t"+objective);
 
                     var conv = IdiotCD.ConvolveFFTPadded(xImage, psf);
                     var resReal = IdiotCD.Subtract(dirtyCopy, conv);
                     var bReal = IdiotCD.ConvolveFFTPadded(resReal, psf);
                     FitsIO.Write(resReal, "greedy_resreal" + iter + ".fits");
                     FitsIO.Write(bReal, "greedy_breal" + iter + ".fits");
-                    objective2 = CalcL1Objective(xImage, integral, lambda);
+                    var objective2 = CalcL1Objective(xImage, integral, lambda);
                     objective2 += CalcDataObjective(resReal);
-
-
-                    UpdateResidualNonCD(res, resUpdate, psf, yPixel, xPixel, xOld - xNew);
-                    UpdateB(b, resUpdate, psf, yPixel, xPixel);
-                    objective -= maxImprov;
-                    Console.WriteLine(Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel +"\t"+objective);
-
-
                     FitsIO.Write(res, "greedy_residuals" + iter + ".fits");
                     FitsIO.Write(b, "greedy_b" + iter + ".fits");
 
@@ -91,9 +83,10 @@ namespace Single_Reference.Deconvolution
                 }
             }
 
-            var conv2 = IdiotCD.ConvolveFFTPadded(xImage, psf);
-            FitsIO.Write(conv2, "reconstruction.fits");
-            FitsIO.Write(res, "residuals.fits");
+            var conv2 = ConvolveFFTPadded(xImage, psf);
+            FitsIO.Write(conv2, "greedy_reconstruction.fits");
+            FitsIO.Write(res, "greedy_residuals.fits");
+            FitsIO.Write(xImage, "greedy_x.fits");
             return converged;
         }
 
@@ -123,7 +116,7 @@ namespace Single_Reference.Deconvolution
             return resOld - totalDiff;
         }
 
-        private static void UpdateResidualNonCD(double[,] residual, double[,] resUpdate, double[,] psf, int yPixel, int xPixel, double xDiff)
+        private static void UpdateResiduals(double[,] residual, double[,] resUpdate, double[,] psf, int yPixel, int xPixel, double xDiff)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -165,55 +158,6 @@ namespace Single_Reference.Deconvolution
                     }
         }
 
-
-
-        #region deleteme when sure
-        private static double CalcResImprovement(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
-        {
-            var yPsfHalf = psf.GetLength(0) / 2;
-            var xPsfHalf = psf.GetLength(1) / 2;
-            var totalDiff = 0.0;
-            var resOld = 0.0;
-            for (int i = 0; i < psf.GetLength(0); i++)
-            {
-                for (int j = 0; j < psf.GetLength(1); j++)
-                {
-                    var y = (yPixel + i) % residual.GetLength(0);
-                    var x = (xPixel + j) % residual.GetLength(1);
-                    var yPsf = (i + yPsfHalf) % psf.GetLength(0);
-                    var xPsf = (j + xPsfHalf) % psf.GetLength(1);
-
-                    var newRes = residual[y, x] + psf[yPsf, xPsf] * xDiff;
-
-                    resOld += (residual[y, x] * residual[y, x]);
-                    totalDiff += (newRes * newRes);
-                }
-            }
-
-            return resOld - totalDiff;
-        }
-
-        private static void UpdateResidual(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
-        {
-            var yPsfHalf = psf.GetLength(0) / 2;
-            var xPsfHalf = psf.GetLength(1) / 2;
-            for (int i = 0; i < psf.GetLength(0); i++)
-            {
-                for (int j = 0; j < psf.GetLength(1); j++)
-                {
-                    var y = (yPixel + i) % residual.GetLength(0);
-                    var x = (xPixel + j) % residual.GetLength(1);
-                    var yPsf = (i + yPsfHalf) % psf.GetLength(0);
-                    var xPsf = (j + xPsfHalf) % psf.GetLength(1);
-                    var diff = psf[yPsf, xPsf] * xDiff;
-                    residual[y, x] += psf[yPsf, xPsf] * xDiff;
-                }
-            }
-
-        }
-
-        #endregion
-
         public static double[,] CalcPSf2Integral(double[,] psf)
         {
             var integral = new double[psf.GetLength(0), psf.GetLength(1)];
@@ -224,22 +168,6 @@ namespace Single_Reference.Deconvolution
                     var jBefore = j > 0 ? integral[i, j - 1] : 0.0;
                     var ijBefore = i > 0 & j > 0 ? integral[i - 1, j - 1] : 0.0;
                     var current = psf[i, j] * psf[i, j];
-                    integral[i, j] = current + iBefore + jBefore - ijBefore;
-                }
-
-            return integral;
-        }
-
-        public static double[,] CalcPSfIntegral(double[,] psf)
-        {
-            var integral = new double[psf.GetLength(0), psf.GetLength(1)];
-            for (int i = 0; i < psf.GetLength(0); i++)
-                for (int j = 0; j < psf.GetLength(1); j++)
-                {
-                    var iBefore = i > 0 ? integral[i - 1, j] : 0.0;
-                    var jBefore = j > 0 ? integral[i, j - 1] : 0.0;
-                    var ijBefore = i > 0 & j > 0 ? integral[i - 1, j - 1] : 0.0;
-                    var current = psf[i, j];
                     integral[i, j] = current + iBefore + jBefore - ijBefore;
                 }
 
@@ -293,75 +221,40 @@ namespace Single_Reference.Deconvolution
             return objective;
         }
 
-
-        public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf2, double lambda, double alpha, int maxIteration = 100)
-        {
-            int iter = 0;
-            bool converged = false;
-            double precision = 1e-12;
-
-            var aa = psf2[psf2.GetLength(0) / 2, psf2.GetLength(1) / 2];
-            //var a2 = CDClean.CalcPSFSquared(psf);
-            while (!converged & iter < maxIteration)
-            {
-                var maxB = Double.NegativeInfinity;
-                var maxAbsB = Double.NegativeInfinity;
-                var yPixel = -1;
-                var xPixel = -1;
-                for (int i = 0; i < b.GetLength(0); i++)
-                    for (int j = 0; j < b.GetLength(1); j++)
-                    {
-                        var currentB = b[i, j];
-                        if (xImage[i, j] > 0.0)
-                            currentB = Math.Abs(currentB);
-
-                        if (currentB > maxAbsB)
-                        {
-                            maxB = b[i, j];
-                            maxAbsB = currentB;
-                            yPixel = i;
-                            xPixel = j;
-                        }
-                    }
-
-                var xOld = xImage[yPixel, xPixel];
-                var xDiff = (maxB / aa);             //calculate minimum of parabola, e.g -b/2a. Simplifications led rise to this line
-
-                Console.WriteLine(xDiff + "\t" + yPixel + "\t" + xPixel);
-                var xNew = xOld + xDiff;
-                //xNew = Math.Max(Math.Max(0, (xNew * xNew) - lambda) * xNew / (xNew * xNew) , 0);
-                //xNew = xNew / (1 + lambda * (1 - alpha));
-                xNew = ShrinkAbsolute(xNew, lambda * alpha) / (1 + lambda * (1 - alpha));
-                xImage[yPixel, xPixel] = xNew;
-                UpdateB2(b, psf2, yPixel, xPixel, xOld - xNew);
-                iter++;
-                converged = Math.Abs(xOld-xNew) < precision;
-            }
-
-            return converged;
-        }
-
-        private static void UpdateB2(double[,] b, double[,] psf2, int yPixel, int xPixel, double xDiff)
-        {
-            var yPsfHalf = psf2.GetLength(0) / 2;
-            var xPsfHalf = psf2.GetLength(1) / 2;
-            for (int i = 0; i < psf2.GetLength(0); i++)
-            {
-                for (int j = 0; j < psf2.GetLength(1); j++)
-                {
-                    var y = (yPixel + i) % b.GetLength(0);
-                    var x = (xPixel + j) % b.GetLength(1);
-                    var yPsf = (i + yPsfHalf) % psf2.GetLength(0);
-                    var xPsf = (j + xPsfHalf) % psf2.GetLength(1);
-                    b[y, x] += psf2[yPsf, xPsf] * xDiff;
-                }
-            }
-        }
-
-        private static double ShrinkAbsolute(double value, double lambda)
+        private static double ShrinkPositive(double value, double lambda)
         {
             value = Math.Max(value, 0.0) - lambda;
             return Math.Max(value, 0.0);
+        }
+
+        private static double ElasticNetRegularization(double value, double alpha) => (1 - alpha) * 1 / 2 * Math.Abs(value * value) + alpha * Math.Abs(value);
+
+        public static double[,] ConvolveFFTPadded(double[,] img, double[,] psf)
+        {
+            var yHalf = img.GetLength(0) / 2;
+            var xHalf = img.GetLength(1) / 2;
+            var img2 = new double[img.GetLength(0) * 2, img.GetLength(1) * 2];
+            var psf2 = new double[img.GetLength(0) * 2, img.GetLength(1) * 2];
+            for (int i = 0; i < img.GetLength(0); i++)
+                for (int j = 0; j < img.GetLength(1); j++)
+                {
+                    img2[i + yHalf, j + xHalf] = img[i, j];
+                    psf2[i + yHalf, j + xHalf] = psf[i, j];
+                }
+            var IMG = FFT.ForwardFFTDebug(img2, 1.0);
+            var PSF = FFT.ForwardFFTDebug(psf2, 1.0);
+            var CONV = IDG.Multiply(IMG, PSF);
+            var conv = FFT.ForwardIFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
+            FFT.Shift(conv);
+
+            var convOut = new double[img.GetLength(0), img.GetLength(1)];
+            for (int i = 0; i < img.GetLength(0); i++)
+                for (int j = 0; j < img.GetLength(1); j++)
+                {
+                    convOut[i, j] = conv[i + yHalf, j + xHalf];
+                }
+
+            return convOut;
         }
     }
 }

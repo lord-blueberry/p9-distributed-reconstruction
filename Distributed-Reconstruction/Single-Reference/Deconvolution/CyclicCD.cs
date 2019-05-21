@@ -9,7 +9,6 @@ namespace Single_Reference.Deconvolution
     {
         public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf2, double lambda, double alpha, int maxIteration = 100, double precision = 1e-4)
         {
-            GreedyCD.Deconvolve(xImage, b, psf2, lambda, alpha, maxIteration);
             var converged = false;
             var iter = 0;
             var aa = psf2[psf2.GetLength(0) / 2, psf2.GetLength(1) / 2];
