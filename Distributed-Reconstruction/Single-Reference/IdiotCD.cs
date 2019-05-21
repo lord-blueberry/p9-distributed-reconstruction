@@ -67,24 +67,12 @@ namespace Single_Reference
             var x = new double[gridSize, gridSize];
             //Deconv(x, dirty, psf, psf2, a, 0.0);
 
-            var psf2LargeStart = new double[128, 128];
-            for (int i = 0; i < psf.GetLength(0); i++)
-                for (int j = 0; j < psf.GetLength(1); j++)
-                    psf2LargeStart[i + 32, j + 32] = psf[i, j];
-            var psf2Large = ConvolveFFT(psf2LargeStart, psf2LargeStart);
-            var max = psf2Large[psf.GetLength(0), psf.GetLength(1)];
-            for (int i = 0; i < psf2Large.GetLength(0); i++)
-                for (int j = 0; j < psf2Large.GetLength(1); j++)
-                    psf2Large[i, j] = psf2Large[i, j] / max;
-
-            FitsIO.Write(psf2Large, "psf2.fits");
-
             var dCopy = new double[gridSize, gridSize];
             for (int i = 0; i < b.GetLength(0); i++)
                 for (int j = 0; j < b.GetLength(1); j++)
                     dCopy[i, j] = dirty[i, j];
             var x2 = new double[gridSize, gridSize];
-            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2Large, 0.0, a, dCopy, 100);
+            GreedyCD.Deconvolve2(x2, dirty, b, psf, 0.0, dCopy, 100);
             FitsIO.Write(x2, "xxxxx.fits");
         }
 
