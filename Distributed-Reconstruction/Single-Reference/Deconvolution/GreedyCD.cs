@@ -61,7 +61,8 @@ namespace Single_Reference.Deconvolution
                     var xOld = xImage[yPixel, xPixel];
                     xImage[yPixel, xPixel] = xNew;
                     UpdateResiduals(res, resUpdate, psf, yPixel, xPixel, xOld - xNew);
-                    UpdateB(b, resUpdate, psf, yPixel, xPixel);
+                    b = ConvolveFFTPadded(res, psf);
+                    //UpdateB(b, resUpdate, psf, yPixel, xPixel);
                     objective -= maxImprov;
                     Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel +"\t"+objective);
 

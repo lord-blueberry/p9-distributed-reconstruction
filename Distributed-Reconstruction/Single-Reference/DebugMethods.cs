@@ -399,11 +399,11 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 128;
+            int gridSize = 64;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 64;
-            double cellSize = 1.0 / 3600.0 * PI / 180.0;
+            double cellSize = 2.0 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
             var watchTotal = new Stopwatch();
@@ -426,7 +426,7 @@ namespace Single_Reference
             //truth[30, 30] = 1.0;
             //var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             //var residualVis = truthVis;
-            for (int cycle = 0; cycle < 1; cycle++)
+            for (int cycle = 0; cycle < 4; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -443,7 +443,7 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 1.0, 500);
+                var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 300);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
