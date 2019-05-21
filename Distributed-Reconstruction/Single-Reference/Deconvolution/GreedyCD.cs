@@ -7,7 +7,7 @@ namespace Single_Reference.Deconvolution
 {
     public class GreedyCD
     {
-        public static bool Deconvolve2(double[,] xImage, double[,] res, double[,]psf, double lambda, double alpha, int maxIteration=100, double[,] dirtyCopy=null)
+        public static bool Deconvolve(double[,] xImage, double[,] res, double[,]psf, double lambda, double alpha, int maxIteration=100, double[,] dirtyCopy=null)
         {
             var integral = CalcPSf2Integral(psf);
             var resUpdate = new double[res.GetLength(0), res.GetLength(1)];
@@ -43,10 +43,7 @@ namespace Single_Reference.Deconvolution
 
                         //sanity check
                         if (Math.Abs(xDiff) > 1e-6 & oImprov > objective + 1e-2)
-                        {
-                            Console.Write("ERROR");
                             throw new Exception("Error in CD");
-                        }
                         
                         if (oImprov > maxImprov)
                         {
@@ -68,25 +65,30 @@ namespace Single_Reference.Deconvolution
                     objective -= maxImprov;
                     Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel +"\t"+objective);
 
-                    var conv = IdiotCD.ConvolveFFTPadded(xImage, psf);
-                    var resReal = IdiotCD.Subtract(dirtyCopy, conv);
-                    var bReal = IdiotCD.ConvolveFFTPadded(resReal, psf);
-                    FitsIO.Write(resReal, "greedy_resreal" + iter + ".fits");
-                    FitsIO.Write(bReal, "greedy_breal" + iter + ".fits");
-                    var objective2 = CalcL1Objective(xImage, integral, lambda);
-                    objective2 += CalcDataObjective(resReal);
-                    FitsIO.Write(res, "greedy_residuals" + iter + ".fits");
-                    FitsIO.Write(b, "greedy_b" + iter + ".fits");
-
+                    /*
+                    if (iter % 50 == 0)
+                    {
+                        var conv = IdiotCD.ConvolveFFTPadded(xImage, psf);
+                        var resReal = IdiotCD.Subtract(dirtyCopy, conv);
+                        var bReal = IdiotCD.ConvolveFFTPadded(resReal, psf);
+                        FitsIO.Write(resReal, "greedy_resreal" + iter + ".fits");
+                        FitsIO.Write(bReal, "greedy_breal" + iter + ".fits");
+                        var objective2 = CalcL1Objective(xImage, integral, lambda);
+                        objective2 += CalcDataObjective(resReal);
+                        FitsIO.Write(res, "greedy_residuals" + iter + ".fits");
+                        FitsIO.Write(b, "greedy_b" + iter + ".fits");
+                        FitsIO.Write(IdiotCD.Subtract(b, bReal), "greedy_breal_diff" + iter + ".fits");
+                        FitsIO.Write(IdiotCD.Subtract(res, resReal), "greedy_res_diff" + iter + ".fits");
+                    }*/
 
                     iter++;
                 }
             }
 
-            var conv2 = ConvolveFFTPadded(xImage, psf);
+            /*var conv2 = ConvolveFFTPadded(xImage, psf);
             FitsIO.Write(conv2, "greedy_reconstruction.fits");
             FitsIO.Write(res, "greedy_residuals.fits");
-            FitsIO.Write(xImage, "greedy_x.fits");
+            FitsIO.Write(xImage, "greedy_x.fits");*/
             return converged;
         }
 
@@ -178,6 +180,8 @@ namespace Single_Reference.Deconvolution
         {
             var yPsfHalf = 32;
             var xPsfHalf = 32;
+
+            //possible off by one error for odd psf dimensions
             var yOverShoot = integral.GetLength(0) * 2 - (yPixel + yPsfHalf) - 1;
             var xOverShoot = integral.GetLength(1) * 2 - (xPixel + xPsfHalf) - 1;
 
