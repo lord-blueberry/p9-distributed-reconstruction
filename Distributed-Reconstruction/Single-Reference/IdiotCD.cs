@@ -40,20 +40,18 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
 
             var truth = new double[64, 64];
-            //truth[40, 25] = 1.5;
-            truth[25, 35] = 2.5;
+            truth[40, 62] = 1.5;
+            truth[0, 0] = 2.5;
             var dirty = ConvolveFFTPadded(truth, psf);
             FitsIO.Write(truth, "truth.fits");
             FitsIO.Write(dirty, "dirty.fits");
 
-            var psf2 = ConvolveFFTPadded(psf, psf);
-            FitsIO.Write(psf2, "psf2.fits");
+            var psf2 = ConvolveFFT(psf, psf);
             var b = ConvolveFFTPadded(dirty, psf);
             var a = psf2[gridSize / 2, gridSize / 2];
 
-
-            var integral = CalcPSf2Integral(psf);
             /*
+            var integral = CalcPSf2Integral(psf);
             FitsIO.Write(integral, "psfIntegral.fits");
             var c0 = new double[64, 64];
             var qY = 0;
@@ -67,23 +65,35 @@ namespace Single_Reference
             var res = QueryIntegral(integral, qY, qX);*/
 
             var x = new double[gridSize, gridSize];
-            //Deconv(x, dirty, psf, integral, a);
+            //Deconv(x, dirty, psf, psf2, a, 0.0);
+
+            var psf2LargeStart = new double[128, 128];
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                    psf2LargeStart[i + 32, j + 32] = psf[i, j];
+            var psf2Large = ConvolveFFT(psf2LargeStart, psf2LargeStart);
+            var max = psf2Large[psf.GetLength(0), psf.GetLength(1)];
+            for (int i = 0; i < psf2Large.GetLength(0); i++)
+                for (int j = 0; j < psf2Large.GetLength(1); j++)
+                    psf2Large[i, j] = psf2Large[i, j] / max;
+
+            FitsIO.Write(psf2Large, "psf2.fits");
 
             var dCopy = new double[gridSize, gridSize];
             for (int i = 0; i < b.GetLength(0); i++)
                 for (int j = 0; j < b.GetLength(1); j++)
                     dCopy[i, j] = dirty[i, j];
             var x2 = new double[gridSize, gridSize];
-            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2, 0.10, a, dCopy, 100);
+            GreedyCD.Deconvolve2(x2, dirty, b, psf, psf2Large, 0.0, a, dCopy, 100);
             FitsIO.Write(x2, "xxxxx.fits");
         }
 
 
-        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, double[,] aMap, double a, int maxIter = 1)
+        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, double[,] psf2, double a, double lambda, int maxIter = 10)
         {
+            var aMap = CalcPSf2IntegralSquared(psf);
             var iter = 0;
             var converged = false;
-            var lambda = 0.1;// * a* 2;
             var FO = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var XO = new double[xImage.GetLength(0), xImage.GetLength(1)];
             
@@ -91,9 +101,9 @@ namespace Single_Reference
             {
                 var convolved = ConvolveFFTPadded(xImage, psf);
                 var residuals = Subtract(dirty, convolved);
-                FitsIO.Write(residuals, "residuals_" + iter + ".fits");
+                FitsIO.Write(residuals, "deconv_residuals_" + iter + ".fits");
                 var bMap = ConvolveFFTPadded(residuals, psf);
-                FitsIO.Write(bMap, "bMap_" + iter + ".fits");
+                FitsIO.Write(bMap, "deconv_bMap_" + iter + ".fits");
                 var objectiveVal = CalcDataObjective(residuals);
                 objectiveVal += CalcL1Objective(xImage, aMap, lambda);
                 var minVal = Double.MaxValue;
@@ -103,6 +113,8 @@ namespace Single_Reference
                 for (int i = 0; i < xImage.GetLength(0); i++)
                     for (int j = 0; j < xImage.GetLength(1); j++)
                     {
+                        if (j == 43)
+                            Console.Write("");
                         var currentB = bMap[i, j];
                         var currentA = QueryIntegral(aMap, i, j);
                         //var xDiff = currentB / a;
@@ -126,21 +138,21 @@ namespace Single_Reference
                             xPixel = j;
                         }
                     }
-                FitsIO.Write(FO, "FO_" + iter+".fits");
-                FitsIO.Write(XO, "XO_" + iter + ".fits");
+                FitsIO.Write(FO, "deconv_FO_" + iter+".fits");
+                FitsIO.Write(XO, "deconv_XO_" + iter + ".fits");
                 var old = xImage[yPixel, xPixel];
                 if (Math.Abs(old - xNew) > 1e-2)
                     xImage[yPixel, xPixel] = xNew;
                 else
                     converged = true;
                 iter++;
-                FitsIO.Write(xImage, "x_" + iter + ".fits");
+                FitsIO.Write(xImage, "deconv_x_" + iter + ".fits");
 
             }
         }
 
         #region psf Integral
-        public static double[,] CalcPSf2Integral(double[,] psf)
+        public static double[,] CalcPSf2IntegralSquared(double[,] psf)
         {
             var integral = new double[psf.GetLength(0), psf.GetLength(1)];
             for (int i = 0; i < psf.GetLength(0); i++)
@@ -150,6 +162,22 @@ namespace Single_Reference
                     var jBefore = j > 0 ? integral[i, j - 1] : 0.0;
                     var ijBefore = i > 0 & j > 0 ? integral[i - 1, j - 1] : 0.0;
                     var current = psf[i, j] * psf[i, j];
+                    integral[i, j] = current + iBefore + jBefore - ijBefore;
+                }
+
+            return integral;
+        }
+
+        public static double[,] CalcPSfIntegral(double[,] psf2)
+        {
+            var integral = new double[psf2.GetLength(0), psf2.GetLength(1)];
+            for (int i = 0; i < psf2.GetLength(0); i++)
+                for (int j = 0; j < psf2.GetLength(1); j++)
+                {
+                    var iBefore = i > 0 ? integral[i - 1, j] : 0.0;
+                    var jBefore = j > 0 ? integral[i, j - 1] : 0.0;
+                    var ijBefore = i > 0 & j > 0 ? integral[i - 1, j - 1] : 0.0;
+                    var current = psf2[i, j];
                     integral[i, j] = current + iBefore + jBefore - ijBefore;
                 }
 
