@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Text;
 using Single_Reference.IDGSequential;
-using Single_Reference.Deconvolution;
 using System.Numerics;
 using static System.Math;
 using System.Diagnostics;
 using System.IO;
 
-namespace Single_Reference
+namespace Single_Reference.Deconvolution
 {
     class IdiotCD
     {
