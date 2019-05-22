@@ -235,10 +235,10 @@ namespace Single_Reference.Deconvolution
                     img2[i + yHalf, j + xHalf] = img[i, j];
                     psf2[i + yHalf, j + xHalf] = psf[i, j];
                 }
-            var IMG = FFT.ForwardFFTDebug(img2, 1.0);
-            var PSF = FFT.ForwardFFTDebug(psf2, 1.0);
+            var IMG = FFT.FFTDebug(img2, 1.0);
+            var PSF = FFT.FFTDebug(psf2, 1.0);
             var CONV = IDG.Multiply(IMG, PSF);
-            var conv = FFT.ForwardIFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
+            var conv = FFT.IFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
             FFT.Shift(conv);
 
             var convOut = new double[img.GetLength(0), img.GetLength(1)];
@@ -253,10 +253,10 @@ namespace Single_Reference.Deconvolution
 
         public static double[,] ConvolveFFT(double[,] img, double[,] psf)
         {
-            var IMG = FFT.ForwardFFTDebug(img, 1.0);
-            var PSF = FFT.ForwardFFTDebug(psf, 1.0);
+            var IMG = FFT.FFTDebug(img, 1.0);
+            var PSF = FFT.FFTDebug(psf, 1.0);
             var CONV = IDG.Multiply(IMG, PSF);
-            var conv = FFT.ForwardIFFTDebug(CONV, img.GetLength(0) * img.GetLength(1));
+            var conv = FFT.IFFTDebug(CONV, img.GetLength(0) * img.GetLength(1));
             FFT.Shift(conv);
             return conv;
         }

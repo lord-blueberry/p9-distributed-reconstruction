@@ -27,16 +27,15 @@ namespace Single_Reference.Deconvolution
                 var maxImprov = 0.0;
                 var xNew = 0.0;
                 for (int y = 0; y < b.GetLength(0); y++)
-                    for (int j = 0; j < b.GetLength(1); j++)
+                    for (int x = 0; x < b.GetLength(1); x++)
                     {
-                        var currentA = QueryIntegral(integral, y, j);
-                        var old = xImage[y, j];
-                        var xTmp = old + b[y, j] / currentA;
-                        //xTmp = ShrinkAbsolute(xTmp, lambda);
+                        var currentA = QueryIntegral(integral, y, x);
+                        var old = xImage[y, x];
+                        var xTmp = old + b[y, x] / currentA;
                         xTmp = ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
 
                         var xDiff = old - xTmp;
-                        var oImprov = EstimateObjectiveImprovement(res, psf, y, j, xDiff);
+                        var oImprov = EstimateObjectiveImprovement(res, psf, y, x, xDiff);
                         var lambdaA = lambda * 2 * currentA;
                         oImprov += lambdaA * ElasticNetRegularization(old, alpha);
                         oImprov -= lambdaA * ElasticNetRegularization(xTmp, alpha);
@@ -48,7 +47,7 @@ namespace Single_Reference.Deconvolution
                         if (oImprov > maxImprov)
                         {
                             yPixel = y;
-                            xPixel = j;
+                            xPixel = x;
                             maxImprov = oImprov;
                             xNew = xTmp;
                         }
@@ -94,7 +93,7 @@ namespace Single_Reference.Deconvolution
         }
 
 
-        private static double EstimateObjectiveImprovement(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
+        public static double EstimateObjectiveImprovement(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -208,7 +207,7 @@ namespace Single_Reference.Deconvolution
             }
         }
 
-        private static double CalcDataObjective(double[,] res)
+        public static double CalcDataObjective(double[,] res)
         {
             double objective = 0;
             for (int i = 0; i < res.GetLength(0); i++)
@@ -217,7 +216,7 @@ namespace Single_Reference.Deconvolution
             return objective;
         }
 
-        private static double CalcL1Objective(double[,] xImage, double[,] aMap, double lambda)
+        public static double CalcL1Objective(double[,] xImage, double[,] aMap, double lambda)
         {
             double objective = 0;
             for (int i = 0; i < xImage.GetLength(0); i++)
@@ -226,13 +225,13 @@ namespace Single_Reference.Deconvolution
             return objective;
         }
 
-        private static double ShrinkPositive(double value, double lambda)
+        public static double ShrinkPositive(double value, double lambda)
         {
             value = Math.Max(value, 0.0) - lambda;
             return Math.Max(value, 0.0);
         }
 
-        private static double ElasticNetRegularization(double value, double alpha) => (1 - alpha) * 1 / 2 * Math.Abs(value * value) + alpha * Math.Abs(value);
+        public static double ElasticNetRegularization(double value, double alpha) => (1 - alpha) * 1 / 2 * Math.Abs(value * value) + alpha * Math.Abs(value);
 
         public static double[,] ConvolveFFTPadded(double[,] img, double[,] psf)
         {
@@ -246,10 +245,10 @@ namespace Single_Reference.Deconvolution
                     img2[i + yHalf, j + xHalf] = img[i, j];
                     psf2[i + yHalf, j + xHalf] = psf[i, j];
                 }
-            var IMG = FFT.ForwardFFTDebug(img2, 1.0);
-            var PSF = FFT.ForwardFFTDebug(psf2, 1.0);
+            var IMG = FFT.FFTDebug(img2, 1.0);
+            var PSF = FFT.FFTDebug(psf2, 1.0);
             var CONV = IDG.Multiply(IMG, PSF);
-            var conv = FFT.ForwardIFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
+            var conv = FFT.IFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
             FFT.Shift(conv);
 
             var convOut = new double[img.GetLength(0), img.GetLength(1)];

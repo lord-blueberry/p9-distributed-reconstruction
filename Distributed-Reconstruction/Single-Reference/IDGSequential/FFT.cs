@@ -166,7 +166,7 @@ namespace Single_Reference.IDGSequential
         /// </summary>
         /// <param name="image"></param>
         /// <returns></returns>
-        public static Complex[,] ForwardFFTDebug(double[,] image, double norm)
+        public static Complex[,] FFTDebug(double[,] image, double norm)
         {
             Complex[,] output = new Complex[image.GetLength(0), image.GetLength(1)];
             using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))
@@ -186,7 +186,7 @@ namespace Single_Reference.IDGSequential
             return output;
         }
 
-        public static double[,] ForwardIFFTDebug(Complex[,] image, double norm)
+        public static double[,] IFFTDebug(Complex[,] image, double norm)
         {
             double[,] output = new double[image.GetLength(0), image.GetLength(1)];
             using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))

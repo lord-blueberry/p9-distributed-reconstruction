@@ -378,9 +378,9 @@ namespace Single_Reference
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
 
-                var hello = FFT.ForwardFFTDebug(xImage, 1.0);
+                var hello = FFT.FFTDebug(xImage, 1.0);
                 hello = IDG.Multiply(hello, psfGrid);
-                var hImg = FFT.ForwardIFFTDebug(hello, 128 * 128);
+                var hImg = FFT.IFFTDebug(hello, 128 * 128);
                 //FFT.Shift(hImg);
                 FitsIO.Write(hImg, "modelDirty_FFT.fits");
 
@@ -461,9 +461,9 @@ namespace Single_Reference
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
 
-                var hello = FFT.ForwardFFTDebug(xImage, 1.0);
+                var hello = FFT.FFTDebug(xImage, 1.0);
                 hello = IDG.Multiply(hello, psfGrid);
-                var hImg = FFT.ForwardIFFTDebug(hello, 128 * 128);
+                var hImg = FFT.IFFTDebug(hello, 128 * 128);
                 //FFT.Shift(hImg);
                 FitsIO.Write(hImg, "modelDirty_FFT.fits");
 
