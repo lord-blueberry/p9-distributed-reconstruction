@@ -118,7 +118,7 @@ namespace Single_Reference.Deconvolution
             return resOld - totalDiff;
         }
 
-        private static void UpdateResiduals(double[,] residual, double[,] resUpdate, double[,] psf, int yPixel, int xPixel, double xDiff)
+        public static void UpdateResiduals(double[,] residual, double[,] resUpdate, double[,] psf, int yPixel, int xPixel, double xDiff)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -130,7 +130,7 @@ namespace Single_Reference.Deconvolution
                     if (y >= 0 & y < residual.GetLength(0) & x >= 0 & x < residual.GetLength(1))
                     {
                         residual[y, x] += psf[i, j] * xDiff;
-                        resUpdate[y, x] = psf[i, j] * xDiff;
+                        //resUpdate[y, x] = psf[i, j] * xDiff;
                     }
                 }
         }

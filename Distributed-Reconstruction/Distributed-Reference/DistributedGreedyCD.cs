@@ -81,6 +81,7 @@ namespace Distributed_Reference
             var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
             FFT.Shift(b);
 
+            //Greedy Coordinate Descent
             int iter = 0;
             bool converged = false;
             double epsilon = 1e-4;
@@ -95,13 +96,13 @@ namespace Distributed_Reference
                     {
                         var yLocal = y - rec.Y;
                         var xLocal = x - rec.X;
-                        var currentA = QueryIntegral(integral, y, x, res.GetLength(0), res.GetLength(1));//wrong
+                        var currentA = QueryIntegral(integral, y, x, res.GetLength(0), res.GetLength(1));
                         var old = xImage[yLocal, xLocal];
-                        var xTmp = old + b[y, x] / currentA;
+                        var xTmp = old + b[y + yPsfHalf, x + xPsfHalf] / currentA;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
 
                         var xDiff = old - xTmp;
-                        var oImprov = GreedyCD.EstimateObjectiveImprovement(res, psf, y, x, xDiff);
+                        var oImprov = EstimateObjectiveImprovement(resPadded, res, psf, y, x, xDiff);
                         var lambdaA = lambda * 2 * currentA;
                         oImprov += lambdaA * GreedyCD.ElasticNetRegularization(old, alpha);
                         oImprov -= lambdaA * GreedyCD.ElasticNetRegularization(xTmp, alpha);
@@ -128,10 +129,12 @@ namespace Distributed_Reference
                         var xLocal = xPixel - rec.X;
                         xImage[yLocal, xLocal] = xNew;
                     }
-                    
-                    
-                    
-                    //UpdateResiduals(res, resUpdate, psf, yPixel, xPixel, xOld - xNew);
+
+                    UpdateResiduals(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
+                    RES = FFT.FFTDebug(resPadded, 1.0);
+                    B = IDG.Multiply(RES, PSFPadded);
+                    b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                    FFT.Shift(b);
                 }
             }
 
@@ -140,30 +143,72 @@ namespace Distributed_Reference
 
         public static double QueryIntegral(double[,] integral, int yPixel, int xPixel, int resYLength, int resXLength)
         {
+            var yOverShoot = (yPixel + (integral.GetLength(0) - integral.GetLength(0) / 2) - 1) - resYLength;
+            var xOverShoot = (xPixel + (integral.GetLength(1) - integral.GetLength(1) / 2) - 1) - resXLength;
+            var yUnderShoot = (-1) * (yPixel - integral.GetLength(0) / 2);
+            var xUnderShoot = (-1) * (xPixel - integral.GetLength(1) / 2);
 
-            var yOverShoot = resYLength * 2 - (yPixel + (integral.GetLength(1) - integral.GetLength(1) / 2) - 1);
-            var xOverShoot = resXLength * 2 - (xPixel + (integral.GetLength(1) - integral.GetLength(1) / 2) - 1);
+            //PSF completely in picture
+            if (yOverShoot <= 0 & xOverShoot <= 0 & yUnderShoot <= 0 & xUnderShoot <= 0)
+                return integral[integral.GetLength(0) - 1, integral.GetLength(1) - 1];
 
-            var yCorrection = yOverShoot % integral.GetLength(0);
-            var xCorrection = xOverShoot % integral.GetLength(1);
-
-            if (yCorrection == yOverShoot & xCorrection == xOverShoot)
-            {
-                return integral[yCorrection, xCorrection];
-            }
-            else if (yCorrection == yOverShoot | xCorrection == xOverShoot)
-            {
-                var y = Math.Min(yOverShoot, integral.GetLength(0) - 1);
-                var x = Math.Min(xOverShoot, integral.GetLength(1) - 1);
-                return integral[y, x] - integral[yCorrection, xCorrection];
-            }
-            else
-            {
+            if(yUnderShoot > 0 & xUnderShoot > 0)
                 return integral[integral.GetLength(0) - 1, integral.GetLength(1) - 1]
-                       - integral[integral.GetLength(0) - 1, xCorrection]
-                       - integral[yCorrection, integral.GetLength(1) - 1]
-                       + integral[yCorrection, xCorrection];
+                       - integral[integral.GetLength(0) - 1, xUnderShoot]
+                       - integral[yUnderShoot, integral.GetLength(1) - 1]
+                       + integral[yUnderShoot, xUnderShoot];
+
+            yOverShoot = Math.Max(1, yOverShoot) - 1;
+            xOverShoot = Math.Max(1, xOverShoot) - 1;
+            var correction = 0.0;
+            if (yUnderShoot > 0)
+                correction = integral[yUnderShoot, integral.GetLength(1) - xOverShoot];
+            if (xUnderShoot > 0)
+                correction = integral[integral.GetLength(0) - yOverShoot, yUnderShoot];
+
+            return integral[integral.GetLength(0) - yOverShoot, integral.GetLength(1) - xOverShoot] - correction;
+        }
+
+        public static void UpdateResiduals(double[,] resPadded, double[,] residuals, double[,] psf, int yPixel, int xPixel, double xDiff, int resYOffset, int resXOffset)
+        {
+            var yPsfHalf = psf.GetLength(0) / 2;
+            var xPsfHalf = psf.GetLength(1) / 2;
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var y = (yPixel + i) - yPsfHalf;
+                    var x = (xPixel + j) - xPsfHalf;
+                    if (y >= 0 & y < residuals.GetLength(0) & x >= 0 & x < residuals.GetLength(1))
+                    {
+                        resPadded[y + resYOffset, x + resXOffset] += psf[i, j] * xDiff;
+                    }
+                }
+        }
+
+        public static double EstimateObjectiveImprovement(double[,] resPadded, double[,] res, double[,] psf, int yPixel, int xPixel, double xDiff)
+        {
+            var yPsfHalf = psf.GetLength(0) / 2;
+            var xPsfHalf = psf.GetLength(1) / 2;
+            var totalDiff = 0.0;
+            var resOld = 0.0;
+            for (int i = 0; i < psf.GetLength(0); i++)
+            {
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var y = (yPixel + i) - yPsfHalf;
+                    var x = (xPixel + j) - xPsfHalf;
+                    if (y >= 0 & y < res.GetLength(0) &
+                        x >= 0 & x < res.GetLength(1))
+                    {
+                        var resVal = resPadded[y + yPsfHalf, x + xPsfHalf];
+                        var newRes = resVal + psf[i, j] * xDiff;
+                        resOld += (resVal * resVal);
+                        totalDiff += (newRes * newRes);
+                    }
+                }
             }
+
+            return resOld - totalDiff;
         }
     }
 }
