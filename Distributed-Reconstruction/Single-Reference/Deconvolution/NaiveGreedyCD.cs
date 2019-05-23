@@ -9,7 +9,7 @@ using System.IO;
 
 namespace Single_Reference.Deconvolution
 {
-    class IdiotCD
+    public class NaiveGreedyCD
     {
         public static void Run()
         {
@@ -137,7 +137,6 @@ namespace Single_Reference.Deconvolution
             }
         }
 
-        #region psf Integral
         public static double[,] CalcPSf2IntegralSquared(double[,] psf)
         {
             var integral = new double[psf.GetLength(0), psf.GetLength(1)];
@@ -198,7 +197,6 @@ namespace Single_Reference.Deconvolution
                        + integral[yCorrection, xCorrection];
             }
         }
-        #endregion
 
         public static double EstimateObjective(double[,] xImage, double[,] dirty, double[,] psf, int yPixel, int xPixel, double newX, double[,] aMap, double lambda)
         {

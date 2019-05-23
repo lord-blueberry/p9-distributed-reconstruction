@@ -6,7 +6,7 @@ namespace Single_Reference
     {
         static void Main()
         {
-            //IdiotCD.Run();
+            //Deconvolution.NaiveGreedyCD.Run();
             DebugMethods.DebugSimulatedGreedy();
         }
     }

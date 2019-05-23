@@ -417,8 +417,9 @@ namespace Single_Reference
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
             var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
+            var psfCut = CutImg(psf);
             FitsIO.Write(psf, "psf.fits");
-            //psf = CutImg(psf);
+            
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
@@ -443,7 +444,8 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 300);
+                var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 1);
+                //var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, psf, 0.10, 0.8, 1);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
