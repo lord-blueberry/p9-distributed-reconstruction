@@ -32,12 +32,18 @@ namespace Distributed_Reference
                     Console.WriteLine(total);
                 }
                 //READ DATA
-                
+
+                var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+                var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+                var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+                double norm = 2.0;
+                var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+                /*
                 var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
                 var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
                 var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
                 var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, 2.0); //norm by 2.0 because we combine polarization XX and YY to I
-
+                */
                 var visCount2 = 0;
                 for (int i = 0; i < flags.GetLength(0); i++)
                     for (int j = 0; j < flags.GetLength(1); j++)
@@ -78,11 +84,13 @@ namespace Distributed_Reference
                 frequencies = freqtmp;
                 flags = flagstmp;
 
-                int gridSize = 1024;
+                //int gridSize = 1024;
+                int gridSize = 128;
                 int subgridsize = 16;
                 int kernelSize = 8;
                 int max_nr_timesteps = 512;
-                double cellSize = 2.5 / 3600.0 * PI / 180.0;
+                //double cellSize = 2.5 / 3600.0 * PI / 180.0;
+                double cellSize = 2.0 / 3600.0 * PI / 180.0;
 
                 comm.Barrier();
                 var watchTotal = new Stopwatch();
@@ -97,28 +105,32 @@ namespace Distributed_Reference
 
                 var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-                var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
-                var psfCut = CutImg(psf);
+                var psfCut = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
 
                 var halfComm = comm.Size / 2;
                 var yResOffset = comm.Rank % 2 * (gridSize / halfComm);
                 var xResOffset = comm.Rank / 2 * (gridSize / halfComm);
-                var rectangle = new DistributedGreedyCD.Rectangle(yResOffset, yResXOffset, gridSize / halfComm, gridSize / halfComm);
+                var rectangle = new DistributedGreedyCD.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
 
                 var residualVis = visibilities;
                 var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
-                for (int cycle=0; cycle < 4; cycle++)
+                for (int cycle = 0; cycle < 4; cycle++)
                 {
                     var imageLocal = Forward(comm, c, metadata, residualVis, uvw, frequencies, watchForward);
                     if (comm.Rank == 0)
                     {
                         watchDeconv.Start();
-                        FitsIO.Write(imageLocal, "residual"+cycle+".fits");
+                        FitsIO.Write(imageLocal, "residual" + cycle + ".fits");
                     }
 
-                    DistributedGreedyCD.Deconvolve(comm, xLocal, imageLocal, psfCut, 0.1, 0.8, rectangle);
-                    CDClean.Deconvolve(xLocal, imageLocal, psf, 1.0 / (10 * (cycle + 1)), 5, yResOffset, xResOffset);
-
+                    var converged = DistributedGreedyCD.Deconvolve(comm, xLocal, imageLocal, psfCut, 0.1, 0.8, rectangle, 300);
+                    if (comm.Rank == 0)
+                    {
+                        if (converged)
+                            Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
+                        else
+                            Console.WriteLine("-------------------------------not converged----------------------");
+                    }
                     comm.Barrier();
                     if (comm.Rank == 0)
                         watchDeconv.Stop();

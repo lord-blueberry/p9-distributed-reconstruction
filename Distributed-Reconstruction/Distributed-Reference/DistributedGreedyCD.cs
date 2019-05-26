@@ -24,7 +24,7 @@ namespace Distributed_Reference
                 YLength = yLen;
             }
         }
-
+        [Serializable]
         public class Candidate
         {
             public double OImprov { get; private set; }
@@ -123,33 +123,41 @@ namespace Distributed_Reference
                     }
 
                 //exchange max
-                var xOld = xImage[yPixel, xPixel];
-                var candidate = new Candidate(maxImprov, xOld - xNew, yPixel, xPixel);
+                var yLocal2 = yPixel - rec.Y;
+                var xLocal2 = xPixel - rec.X;
+                Candidate candidate = null;
+                var xOld = 0.0;
+                if (maxImprov > 0.0)
+                {
+                    xOld = xImage[yLocal2, xLocal2];
+                    candidate = new Candidate(maxImprov, xOld - xNew, yPixel, xPixel);
+                }
+                else
+                {
+                    candidate = new Candidate(0.0, 0, -1, -1);
+                }
+                
                 var maxCandidate = comm.Allreduce(candidate, (aC, bC) => aC.OImprov > bC.OImprov ? aC : bC);
-                converged = maxImprov < epsilon;
+                converged = maxCandidate.OImprov < epsilon;
                 if (!converged)
                 {
-                    if(maxCandidate == candidate)
-                    {
-                        var yLocal = yPixel - rec.Y;
-                        var xLocal = xPixel - rec.X;
-                        xImage[yLocal, xLocal] = xNew;
-                    }
-
+                    if(maxCandidate.YPixel == yPixel && maxCandidate.XPixel == xPixel)
+                        xImage[yLocal2, xLocal2] = xNew;
+                    
                     objective -= maxImprov;
 
                     if (comm.Rank == 0)
                         Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel + "\t" + objective);
-
-                    GreedyCD.UpdateResiduals2(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
+                    GreedyCD.UpdateResiduals2(resPadded, res, psf, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff, yPsfHalf, xPsfHalf);
                     RES = FFT.FFTDebug(resPadded, 1.0);
                     B = IDG.Multiply(RES, PSFPadded);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                     FFT.Shift(b);
+                    iter++;
                 }
             }
 
-            return true;
+            return converged;
         }
     }
 }
