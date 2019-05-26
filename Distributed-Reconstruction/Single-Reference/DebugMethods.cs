@@ -399,7 +399,7 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 64;
+            int gridSize = 128;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 64;
@@ -419,7 +419,8 @@ namespace Single_Reference
             FFT.Shift(psf);
             var psfCut = CutImg(psf);
             FitsIO.Write(psf, "psf.fits");
-            
+            FitsIO.Write(psfCut, "psfCut.fits");
+
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
@@ -444,8 +445,8 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 1);
-                //var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, psf, 0.10, 0.8, 1);
+                //var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 1);
+                var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.10, 0.8, 200);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else

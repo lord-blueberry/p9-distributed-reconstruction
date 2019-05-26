@@ -98,14 +98,16 @@ namespace Distributed_Reference
                 var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
+                var psfCut = CutImg(psf);
 
                 var halfComm = comm.Size / 2;
                 var yResOffset = comm.Rank % 2 * (gridSize / halfComm);
                 var xResOffset = comm.Rank / 2 * (gridSize / halfComm);
+                var rectangle = new DistributedGreedyCD.Rectangle(yResOffset, yResXOffset, gridSize / halfComm, gridSize / halfComm);
 
                 var residualVis = visibilities;
                 var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
-                for (int cycle=0; cycle < 7; cycle++)
+                for (int cycle=0; cycle < 4; cycle++)
                 {
                     var imageLocal = Forward(comm, c, metadata, residualVis, uvw, frequencies, watchForward);
                     if (comm.Rank == 0)
@@ -113,7 +115,10 @@ namespace Distributed_Reference
                         watchDeconv.Start();
                         FitsIO.Write(imageLocal, "residual"+cycle+".fits");
                     }
+
+                    DistributedGreedyCD.Deconvolve(comm, xLocal, imageLocal, psfCut, 0.1, 0.8, rectangle);
                     CDClean.Deconvolve(xLocal, imageLocal, psf, 1.0 / (10 * (cycle + 1)), 5, yResOffset, xResOffset);
+
                     comm.Barrier();
                     if (comm.Rank == 0)
                         watchDeconv.Stop();
@@ -126,8 +131,6 @@ namespace Distributed_Reference
                         watchBackward.Start();
                         var x = StitchX(comm, c, totalX);
                         FitsIO.Write(x, "xImage_"+cycle+".fits");
-                        x = CleanBeam.ConvolveCleanBeam(x);
-                        FitsIO.Write(x, "convXImage_" + cycle + ".fits");
                         FFT.Shift(x);
                         modelGrid = FFT.GridFFT(x);
                     }

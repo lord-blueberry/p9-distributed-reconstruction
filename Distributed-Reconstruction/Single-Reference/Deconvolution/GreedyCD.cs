@@ -13,12 +13,11 @@ namespace Single_Reference.Deconvolution
             var resUpdate = new double[res.GetLength(0), res.GetLength(1)];
             var b = ConvolveFFTPadded(res, psf);
 
-            var ccca = QueryIntegral(integral, 25, 31);
-            var ccca2 = QueryIntegral2(integral, 25, 31, res.GetLength(0), res.GetLength(1));
-
             double objective = 0;
             objective += CalcL1Objective(xImage, integral, lambda);
             objective += CalcDataObjective(res);
+
+            Console.WriteLine("Objective \t" + objective);
 
             int iter = 0;
             bool converged = false;
@@ -63,9 +62,8 @@ namespace Single_Reference.Deconvolution
                 if (!converged)
                 {
                     var xOld = xImage[yPixel, xPixel];
-                    var debug = EstimateObjectiveImprovement(res, psf, yPixel, xPixel, xOld - xNew);
                     xImage[yPixel, xPixel] = xNew;
-                    UpdateResiduals(res, resUpdate, psf, yPixel, xPixel, xOld - xNew);
+                    UpdateResiduals(res, psf, yPixel, xPixel, xOld - xNew);
                     b = ConvolveFFTPadded(res, psf);
                     //UpdateB(b, resUpdate, psf, yPixel, xPixel);
                     objective -= maxImprov;
@@ -162,7 +160,7 @@ namespace Single_Reference.Deconvolution
         }
 
 
-        public static void UpdateResiduals(double[,] residual, double[,] resUpdate, double[,] psf, int yPixel, int xPixel, double xDiff)
+        public static void UpdateResiduals(double[,] residual, double[,] psf, int yPixel, int xPixel, double xDiff)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -172,10 +170,8 @@ namespace Single_Reference.Deconvolution
                     var y = (yPixel + i) - yPsfHalf;
                     var x = (xPixel + j) - xPsfHalf;
                     if (y >= 0 & y < residual.GetLength(0) & x >= 0 & x < residual.GetLength(1))
-                    {
                         residual[y, x] += psf[i, j] * xDiff;
-                        //resUpdate[y, x] = psf[i, j] * xDiff;
-                    }
+                    
                 }
         }
 
@@ -260,7 +256,7 @@ namespace Single_Reference.Deconvolution
             return objective;
         }
 
-        public static double CalcL1Objective(double[,] xImage, double[,] aMap, double lambda)
+        public static double CalcL1Objective(double[,] xImage, double[,] aMap,double lambda)
         {
             double objective = 0;
             for (int i = 0; i < xImage.GetLength(0); i++)
@@ -317,7 +313,6 @@ namespace Single_Reference.Deconvolution
                 for (int x = 0; x < res.GetLength(1); x++)
                     resPadded[y + yPsfHalf, x + xPsfHalf] = res[y, x];
 
-            
             var psfPadded = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
             var psfYOffset = res.GetLength(0) / 2;
             var psfXOffset = res.GetLength(1) / 2;
@@ -330,7 +325,13 @@ namespace Single_Reference.Deconvolution
             var B = IDG.Multiply(RES, PSFPadded);
             var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
             FFT.Shift(b);
-            FitsIO.Write(b, "b_newmethods.fits");
+
+            double objective = 0;
+            objective += CalcL1Objective2(xImage, integral, res, lambda);
+            objective += CalcDataObjective(res);
+
+
+            Console.WriteLine("Objective \t" + objective);
 
             int iter = 0;
             bool converged = false;
@@ -369,6 +370,8 @@ namespace Single_Reference.Deconvolution
                 if (!converged)
                 {
                     xImage[yPixel, xPixel] = xNew;
+                    objective -= maxImprov;
+                    Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel + "\t" + objective);
 
                     var debug = EstimateObjectiveImprovement2(resPadded, res, psf, yPixel, xPixel, xOld - xNew);
                     UpdateResiduals2(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
@@ -376,6 +379,7 @@ namespace Single_Reference.Deconvolution
                     B = IDG.Multiply(RES, PSFPadded);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                     FFT.Shift(b);
+                    iter++;
                 }
             }
             return converged;
@@ -423,6 +427,15 @@ namespace Single_Reference.Deconvolution
                         resPadded[y + resYOffset, x + resXOffset] += psf[i, j] * xDiff;
                     }
                 }
+        }
+
+        public static double CalcL1Objective2(double[,] xImage, double[,] aMap, double[,] res, double lambda)
+        {
+            double objective = 0;
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                    objective += Math.Abs(xImage[i, j]) * lambda * 2 * QueryIntegral2(aMap, i, j, res.GetLength(0), res.GetLength(1));
+            return objective;
         }
         #endregion
 
