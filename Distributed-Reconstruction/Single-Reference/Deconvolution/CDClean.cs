@@ -175,6 +175,29 @@ namespace Single_Reference.Deconvolution
             return b;
         }
 
+        public static double CalculateBDebug(double[,] residual, double[,] psf, int y, int x, int yResOffset, int xResOffset)
+        {
+            int yOffset = y - psf.GetLength(0) / 2;
+            int xOffset = x - psf.GetLength(1) / 2;
+
+            var b = 0.0;
+            for (int i = 0; i < psf.GetLength(0); i++)
+            {
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var ySrc = yOffset + i + yResOffset;
+                    var xSrc = xOffset + j + xResOffset;
+                    if (ySrc >= 0 & ySrc < residual.GetLength(0) &
+                        xSrc >= 0 & xSrc < residual.GetLength(1))
+                    {
+                        b += residual[ySrc, xSrc] * psf[i, j];
+                    }
+                }
+            }
+
+            return b;
+        }
+
         private static double CalculateBParallel(double[,] residual, double[,] psf, int y, int x, int yResOffset, int xResOffset)
         {
             int yOffset = y - psf.GetLength(0) / 2;

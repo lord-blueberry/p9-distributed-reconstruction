@@ -39,7 +39,7 @@ namespace Single_Reference.Deconvolution
             FitsIO.Write(psf, "psf.fits");
 
             var truth = new double[64, 64];
-            truth[40, 50] = 1.5;
+            //truth[40, 50] = 1.5;
             truth[0, 0] = 1.7;
             var dirty = ConvolveFFTPadded(truth, psf);
             FitsIO.Write(truth, "truth.fits");
@@ -71,13 +71,14 @@ namespace Single_Reference.Deconvolution
                 for (int j = 0; j < b.GetLength(1); j++)
                     dCopy[i, j] = dirty[i, j];
             var x2 = new double[gridSize, gridSize];
-            var converged = GreedyCD.Deconvolve(x2, dirty, psf, 0.0, 1.0, 500, dCopy);
+            var converged = GreedyCD.Deconvolve2(x2, dirty, psf, 0.0, 1.0, 500, dCopy);
         }
 
 
-        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, double[,] psf2, double a, double lambda, int maxIter = 10)
+        public static void Deconv(double[,] xImage, double[,] dirty, double[,] psf, double[,] psf2, double a, double lambda, int maxIter = 1)
         {
             var aMap = CalcPSf2IntegralSquared(psf);
+            var aMapInverted = CalcPSf2IntegralSquared2(psf);
             var iter = 0;
             var converged = false;
             var FO = new double[xImage.GetLength(0), xImage.GetLength(1)];
@@ -88,7 +89,7 @@ namespace Single_Reference.Deconvolution
                 var convolved = ConvolveFFTPadded(xImage, psf);
                 var residuals = Subtract(dirty, convolved);
                 FitsIO.Write(residuals, "deconv_residuals_" + iter + ".fits");
-                var bMap = ConvolveFFTPadded(residuals, psf);
+                var bMap = ConvolveFFTPaddedInverted(residuals, psf);
                 FitsIO.Write(bMap, "deconv_bMap_" + iter + ".fits");
                 var objectiveVal = CalcDataObjective(residuals);
                 objectiveVal += CalcL1Objective(xImage, aMap, lambda);
@@ -99,10 +100,9 @@ namespace Single_Reference.Deconvolution
                 for (int i = 0; i < xImage.GetLength(0); i++)
                     for (int j = 0; j < xImage.GetLength(1); j++)
                     {
-                        if (j == 43)
-                            Console.Write("");
                         var currentB = bMap[i, j];
                         var currentA = QueryIntegral(aMap, i, j);
+
                         //var xDiff = currentB / a;
                         var xDiff = currentB / currentA;
                         var x = xImage[i, j] + xDiff;
@@ -146,23 +146,25 @@ namespace Single_Reference.Deconvolution
                     var iBefore = i > 0 ? integral[i - 1, j] : 0.0;
                     var jBefore = j > 0 ? integral[i, j - 1] : 0.0;
                     var ijBefore = i > 0 & j > 0 ? integral[i - 1, j - 1] : 0.0;
-                    var current = psf[i, j] * psf[i, j];
+                    var current = psf[i, j];
+                    current *= current;
                     integral[i, j] = current + iBefore + jBefore - ijBefore;
                 }
 
             return integral;
         }
 
-        public static double[,] CalcPSfIntegral(double[,] psf2)
+        public static double[,] CalcPSf2IntegralSquared2(double[,] psf)
         {
-            var integral = new double[psf2.GetLength(0), psf2.GetLength(1)];
-            for (int i = 0; i < psf2.GetLength(0); i++)
-                for (int j = 0; j < psf2.GetLength(1); j++)
+            var integral = new double[psf.GetLength(0), psf.GetLength(1)];
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
                 {
                     var iBefore = i > 0 ? integral[i - 1, j] : 0.0;
                     var jBefore = j > 0 ? integral[i, j - 1] : 0.0;
                     var ijBefore = i > 0 & j > 0 ? integral[i - 1, j - 1] : 0.0;
-                    var current = psf2[i, j];
+                    var current = psf[psf.GetLength(0) - i -1, psf.GetLength(1) - j -1];
+                    current *= current;
                     integral[i, j] = current + iBefore + jBefore - ijBefore;
                 }
 
@@ -232,6 +234,34 @@ namespace Single_Reference.Deconvolution
                 {
                     img2[i + yHalf, j + xHalf] = img[i, j];
                     psf2[i + yHalf, j + xHalf] = psf[i, j];
+                }
+            var IMG = FFT.FFTDebug(img2, 1.0);
+            var PSF = FFT.FFTDebug(psf2, 1.0);
+            var CONV = IDG.Multiply(IMG, PSF);
+            var conv = FFT.IFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
+            FFT.Shift(conv);
+
+            var convOut = new double[img.GetLength(0), img.GetLength(1)];
+            for (int i = 0; i < img.GetLength(0); i++)
+                for (int j = 0; j < img.GetLength(1); j++)
+                {
+                    convOut[i, j] = conv[i + yHalf, j + xHalf];
+                }
+
+            return convOut;
+        }
+
+        public static double[,] ConvolveFFTPaddedInverted(double[,] img, double[,] psf)
+        {
+            var yHalf = img.GetLength(0) / 2;
+            var xHalf = img.GetLength(1) / 2;
+            var img2 = new double[img.GetLength(0) * 2, img.GetLength(1) * 2];
+            var psf2 = new double[img.GetLength(0) * 2, img.GetLength(1) * 2];
+            for (int i = 0; i < img.GetLength(0); i++)
+                for (int j = 0; j < img.GetLength(1); j++)
+                {
+                    img2[i + yHalf, j + xHalf] = img[i, j];
+                    psf2[i + yHalf+1, j + xHalf +1] = psf[psf.GetLength(0) - i - 1, psf.GetLength(1) - j -1];
                 }
             var IMG = FFT.FFTDebug(img2, 1.0);
             var PSF = FFT.FFTDebug(psf2, 1.0);
@@ -320,6 +350,62 @@ namespace Single_Reference.Deconvolution
         {
             value = Math.Max(value, 0.0) - lambda;
             return Math.Max(value, 0.0);
+        }
+
+        private static double CalcA(double[,] psf, int yPixel, int xPixel)
+        {
+            int yOffset = yPixel - psf.GetLength(0) / 2 + 1;
+            int xOffset = xPixel - psf.GetLength(1) / 2 + 1;
+            var psf2 = new double[psf.GetLength(0), psf.GetLength(1)];
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                    psf2[i, j] = psf[psf.GetLength(0) - i - 1, psf.GetLength(1) - j - 1];
+
+
+            var a = 0.0;
+            for (int i = 0; i < psf.GetLength(0); i++)
+            {
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var ySrc = yOffset + i;
+                    var xSrc = xOffset + j;
+                    if (ySrc >= 0 & ySrc < psf2.GetLength(0) &
+                        xSrc >= 0 & xSrc < psf2.GetLength(1))
+                    {
+                        a += psf2[i, j] * psf2[i, j];
+                    }
+                }
+            }
+
+            return a;
+        }
+
+        private static double CalcB2(double[,] res, double[,] psf, int yPixel, int xPixel)
+        {
+            int yOffset = yPixel - psf.GetLength(0) / 2 + 1;
+            int xOffset = xPixel - psf.GetLength(1) / 2 + 1;
+            var psf2 = new double[psf.GetLength(0), psf.GetLength(1)];
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                    psf2[i, j] = psf[psf.GetLength(0) - i -1, psf.GetLength(1) - j -1];
+
+
+            var b = 0.0;
+            for (int i = 0; i < psf.GetLength(0); i++)
+            {
+                for (int j = 0; j < psf.GetLength(1); j++)
+                {
+                    var ySrc = yOffset + i;
+                    var xSrc = xOffset + j;
+                    if (ySrc >= 0 & ySrc < res.GetLength(0) &
+                        xSrc >= 0 & xSrc < res.GetLength(1))
+                    {
+                        b += res[ySrc, xSrc] * psf2[i, j];
+                    }
+                }
+            }
+
+            return b;
         }
     }
 }

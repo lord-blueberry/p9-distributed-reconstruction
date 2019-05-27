@@ -81,7 +81,7 @@ namespace Distributed_Reference
             FFT.Shift(b);
 
             double objective = 0;
-            objective += GreedyCD.CalcL1Objective2(xImage, integral, res, lambda);
+            objective += GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
             objective += GreedyCD.CalcDataObjective(res);
 
             if(comm.Rank ==0)
