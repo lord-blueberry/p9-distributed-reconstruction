@@ -399,7 +399,7 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 128;
+            int gridSize = 64;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 64;
@@ -445,8 +445,9 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                //var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 1);
-                var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.10, 0.8, 200);
+                //var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 300);
+                //var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.10, 0.8, 200);
+                var converged = CyclicCD2.DeconvolveCyclic(xImage, dirtyImage, psf, 0.10, 0.8, 20);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else

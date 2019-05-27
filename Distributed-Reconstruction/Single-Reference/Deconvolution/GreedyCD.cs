@@ -68,32 +68,10 @@ namespace Single_Reference.Deconvolution
                     //UpdateB(b, resUpdate, psf, yPixel, xPixel);
                     objective -= maxImprov;
                     Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel + "\t" + objective);
-                    
-                    /*
-                    if (iter % 50 == 0)
-                    {
-                        var conv = IdiotCD.ConvolveFFTPadded(xImage, psf);
-                        var resReal = IdiotCD.Subtract(dirtyCopy, conv);
-                        var bReal = IdiotCD.ConvolveFFTPadded(resReal, psf);
-                        FitsIO.Write(resReal, "greedy_resreal" + iter + ".fits");
-                        FitsIO.Write(bReal, "greedy_breal" + iter + ".fits");
-                        var objective2 = CalcL1Objective(xImage, integral, lambda);
-                        objective2 += CalcDataObjective(resReal);
-                        FitsIO.Write(res, "greedy_residuals" + iter + ".fits");
-                        FitsIO.Write(b, "greedy_b" + iter + ".fits");
-                        FitsIO.Write(IdiotCD.Subtract(b, bReal), "greedy_breal_diff" + iter + ".fits");
-                        FitsIO.Write(IdiotCD.Subtract(res, resReal), "greedy_res_diff" + iter + ".fits");
-                    }*/
 
                     iter++;
                 }
             }
-
-            /*var conv2 = ConvolveFFTPadded(xImage, psf);
-            FitsIO.Write(conv2, "greedy_reconstruction.fits");
-            FitsIO.Write(res, "greedy_residuals.fits");
-            FitsIO.Write(xImage, "greedy_x.fits");*/
-
 
             return converged;
         }
@@ -253,6 +231,15 @@ namespace Single_Reference.Deconvolution
             for (int i = 0; i < res.GetLength(0); i++)
                 for (int j = 0; j < res.GetLength(1); j++)
                     objective += res[i, j] * res[i, j];
+            return objective;
+        }
+
+        public static double CalcDataObjective(double[,] resPadded, double[,] res, int yPsfOffset, int xPsfOffset)
+        {
+            double objective = 0;
+            for (int i = 0; i < res.GetLength(0); i++)
+                for (int j = 0; j < res.GetLength(1); j++)
+                    objective += resPadded[i + yPsfOffset, j + xPsfOffset] * resPadded[i + yPsfOffset, j + xPsfOffset];
             return objective;
         }
 

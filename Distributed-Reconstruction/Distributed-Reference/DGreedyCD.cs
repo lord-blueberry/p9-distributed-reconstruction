@@ -7,7 +7,7 @@ using Single_Reference.Deconvolution;
 
 namespace Distributed_Reference
 {
-    class DistributedGreedyCD
+    class DGreedyCD
     {
         public class Rectangle
         {
@@ -98,6 +98,7 @@ namespace Distributed_Reference
                 var maxImprov = 0.0;
                 var xNew = 0.0;
                 for (int y = rec.Y; y < rec.YLength; y++)
+                {
                     for (int x = rec.X; x < rec.XLength; x++)
                     {
                         var yLocal = y - rec.Y;
@@ -121,6 +122,11 @@ namespace Distributed_Reference
                             xNew = xTmp;
                         }
                     }
+
+                    if (comm.Rank == 0)
+                        Console.Write(".");
+                }
+                Console.Write("\n0");
 
                 //exchange max
                 var yLocal2 = yPixel - rec.Y;
