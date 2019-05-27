@@ -337,7 +337,7 @@ namespace Single_Reference.Deconvolution
             return resOld - totalDiff;
         }
 
-        public static void UpdateResiduals2(double[,] resPadded, double[,] residuals, double[,] psf, int yPixel, int xPixel, double xDiff, int resYOffset, int resXOffset)
+        public static void UpdateResiduals2(double[,] resPadded, double[,] xImage, double[,] psf, int yPixel, int xPixel, double xDiff, int resYOffset, int resXOffset)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -346,7 +346,7 @@ namespace Single_Reference.Deconvolution
                 {
                     var y = (yPixel + i) - yPsfHalf;
                     var x = (xPixel + j) - xPsfHalf;
-                    if (y >= 0 & y < residuals.GetLength(0) & x >= 0 & x < residuals.GetLength(1))
+                    if (y >= 0 & y < xImage.GetLength(0) & x >= 0 & x < xImage.GetLength(1))
                     {
                         resPadded[y + resYOffset, x + resXOffset] += psf[i, j] * xDiff;
                     }
@@ -375,11 +375,11 @@ namespace Single_Reference.Deconvolution
             return objective;
         }
 
-        public static double CalcDataObjective(double[,] resPadded, double[,] res, int yPsfOffset, int xPsfOffset)
+        public static double CalcDataObjective(double[,] resPadded, double[,] xImage, int yPsfOffset, int xPsfOffset)
         {
             double objective = 0;
-            for (int i = 0; i < res.GetLength(0); i++)
-                for (int j = 0; j < res.GetLength(1); j++)
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
                     objective += resPadded[i + yPsfOffset, j + xPsfOffset] * resPadded[i + yPsfOffset, j + xPsfOffset];
             return objective;
         }
