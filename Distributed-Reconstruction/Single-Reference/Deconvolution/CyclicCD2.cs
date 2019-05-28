@@ -35,23 +35,18 @@ namespace Single_Reference.Deconvolution
             FFT.Shift(psfPaddedConv);
             var PSFPaddedConv = FFT.FFTDebug(psfPaddedConv, 1.0);
 
-            DeconvolveGreedy(xImage, resPadded,res, psf, PSFPaddedCorr, integral, lambda, alpha, 200);
+            DeconvolveGreedy(xImage, resPadded, res, psf, PSFPaddedCorr, integral, lambda, alpha, 200);
 
-            var xCummulatedDiff = [res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
+            var xCummulatedDiff = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
             int iter = 0;
             bool converged = false;
             double epsilon = 1e-6;
             while (!converged & iter < maxIteration)
             {
-                double objective = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
-                objective += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
-                Console.WriteLine("Objective \t" + objective);
-
                 var RES = FFT.FFTDebug(resPadded, 1.0);
                 var B = IDG.Multiply(RES, PSFPaddedCorr);
                 var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
-                Console.WriteLine("--------------------adding to active set------------------");
                 var activeSet = new List<Tuple<int, int>>();
                 for (int y = 0; y < xImage.GetLength(0); y++)
                 {
@@ -63,14 +58,14 @@ namespace Single_Reference.Deconvolution
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
                         var xDiff = old - xTmp;
 
-                        if (Math.Abs(xDiff) > 1e-8)
+                        if (Math.Abs(xDiff) > epsilon)
                         {
                             activeSet.Add(new Tuple<int, int>(y, x));
                         }
                     }
                 }
 
-                objective = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+                var objective = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
                 objective += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
                 Console.WriteLine("Objective test \t" + objective);
                 Console.WriteLine("--------------------count:" + activeSet.Count + "------------------");
@@ -86,7 +81,7 @@ namespace Single_Reference.Deconvolution
                     var delete = new List<Tuple<int, int>>();
                     foreach (var pixel in activeSet)
                     {
-                        /*
+
                         //serial descent
                         var y = pixel.Item1;
                         var x = pixel.Item2;
@@ -98,7 +93,7 @@ namespace Single_Reference.Deconvolution
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
                         var xDiff = xOld - xTmp;
 
-                        
+
                         if (Math.Abs(xDiff) > epsilon)
                         {
                             activeSetConverged = false;
@@ -116,8 +111,8 @@ namespace Single_Reference.Deconvolution
                             GreedyCD.UpdateResiduals2(resPadded, xImage, psf, y, x, xDiff, yPsfHalf, xPsfHalf);
                             delete.Add(pixel);
                             //Console.WriteLine("drop pixel \t" + xTmp + "\t" + y + "\t" + x);
-                        }*/
-
+                        }
+                        /*
                         var y = pixel.Item1;
                         var x = pixel.Item2;
                         var xOld = xImage[y, x];
@@ -154,14 +149,15 @@ namespace Single_Reference.Deconvolution
                     {
                         var y = pixel.Item1;
                         var x = pixel.Item2;
-                        xCummulatedDiff[y, x] = 0;
+                        xCummulatedDiff[y + yPsfHalf, x +xPsfHalf] = 0;
                     }
 
                     RES = FFT.FFTDebug(resPadded, 1.0);
                     B = IDG.Multiply(RES, PSFPaddedCorr);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                     //end tryout
-
+                    */
+                    }
                     innerIter++;
 
                     foreach (var pixel in delete)

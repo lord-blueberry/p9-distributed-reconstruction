@@ -126,7 +126,8 @@ namespace Single_Reference
 
             var reconstruction = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            for (int cycle = 0; cycle < 5; cycle++)
+            var maxCycle = 5;
+            for (int cycle = 0; cycle < maxCycle; cycle++)
             {
                 watchForward.Start();
                 var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
@@ -134,11 +135,14 @@ namespace Single_Reference
                 FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
 
                 watchDeconv.Start();
-                var converged = CyclicCD2.Deconvolve(reconstruction, dirtyImage, psfCut, 0.1 * (5 - cycle), 0.7, 15 + 2 * cycle);
+                var lambdaStart = 0.5;
+                var lambdaEnd = 0.05;
+                var lambda = (lambdaStart - lambdaEnd) * (maxCycle -1 - cycle) + lambdaStart;
+                var converged = CyclicCD2.Deconvolve(reconstruction, dirtyImage, psfCut, lambda, 0.7, 15 + 2 * cycle);
                 if (converged)
-                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
+                    Console.WriteLine("-----------------------------CONVERGED!!!! with lambda "+ lambda +"------------------------");
                 else
-                    Console.WriteLine("-------------------------------not converged----------------------");
+                    Console.WriteLine("-------------------------------not converged with lambda " + lambda + "----------------------");
                 watchDeconv.Stop();
                 FitsIO.Write(reconstruction, "xImage_" + cycle + ".fits");
 
