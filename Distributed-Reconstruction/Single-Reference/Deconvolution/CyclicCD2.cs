@@ -10,7 +10,6 @@ namespace Single_Reference.Deconvolution
     {
         public static bool Deconvolve(double[,] xImage, double[,] res, double[,] psf, double lambda, double alpha, int maxIteration = 100, double[,] dirtyCopy = null)
         {
-            
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
             var integral = GreedyCD.CalcPSf2Integral(psf);
@@ -27,18 +26,21 @@ namespace Single_Reference.Deconvolution
                 for (int x = 0; x < psf.GetLength(1); x++)
                     psfPadded[y + psfYOffset + 1, x + psfXOffset + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
             FFT.Shift(psfPadded);
-            var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
+            var PSFPaddedCorr = FFT.FFTDebug(psfPadded, 1.0);
 
-            //DeconvolveGreedy(xImage, resPadded,res, psf, PSFPadded, integral, lambda, alpha, 100);
+            var psfPaddedConv = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
+            for (int y = 0; y < psf.GetLength(0); y++)
+                for (int x = 0; x < psf.GetLength(1); x++)
+                    psfPaddedConv[y + psfYOffset + 1, x + psfXOffset + 1] = psf[y, x];
+            FFT.Shift(psfPaddedConv);
+            var PSFPaddedConv = FFT.FFTDebug(psfPaddedConv, 1.0);
 
-            var XTMPBefore = new double[res.GetLength(0), res.GetLength(1)];
-            var XTMP = new double[res.GetLength(0), res.GetLength(1)];
-            var OIMPROV = new double[res.GetLength(0), res.GetLength(1)];
+            DeconvolveGreedy(xImage, resPadded,res, psf, PSFPaddedCorr, integral, lambda, alpha, 200);
 
-            var xCummulatedDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
+            var xCummulatedDiff = [res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
             int iter = 0;
             bool converged = false;
-            double epsilon = 1e-4;
+            double epsilon = 1e-6;
             while (!converged & iter < maxIteration)
             {
                 double objective = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
@@ -46,7 +48,7 @@ namespace Single_Reference.Deconvolution
                 Console.WriteLine("Objective \t" + objective);
 
                 var RES = FFT.FFTDebug(resPadded, 1.0);
-                var B = IDG.Multiply(RES, PSFPadded);
+                var B = IDG.Multiply(RES, PSFPaddedCorr);
                 var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
                 Console.WriteLine("--------------------adding to active set------------------");
@@ -58,74 +60,34 @@ namespace Single_Reference.Deconvolution
                         var currentA = GreedyCD.QueryIntegral2(integral, y, x, xImage.GetLength(0), xImage.GetLength(1));
                         var old = xImage[y, x];
                         var xTmp = old + b[y + yPsfHalf, x + xPsfHalf] / currentA;
-                        var xTmpBefore = xTmp;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
                         var xDiff = old - xTmp;
 
-                        
-                        var oImprov = GreedyCD.EstimateObjectiveImprovement2(resPadded, res, psf, y, x, old - xTmp);
-                        var lambdaA = lambda * 2 * currentA;
-                        var oImprovEl = lambdaA * GreedyCD.ElasticNetRegularization(old, alpha);
-                        oImprovEl -= lambdaA * GreedyCD.ElasticNetRegularization(xTmp, alpha);
-
-                        XTMPBefore[y, x] = xTmpBefore;
-                        XTMP[y, x] = xTmp;
-                        OIMPROV[y, x] = oImprov;
-
-
-                        if (Math.Abs(xDiff) > epsilon)
+                        if (Math.Abs(xDiff) > 1e-8)
                         {
                             activeSet.Add(new Tuple<int, int>(y, x));
-
-                            xImage[y, x] = xTmp;
-
-                            xCummulatedDiff[y, x] += xDiff;
-                            GreedyCD.UpdateResiduals2(resPadded, res, psf, y, x, xDiff, yPsfHalf, xPsfHalf);
-                            RES = FFT.FFTDebug(resPadded, 1.0);
-                            B = IDG.Multiply(RES, PSFPadded);
-                            b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-
-                            var oTmp = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha) + GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
-                            if (oTmp > objective)
-                                Console.Write("E.");
-                            else
-                                Console.Write("");
-                            objective = oTmp;
-
                         }
                     }
                 }
 
-
-                FitsIO.Write(XTMPBefore, "xTmpBefore.fits");
-                FitsIO.Write(XTMP, "xTmp.fits");
-                FitsIO.Write(OIMPROV, "oImprov.fits");
-
                 objective = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
                 objective += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
                 Console.WriteLine("Objective test \t" + objective);
-
                 Console.WriteLine("--------------------count:" + activeSet.Count + "------------------");
-
-
 
                 //active set iterations
                 converged = activeSet.Count == 0;
                 bool activeSetConverged = activeSet.Count == 0;
-                var innerMax = 2000;
+                var innerMax = 200;
                 var innerIter = 0;
                 while (!activeSetConverged & innerIter <= innerMax)
                 {
-                    var objectiveNew = 0.0;
-                    objectiveNew = GreedyCD.CalcL1Objective(xImage, integral, lambda);
-                    objectiveNew += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
-                    Console.WriteLine("Objective \t" + objectiveNew + "\t valid "+ (objectiveNew <= objective));
-                    objective = objectiveNew;
-
                     activeSetConverged = true;
                     var delete = new List<Tuple<int, int>>();
-                    foreach (var pixel in activeSet.ToArray())
+                    foreach (var pixel in activeSet)
                     {
+                        /*
+                        //serial descent
                         var y = pixel.Item1;
                         var x = pixel.Item2;
                         var xOld = xImage[y, x];
@@ -136,6 +98,7 @@ namespace Single_Reference.Deconvolution
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
                         var xDiff = xOld - xTmp;
 
+                        
                         if (Math.Abs(xDiff) > epsilon)
                         {
                             activeSetConverged = false;
@@ -143,14 +106,6 @@ namespace Single_Reference.Deconvolution
                             xImage[y, x] = xTmp;
                             xCummulatedDiff[y, x] += xDiff;
                             GreedyCD.UpdateResiduals2(resPadded, xImage, psf, y, x, xDiff, yPsfHalf, xPsfHalf);
-                            innerIter++;
-
-                            var oTmp = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha) + GreedyCD.CalcDataObjective(resPadded, xImage, yPsfHalf, yPsfHalf);
-                            if (oTmp > objective)
-                                Console.Write("");
-                            else
-                                Console.Write("");
-                            objective = oTmp;
                         }
                         else if (xTmp == 0.0)
                         {
@@ -161,20 +116,63 @@ namespace Single_Reference.Deconvolution
                             GreedyCD.UpdateResiduals2(resPadded, xImage, psf, y, x, xDiff, yPsfHalf, xPsfHalf);
                             delete.Add(pixel);
                             //Console.WriteLine("drop pixel \t" + xTmp + "\t" + y + "\t" + x);
-                            innerIter++;
+                        }*/
 
-                            var oTmp = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha) + GreedyCD.CalcDataObjective(resPadded, xImage, yPsfHalf, yPsfHalf);
-                            if (oTmp > objective)
-                                Console.Write("");
-                            else
-                                Console.Write("");
-                            objective = oTmp;
+                        var y = pixel.Item1;
+                        var x = pixel.Item2;
+                        var xOld = xImage[y, x];
+                        var currentB = b[y + yPsfHalf, x + xPsfHalf];
+                        var xTmp = xOld + currentB / GreedyCD.QueryIntegral2(integral, y, x, xImage.GetLength(0), xImage.GetLength(1)); ;
+                        xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
+                        var xDiff = xOld - xTmp;
+
+                        if (Math.Abs(xDiff) > epsilon)
+                        {
+                            activeSetConverged = false;
+                            //Console.WriteLine(Math.Abs(xOld - xTmp) + "\t" + y + "\t" + x);
+                            xImage[y, x] = xTmp;
+                            xCummulatedDiff[y + yPsfHalf, x + xPsfHalf] += xDiff;
+                        }
+                        else if (xTmp == 0.0)
+                        {
+                            //approximately zero, remove from active set
+                            activeSetConverged = false;
+                            xImage[y, x] = 0.0;
+                            xCummulatedDiff[y + yPsfHalf, x +xPsfHalf] += xOld;
+                            //Console.WriteLine("drop pixel \t" + xTmp + "\t" + y + "\t" + x);
                         }
                     }
+
+                    var RESDiff = FFT.FFTDebug(xCummulatedDiff, 1.0);
+                    var RESDiffConv = IDG.Multiply(RESDiff, PSFPaddedConv);
+                    var resDiff = FFT.IFFTDebug(RESDiffConv, RESDiffConv.GetLength(0) * RESDiffConv.GetLength(1));
+                    for (int y = 0; y < res.GetLength(0); y++)
+                        for (int x = 0; x < res.GetLength(1); x++)
+                            resPadded[y + yPsfHalf, x + xPsfHalf] += resDiff[y + yPsfHalf, x + xPsfHalf];
+
+                    foreach(var pixel in activeSet)
+                    {
+                        var y = pixel.Item1;
+                        var x = pixel.Item2;
+                        xCummulatedDiff[y, x] = 0;
+                    }
+
+                    RES = FFT.FFTDebug(resPadded, 1.0);
+                    B = IDG.Multiply(RES, PSFPaddedCorr);
+                    b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                    //end tryout
+
+                    innerIter++;
 
                     foreach (var pixel in delete)
                         activeSet.Remove(pixel);
                 }
+
+
+
+                RES = FFT.FFTDebug(resPadded, 1.0);
+                B = IDG.Multiply(RES, PSFPaddedCorr);
+                b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
                 iter++;
             }
@@ -186,7 +184,6 @@ namespace Single_Reference.Deconvolution
 
             return converged;
         }
-
 
         public static bool DeconvolveGreedy(double[,] xImage, double[,] resPadded, double[,] res, double[,] psf, Complex[,] PSFPadded, double[,] integral, double lambda, double alpha, int maxIteration = 100, double[,] dirtyCopy = null)
         {
@@ -264,8 +261,8 @@ namespace Single_Reference.Deconvolution
                         b += resPadded[ySrc + yPsfHalf, xSrc + xPsfHalf] * psf[i, j];
                 }
             
-
             return b;
         }
+
     }
 }

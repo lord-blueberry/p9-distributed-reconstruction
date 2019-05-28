@@ -122,11 +122,11 @@ namespace Single_Reference
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies);
             FitsIO.Write(psf, "psf.fits");
-            var psf2 = psf;
+            var psfCut = CutImg(psf);
 
             var reconstruction = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            for (int cycle = 0; cycle < 1; cycle++)
+            for (int cycle = 0; cycle < 5; cycle++)
             {
                 watchForward.Start();
                 var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
@@ -134,12 +134,13 @@ namespace Single_Reference
                 FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
 
                 watchDeconv.Start();
-                GreedyCD.Deconvolve(reconstruction, dirtyImage, psf, 0.1, 1.0, 500);
-                //CDClean.Deconvolve(reconstruction, dirtyImage, psf2, 0.1 / (10*(cycle + 1)), 1);
-                int nonzero = CountNonZero(reconstruction);
-                Console.WriteLine("number of nonzeros in reconstruction: " + nonzero);
+                var converged = CyclicCD2.Deconvolve(reconstruction, dirtyImage, psfCut, 0.1 * (5 - cycle), 0.7, 15 + 2 * cycle);
+                if (converged)
+                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
+                else
+                    Console.WriteLine("-------------------------------not converged----------------------");
                 watchDeconv.Stop();
-                FitsIO.Write(reconstruction, "reconstruction" + cycle + ".fits");
+                FitsIO.Write(reconstruction, "xImage_" + cycle + ".fits");
 
                 watchBackwards.Start();
                 var modelVis = IDG.ToVisibilities(c, metadata, reconstruction, uvw, frequencies);
@@ -447,7 +448,7 @@ namespace Single_Reference
                 watchDeconv.Start();
                 //var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 300);
                 //var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.10, 0.8, 200);
-                var converged = CyclicCD2.Deconvolve(xImage, dirtyImage, psf, 0.00, 1.0, 20);
+                var converged = CyclicCD2.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 100);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else

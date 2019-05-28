@@ -4,6 +4,7 @@ using System.Text;
 using MPI;
 using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
+using System.Numerics;
 
 namespace Distributed_Reference
 {
@@ -55,6 +56,10 @@ namespace Distributed_Reference
                 return (o & xd & y & x);
             }
         }
+
+        
+    
+
 
         public static bool Deconvolve(Intracommunicator comm, double[,] xImage, double[,] res, double[,] psf, double lambda, double alpha, Rectangle rec, int maxIteration = 100, double[,] dirtyCopy = null)
         {

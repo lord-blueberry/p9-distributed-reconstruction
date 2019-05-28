@@ -8,6 +8,7 @@ namespace Single_Reference
         {
             //Deconvolution.NaiveGreedyCD.Run();
             DebugMethods.DebugSimulatedGreedy();
+            //DebugMethods.MeerKATFull();
         }
     }
 }
