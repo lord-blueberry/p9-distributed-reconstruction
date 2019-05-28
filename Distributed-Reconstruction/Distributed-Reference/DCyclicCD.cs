@@ -9,7 +9,7 @@ using System.Numerics;
 
 namespace Distributed_Reference
 {
-    class Greedy
+    class DCyclicCD
     {
         [Serializable]
         public struct PixelExchange
@@ -40,7 +40,7 @@ namespace Distributed_Reference
             FFT.Shift(psfPadded);
             var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
 
-            DeconvolveGreedy2(comm, xImage, resPadded, res, psf, PSFPadded, integral, lambda, alpha, rec, 200);
+            DeconvolveGreedy2(comm, xImage, resPadded, res, psf, PSFPadded, integral, lambda, alpha, rec, 100);
 
             var xCummulatedDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
             int iter = 0;
@@ -60,11 +60,10 @@ namespace Distributed_Reference
                 var B = IDG.Multiply(RES, PSFPadded);
                 var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
-                Console.WriteLine("--------------------adding to active set------------------");
                 var activeSet = new List<Tuple<int, int>>();
-                for (int y = 0; y < xImage.GetLength(0); y++)
-                {
-                    for (int x = 0; x < xImage.GetLength(1); x++)
+                for (int y = rec.Y; y < rec.YLength; y++)
+                { 
+                    for (int x = rec.X; x < rec.XLength; x++)
                     {
                         var yLocal = y - rec.Y;
                         var xLocal = x - rec.X;
@@ -74,26 +73,18 @@ namespace Distributed_Reference
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
                         var xDiff = old - xTmp;
 
-                        if (Math.Abs(xDiff) > 1e-8)
+                        if (Math.Abs(xDiff) > epsilon)
                         {
                             activeSet.Add(new Tuple<int, int>(y, x));
-                            /*xImage[y, x] = xTmp;
-                            xCummulatedDiff[y, x] += xDiff;
-                            GreedyCD.UpdateResiduals2(resPadded, res, psf, y, x, xDiff, yPsfHalf, xPsfHalf);
-                            RES = FFT.FFTDebug(resPadded, 1.0);
-                            B = IDG.Multiply(RES, PSFPadded);
-                            b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));*/
                         }
                     }
                 }
 
-                //objective = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
-                //objective += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
-                //Console.WriteLine("Objective test \t" + objective);
-                Console.WriteLine("--------------------count:" + activeSet.Count + "------------------");
-
                 //active set iterations
-                converged = activeSet.Count == 0;
+                var totalActiveSetCount = comm.Allreduce(activeSet.Count, (aC, bC) => aC + bC);
+                if(comm.Rank == 0)
+                    Console.WriteLine("--------------------count:" + totalActiveSetCount + "------------------");
+                converged = totalActiveSetCount == 0;
                 bool activeSetConverged = activeSet.Count == 0;
                 var innerMax = 20;
                 var innerIter = 0;
@@ -141,34 +132,32 @@ namespace Distributed_Reference
                 }
 
                 //exchange with other nodes
-                if (iter % 2 == 0)
-                {
-                    var allXDiff = new List<PixelExchange>();
-                    for (int y = 0; y < xCummulatedDiff.GetLength(0); y++)
-                        for (int x = 0; x < xCummulatedDiff.GetLength(1); x++)
-                        {
-                            if (xCummulatedDiff[y, x] > 0.0)
-                            {
-                                var p = new PixelExchange();
-                                p.Rank = comm.Rank;
-                                p.Y = rec.Y + y;
-                                p.X = rec.X + x;
-                                p.Value = xCummulatedDiff[y, x];
-                                allXDiff.Add(p);
-                                xCummulatedDiff[y, x] = 0.0;
-                            }
-                        }
-
-                    var allNonZeros = comm.Allreduce(allXDiff, (aC, bC) =>
+                var allXDiff = new List<PixelExchange>();
+                for (int y = 0; y < xCummulatedDiff.GetLength(0); y++)
+                    for (int x = 0; x < xCummulatedDiff.GetLength(1); x++)
                     {
-                        aC.AddRange(bC);
-                        return aC;
-                    });
+                        if (xCummulatedDiff[y, x] > 0.0)
+                        {
+                            var p = new PixelExchange();
+                            p.Rank = comm.Rank;
+                            p.Y = rec.Y + y;
+                            p.X = rec.X + x;
+                            p.Value = xCummulatedDiff[y, x];
+                            allXDiff.Add(p);
+                            xCummulatedDiff[y, x] = 0.0;
+                        }
+                    }
 
-                    foreach (var p in allXDiff)
-                        if (p.Rank != comm.Rank)
-                            GreedyCD.UpdateResiduals2(resPadded, res, psf, p.Y, p.X, p.Value, yPsfHalf, xPsfHalf);
-                }
+                var allNonZeros = comm.Allreduce(allXDiff, (aC, bC) =>
+                {
+                    aC.AddRange(bC);
+                    return aC;
+                });
+
+                foreach (var p in allXDiff)
+                    if (p.Rank != comm.Rank)
+                        GreedyCD.UpdateResiduals2(resPadded, res, psf, p.Y, p.X, p.Value, yPsfHalf, xPsfHalf);
+                
 
                 RES = FFT.FFTDebug(resPadded, 1.0);
                 B = IDG.Multiply(RES, PSFPadded);
@@ -185,7 +174,7 @@ namespace Distributed_Reference
             return converged;
         }
 
-        public static bool DeconvolveGreedy2(Intracommunicator comm, double[,] xImage, double[,] resPadded, double[,] res, double[,] psf, Complex[,] PSFPadded, double[,] integral, double lambda, double alpha, Rectangle rec, int maxIteration = 100, double[,] dirtyCopy = null)
+        public static bool DeconvolveGreedy2(Intracommunicator comm, double[,] xImage, double[,] resPadded, double[,] res, double[,] psf, Complex[,] PSFPadded, double[,] integral, double lambda, double alpha, DGreedyCD.Rectangle rec, int maxIteration = 100, double[,] dirtyCopy = null)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -211,13 +200,16 @@ namespace Distributed_Reference
                 var xPixel = -1;
                 var xMax = 0.0;
                 var xNew = 0.0;
-                for (int y = 0; y < res.GetLength(0); y++)
-                    for (int x = 0; x < res.GetLength(1); x++)
+                for (int y = rec.Y; y < rec.YLength; y++)
+                    for (int x = rec.X; x < rec.XLength; x++)
                     {
+                        var yLocal = y - rec.Y;
+                        var xLocal = x - rec.X;
                         var currentA = GreedyCD.QueryIntegral2(integral, y, x, res.GetLength(0), res.GetLength(1));
-                        var old = xImage[y, x];
+                        var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[y + yPsfHalf, x + xPsfHalf] / currentA;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
+
                         var xDiff = old - xTmp;
 
                         if (Math.Abs(xDiff) > xMax)
@@ -252,7 +244,7 @@ namespace Distributed_Reference
                         xImage[yLocal2, xLocal2] = xNew;
 
                     if (comm.Rank == 0)
-                        Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel);
+                        Console.WriteLine(iter + "\t" + Math.Abs(candidate.XDiff) + "\t" + maxCandidate.YPixel + "\t" + maxCandidate.XPixel);
                     GreedyCD.UpdateResiduals2(resPadded, res, psf, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff, yPsfHalf, xPsfHalf);
                     RES = FFT.FFTDebug(resPadded, 1.0);
                     B = IDG.Multiply(RES, PSFPadded);

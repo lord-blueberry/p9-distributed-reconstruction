@@ -81,7 +81,6 @@ namespace Single_Reference.Deconvolution
                     var delete = new List<Tuple<int, int>>();
                     foreach (var pixel in activeSet)
                     {
-
                         //serial descent
                         var y = pixel.Item1;
                         var x = pixel.Item2;
@@ -112,59 +111,12 @@ namespace Single_Reference.Deconvolution
                             delete.Add(pixel);
                             //Console.WriteLine("drop pixel \t" + xTmp + "\t" + y + "\t" + x);
                         }
-                        /*
-                        var y = pixel.Item1;
-                        var x = pixel.Item2;
-                        var xOld = xImage[y, x];
-                        var currentB = b[y + yPsfHalf, x + xPsfHalf];
-                        var xTmp = xOld + currentB / GreedyCD.QueryIntegral2(integral, y, x, xImage.GetLength(0), xImage.GetLength(1)); ;
-                        xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
-                        var xDiff = xOld - xTmp;
-
-                        if (Math.Abs(xDiff) > epsilon)
-                        {
-                            activeSetConverged = false;
-                            //Console.WriteLine(Math.Abs(xOld - xTmp) + "\t" + y + "\t" + x);
-                            xImage[y, x] = xTmp;
-                            xCummulatedDiff[y + yPsfHalf, x + xPsfHalf] += xDiff;
-                        }
-                        else if (xTmp == 0.0)
-                        {
-                            //approximately zero, remove from active set
-                            activeSetConverged = false;
-                            xImage[y, x] = 0.0;
-                            xCummulatedDiff[y + yPsfHalf, x +xPsfHalf] += xOld;
-                            //Console.WriteLine("drop pixel \t" + xTmp + "\t" + y + "\t" + x);
-                        }
-                    }
-
-                    var RESDiff = FFT.FFTDebug(xCummulatedDiff, 1.0);
-                    var RESDiffConv = IDG.Multiply(RESDiff, PSFPaddedConv);
-                    var resDiff = FFT.IFFTDebug(RESDiffConv, RESDiffConv.GetLength(0) * RESDiffConv.GetLength(1));
-                    for (int y = 0; y < res.GetLength(0); y++)
-                        for (int x = 0; x < res.GetLength(1); x++)
-                            resPadded[y + yPsfHalf, x + xPsfHalf] += resDiff[y + yPsfHalf, x + xPsfHalf];
-
-                    foreach(var pixel in activeSet)
-                    {
-                        var y = pixel.Item1;
-                        var x = pixel.Item2;
-                        xCummulatedDiff[y + yPsfHalf, x +xPsfHalf] = 0;
-                    }
-
-                    RES = FFT.FFTDebug(resPadded, 1.0);
-                    B = IDG.Multiply(RES, PSFPaddedCorr);
-                    b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                    //end tryout
-                    */
                     }
                     innerIter++;
 
                     foreach (var pixel in delete)
                         activeSet.Remove(pixel);
                 }
-
-
 
                 RES = FFT.FFTDebug(resPadded, 1.0);
                 B = IDG.Multiply(RES, PSFPaddedCorr);

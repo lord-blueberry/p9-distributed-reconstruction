@@ -115,7 +115,8 @@ namespace Distributed_Reference
 
                 var residualVis = visibilities;
                 var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
-                for (int cycle = 0; cycle < 4; cycle++)
+                var maxCycle = 4;
+                for (int cycle = 0; cycle < maxCycle; cycle++)
                 {
                     var imageLocal = Forward(comm, c, metadata, residualVis, uvw, frequencies, watchForward);
                     if (comm.Rank == 0)
@@ -124,7 +125,7 @@ namespace Distributed_Reference
                         FitsIO.Write(imageLocal, "residual" + cycle + ".fits");
                     }
 
-                    var converged = DGreedyCD.Deconvolve(comm, xLocal, imageLocal, psfCut, 0.1, 0.8, rectangle, 300);
+                    var converged = DCyclicCD.Deconvolve2(comm, xLocal, imageLocal, psfCut, 0.1*(maxCycle - cycle), 0.8, rectangle, 20);
                     if (comm.Rank == 0)
                     {
                         if (converged)
