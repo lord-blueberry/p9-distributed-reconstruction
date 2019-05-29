@@ -20,6 +20,22 @@ namespace Distributed_Reference
             public double Value;
         }
 
+        public class Rectangle
+        {
+            public int X { get; private set; }
+            public int Y { get; private set; }
+            public int XLength { get; private set; }
+            public int YLength { get; private set; }
+
+            public Rectangle(int x, int y, int xLen, int yLen)
+            {
+                X = x;
+                Y = y;
+                XLength = xLen;
+                YLength = yLen;
+            }
+        }
+
         public static bool Deconvolve2(Intracommunicator comm, double[,] xImage, double[,] res, double[,] psf, double lambda, double alpha, DGreedyCD.Rectangle rec, int maxIteration = 100, double[,] dirtyCopy = null)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
@@ -99,7 +115,7 @@ namespace Distributed_Reference
                         var yLocal = y - rec.Y;
                         var xLocal = x - rec.X;
                         var xOld = xImage[yLocal, xLocal];
-                        var currentB = CalculateB(resPadded, xImage, psf, y, x);
+                        var currentB = CalculateB(resPadded, res, psf, y, x);
 
                         //calculate minimum of parabola, eg -2b/a
                         var xTmp = xOld + currentB / GreedyCD.QueryIntegral2(integral, y, x, res.GetLength(0), res.GetLength(1));
@@ -112,7 +128,7 @@ namespace Distributed_Reference
                             //Console.WriteLine(Math.Abs(xOld - xTmp) + "\t" + y + "\t" + x);
                             xImage[yLocal, xLocal] = xTmp;
                             xCummulatedDiff[yLocal, xLocal] += xDiff;
-                            GreedyCD.UpdateResiduals2(resPadded, xImage, psf, y, x, xDiff, yPsfHalf, xPsfHalf);
+                            GreedyCD.UpdateResiduals2(resPadded, res, psf, y, x, xDiff, yPsfHalf, xPsfHalf);
                         }
                         else if (xTmp == 0.0)
                         {
@@ -120,16 +136,17 @@ namespace Distributed_Reference
                             activeSetConverged = false;
                             xImage[yLocal, xLocal] = 0.0;
                             xCummulatedDiff[yLocal, xLocal] += xOld;
-                            GreedyCD.UpdateResiduals2(resPadded, xImage, psf, y, x, xDiff, yPsfHalf, xPsfHalf);
+                            GreedyCD.UpdateResiduals2(resPadded, res, psf, y, x, xDiff, yPsfHalf, xPsfHalf);
                             delete.Add(pixel);
                             //Console.WriteLine("drop pixel \t" + xTmp + "\t" + y + "\t" + x);
                         }
                     }
                     innerIter++;
-
-                    foreach (var pixel in delete)
-                        activeSet.Remove(pixel);
                 }
+
+                /*
+                foreach (var pixel in delete)
+                    activeSet.Remove(pixel);
 
                 //exchange with other nodes
                 var allXDiff = new List<PixelExchange>();
@@ -156,14 +173,22 @@ namespace Distributed_Reference
 
                 foreach (var p in allXDiff)
                     if (p.Rank != comm.Rank)
-                        GreedyCD.UpdateResiduals2(resPadded, res, psf, p.Y, p.X, p.Value, yPsfHalf, xPsfHalf);
-                
+                        GreedyCD.UpdateResiduals2(resPadded, res, psf, p.Y, p.X, p.Value, yPsfHalf, xPsfHalf);*/
 
                 RES = FFT.FFTDebug(resPadded, 1.0);
                 B = IDG.Multiply(RES, PSFPadded);
                 b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
+
                 iter++;
+            }
+
+            double objective2 = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+            objective2 = comm.Allreduce(objective2, (aC, bC) => aC + bC);
+            objective2 += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
+            if (comm.Rank == 0)
+            {
+                Console.WriteLine("Objective \t" + objective2);
             }
 
             //copy back the residuals

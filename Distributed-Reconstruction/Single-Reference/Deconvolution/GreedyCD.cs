@@ -309,7 +309,7 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        public static double EstimateObjectiveImprovement2(double[,] resPadded, double[,] res, double[,] psf, int yPixel, int xPixel, double xDiff)
+        public static double EstimateObjectiveImprovement2(double[,] resPadded, double[,] window, double[,] psf, int yPixel, int xPixel, double xDiff)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -322,8 +322,8 @@ namespace Single_Reference.Deconvolution
                 {
                     var y = (yPixel + i) - yPsfHalf;
                     var x = (xPixel + j) - xPsfHalf;
-                    if (y >= 0 & y < res.GetLength(0) &
-                        x >= 0 & x < res.GetLength(1))
+                    if (y >= 0 & y < window.GetLength(0) &
+                        x >= 0 & x < window.GetLength(1))
                     {
                         count++;
                         var resVal = resPadded[y + yPsfHalf, x + xPsfHalf];
@@ -337,7 +337,7 @@ namespace Single_Reference.Deconvolution
             return resOld - totalDiff;
         }
 
-        public static void UpdateResiduals2(double[,] resPadded, double[,] xImage, double[,] psf, int yPixel, int xPixel, double xDiff, int resYOffset, int resXOffset)
+        public static void UpdateResiduals2(double[,] resPadded, double[,] window, double[,] psf, int yPixel, int xPixel, double xDiff, int resYOffset, int resXOffset)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -346,7 +346,7 @@ namespace Single_Reference.Deconvolution
                 {
                     var y = (yPixel + i) - yPsfHalf;
                     var x = (xPixel + j) - xPsfHalf;
-                    if (y >= 0 & y < xImage.GetLength(0) & x >= 0 & x < xImage.GetLength(1))
+                    if (y >= 0 & y < window.GetLength(0) & x >= 0 & x < window.GetLength(1))
                     {
                         resPadded[y + resYOffset, x + resXOffset] += psf[i, j] * xDiff;
                     }
