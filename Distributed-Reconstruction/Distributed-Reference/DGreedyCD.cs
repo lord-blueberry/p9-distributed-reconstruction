@@ -25,6 +25,7 @@ namespace Distributed_Reference
                 YLength = yLen;
             }
         }
+
         [Serializable]
         public class Candidate
         {

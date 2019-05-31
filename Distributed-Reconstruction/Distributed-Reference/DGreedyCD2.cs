@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Numerics;
+using MPI;
+using Single_Reference.Deconvolution;
 using Single_Reference.IDGSequential;
 
-namespace Single_Reference.Deconvolution
+namespace Distributed_Reference
 {
-    public class GreedyCD2
+    class DGreedyCD2
     {
-        public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha, int maxIteration = 100, double[,] dirtyCopy = null)
+        public static bool Deconvolve(Intracommunicator comm, Communication.Rectangle imageSection, Communication.Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha, int maxIteration = 1000)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -23,14 +24,14 @@ namespace Single_Reference.Deconvolution
             var PsfCorr = FFT.FFTDebug(psfTmp, 1.0);
 
             psfTmp = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
-            SetPsf(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
+            SetPsf(psfTmp, totalSize, psf, totalSize.YLength / 2, totalSize.XLength / 2);
             var tmp = FFT.FFTDebug(psfTmp, 1.0);
             var tmp2 = IDG.Multiply(tmp, PsfCorr);
 
             //cached bUpdate. When the PSF is not masked
             var bUpdateCache = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
 
-            //masked psf
+            //masked psf update. When the psf is masked by the image borders
             var maskedPsf = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
             double[,] bUpdateMasked;
 
@@ -43,12 +44,12 @@ namespace Single_Reference.Deconvolution
                 var xPixel = -1;
                 var xMax = 0.0;
                 var xNew = 0.0;
-                for (int y = 0; y < b.GetLength(0); y++)
-                    for (int x = 0; x < b.GetLength(1); x++)
+                for (int y = imageSection.Y; y < imageSection.YLength; y++)
+                    for (int x = imageSection.X; x < imageSection.XLength; x++)
                     {
-                        var yLocal = y;
-                        var xLocal = x;
-                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, b.GetLength(0), b.GetLength(1));
+                        var yLocal = y - imageSection.Y;
+                        var xLocal = x - imageSection.X;
+                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, totalSize.YLength, totalSize.XLength);
                         var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[y, x] / currentA;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
@@ -65,27 +66,39 @@ namespace Single_Reference.Deconvolution
                     }
 
                 //exchange max
-                converged = Math.Abs(xMax) < epsilon;
+                var yLocal2 = yPixel - imageSection.Y;
+                var xLocal2 = xPixel - imageSection.X;
+                Communication.Candidate candidate = null;
+                var xOld = 0.0;
+                if (xMax > 0.0)
+                {
+                    xOld = xImage[yLocal2, xLocal2];
+                    candidate = new Communication.Candidate(xMax, xOld - xNew, yPixel, xPixel);
+                }
+                else
+                {
+                    candidate = new Communication.Candidate(0.0, 0, -1, -1);
+                }
+                var maxCandidate = comm.Allreduce(candidate, (aC, bC) => aC.XDiffMax > bC.XDiffMax ? aC : bC);
+                converged = Math.Abs(candidate.XDiffMax) < epsilon;
                 if (!converged)
                 {
-                    var yLocal2 = yPixel;
-                    var xLocal2 = xPixel;
-                    var xOld = xImage[yLocal2, xLocal2];
-                    xImage[yLocal2, xLocal2] = xNew;
+                    if (maxCandidate.YPixel == yPixel && maxCandidate.XPixel == xPixel)
+                        xImage[yLocal2, xLocal2] = xNew;
 
                     Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yLocal2 + "\t" + xLocal2);
-                    var rec = new DebugCyclic.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
-                    if (yPixel - yPsfHalf >= 0 & yPixel + yPsfHalf < xImage.GetLength(0) & xPixel - xPsfHalf >= 0 & xPixel + xPsfHalf < xImage.GetLength(0))
+
+                    if (yPixel - yPsfHalf >= 0 & yPixel + yPsfHalf < totalSize.YLength & xPixel - xPsfHalf >= 0 & xPixel + xPsfHalf < totalSize.XLength)
                     {
-                        UpdateB(b, bUpdateCache, rec, yPixel, xPixel, xOld - xNew);
+                        UpdateB(b, bUpdateCache, imageSection, yPixel, xPixel, xOld - xNew);
                     }
                     else
                     {
-                        SetPsf(maskedPsf, xImage, psf, yPixel, xPixel);
+                        SetPsf(maskedPsf, totalSize, psf, yPixel, xPixel);
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
                         tmp2 = IDG.Multiply(tmp, PsfCorr);
                         bUpdateMasked = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
-                        UpdateB(b, bUpdateMasked, rec, yPixel, xPixel, xOld - xNew);
+                        UpdateB(b, bUpdateMasked, imageSection, yPixel, xPixel, xOld - xNew);
                     }
                     iter++;
                 }
@@ -94,45 +107,7 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        public static double[,] PadResiduals(double[,] res, double[,] psf)
-        {
-            var yPsfHalf = psf.GetLength(0) / 2;
-            var xPsfHalf = psf.GetLength(1) / 2;
-            var resPadded = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
-            for (int y = 0; y < res.GetLength(0); y++)
-                for (int x = 0; x < res.GetLength(1); x++)
-                    resPadded[y + yPsfHalf, x + xPsfHalf] = res[y, x];
-
-            return resPadded;
-        }
-
-        public static Complex[,] PadAndInvertPsf(double[,] res, double[,] psf)
-        {
-            var psfPadded = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
-            var yPsfHalf = res.GetLength(0) / 2;
-            var xPsfHalf = res.GetLength(1) / 2;
-            for (int y = 0; y < psf.GetLength(0); y++)
-                for (int x = 0; x < psf.GetLength(1); x++)
-                    psfPadded[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
-            FFT.Shift(psfPadded);
-            var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
-
-            return PSFPadded;
-        }
-
-        public static double[,] RemovePadding(double[,] img, double[,] psf)
-        {
-            var yPsfHalf = psf.GetLength(0) / 2;
-            var xPsfHalf = psf.GetLength(1) / 2;
-            var imgNoPadding = new double[img.GetLength(0) - psf.GetLength(0), img.GetLength(1) - psf.GetLength(1)];
-            for (int y = 0; y < imgNoPadding.GetLength(0); y++)
-                for (int x = 0; x < imgNoPadding.GetLength(1); x++)
-                    imgNoPadding[y, x] = img[y + yPsfHalf, x + xPsfHalf];
-
-            return imgNoPadding;
-        }
-
-        public static void SetPsf(double[,] psfPadded, double[,] window, double[,] psf, int yPixel, int xPixel)
+        public static void SetPsf(double[,] psfPadded, Communication.Rectangle window, double[,] psf, int yPixel, int xPixel)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -141,9 +116,9 @@ namespace Single_Reference.Deconvolution
                 {
                     var y = (yPixel + i) - yPsfHalf;
                     var x = (xPixel + j) - xPsfHalf;
-                    if (y >= 0 & y < window.GetLength(0) & x >= 0 & x < window.GetLength(1))
+                    if (y >= 0 & y < window.YLength & x >= 0 & x < window.XLength)
                     {
-                        psfPadded[i+ yPsfHalf, j + xPsfHalf] = psf[i, j];
+                        psfPadded[i + yPsfHalf, j + xPsfHalf] = psf[i, j];
                     }
                     else
                     {
@@ -152,21 +127,7 @@ namespace Single_Reference.Deconvolution
                 }
         }
 
-        public static void UpdateB(double[,] b, double[,] bUpdate, int yPixel, int xPixel, double xDiff)
-        {
-            var yBHalf = bUpdate.GetLength(0) / 2;
-            var xBHalf = bUpdate.GetLength(1) / 2;
-            for (int i = 0; i < bUpdate.GetLength(0); i++)
-                for (int j = 0; j < bUpdate.GetLength(1); j++)
-                {
-                    var y = (yPixel + i) - yBHalf;
-                    var x = (xPixel + j) - xBHalf;
-                    if (y >= 0 & y < b.GetLength(0) & x >= 0 & x < b.GetLength(1))
-                        b[y, x] += bUpdate[i, j] * xDiff;
-                }
-        }
-
-        public static void UpdateB(double[,] b, double[,] bUpdate, DebugCyclic.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
+        public static void UpdateB(double[,] b, double[,] bUpdate, Communication.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
             var xBHalf = bUpdate.GetLength(1) / 2;
@@ -176,7 +137,7 @@ namespace Single_Reference.Deconvolution
             var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imageSection.YLength);
             var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imageSection.XLength);
             for (int i = yBMin; i < yBMax; i++)
-                for (int j = xBMin; j < xBMax; j++)
+                for(int j = xBMin; j < xBMax; j++)
                 {
                     var yLocal = i - imageSection.Y;
                     var xLocal = j - imageSection.X;
@@ -185,6 +146,5 @@ namespace Single_Reference.Deconvolution
                     b[yLocal, xLocal] += bUpdate[yBUpdate, xBUpdate] * xDiff;
                 }
         }
-
     }
 }

@@ -595,12 +595,7 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                /*
-                var rec = new DebugCyclic.Rectangle(0, 0, 128, 128);
-                var converged = DebugCyclic.DeconvolveGreedy3(xImage, dirtyImage, psfCut, 0.1, 0.8, rec, 10);
-                */
 
-                
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(dirtyImage, psfCut);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
