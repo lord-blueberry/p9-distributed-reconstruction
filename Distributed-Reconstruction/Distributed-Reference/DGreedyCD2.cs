@@ -4,12 +4,13 @@ using System.Text;
 using MPI;
 using Single_Reference.Deconvolution;
 using Single_Reference.IDGSequential;
+using static Distributed_Reference.Communication;
 
 namespace Distributed_Reference
 {
     class DGreedyCD2
     {
-        public static bool Deconvolve(Intracommunicator comm, Communication.Rectangle imageSection, Communication.Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha, int maxIteration = 1000)
+        public static bool Deconvolve(Intracommunicator comm, Communication.Rectangle imgSection, Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha, int maxIteration = 1000)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -44,11 +45,11 @@ namespace Distributed_Reference
                 var xPixel = -1;
                 var xMax = 0.0;
                 var xNew = 0.0;
-                for (int y = imageSection.Y; y < imageSection.YLength; y++)
-                    for (int x = imageSection.X; x < imageSection.XLength; x++)
+                for (int y = imgSection.Y; y < imgSection.YLength; y++)
+                    for (int x = imgSection.X; x < imgSection.XLength; x++)
                     {
-                        var yLocal = y - imageSection.Y;
-                        var xLocal = x - imageSection.X;
+                        var yLocal = y - imgSection.Y;
+                        var xLocal = x - imgSection.X;
                         var currentA = GreedyCD.QueryIntegral2(integral, y, x, totalSize.YLength, totalSize.XLength);
                         var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[y, x] / currentA;
@@ -66,18 +67,18 @@ namespace Distributed_Reference
                     }
 
                 //exchange max
-                var yLocal2 = yPixel - imageSection.Y;
-                var xLocal2 = xPixel - imageSection.X;
-                Communication.Candidate candidate = null;
+                var yLocal2 = yPixel - imgSection.Y;
+                var xLocal2 = xPixel - imgSection.X;
+                Candidate candidate = null;
                 var xOld = 0.0;
                 if (xMax > 0.0)
                 {
                     xOld = xImage[yLocal2, xLocal2];
-                    candidate = new Communication.Candidate(xMax, xOld - xNew, yPixel, xPixel);
+                    candidate = new Candidate(xMax, xOld - xNew, yPixel, xPixel);
                 }
                 else
                 {
-                    candidate = new Communication.Candidate(0.0, 0, -1, -1);
+                    candidate = new Candidate(0.0, 0, -1, -1);
                 }
                 var maxCandidate = comm.Allreduce(candidate, (aC, bC) => aC.XDiffMax > bC.XDiffMax ? aC : bC);
                 converged = Math.Abs(candidate.XDiffMax) < epsilon;
@@ -90,7 +91,7 @@ namespace Distributed_Reference
 
                     if (yPixel - yPsfHalf >= 0 & yPixel + yPsfHalf < totalSize.YLength & xPixel - xPsfHalf >= 0 & xPixel + xPsfHalf < totalSize.XLength)
                     {
-                        UpdateB(b, bUpdateCache, imageSection, yPixel, xPixel, xOld - xNew);
+                        UpdateB(b, bUpdateCache, imgSection, yPixel, xPixel, xOld - xNew);
                     }
                     else
                     {
@@ -98,7 +99,7 @@ namespace Distributed_Reference
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
                         tmp2 = IDG.Multiply(tmp, PsfCorr);
                         bUpdateMasked = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
-                        UpdateB(b, bUpdateMasked, imageSection, yPixel, xPixel, xOld - xNew);
+                        UpdateB(b, bUpdateMasked, imgSection, yPixel, xPixel, xOld - xNew);
                     }
                     iter++;
                 }
@@ -107,7 +108,7 @@ namespace Distributed_Reference
             return converged;
         }
 
-        public static void SetPsf(double[,] psfPadded, Communication.Rectangle window, double[,] psf, int yPixel, int xPixel)
+        public static void SetPsf(double[,] psfPadded, Rectangle window, double[,] psf, int yPixel, int xPixel)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -127,20 +128,20 @@ namespace Distributed_Reference
                 }
         }
 
-        public static void UpdateB(double[,] b, double[,] bUpdate, Communication.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
+        public static void UpdateB(double[,] b, double[,] bUpdate, Rectangle imgSection, int yPixel, int xPixel, double xDiff)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
             var xBHalf = bUpdate.GetLength(1) / 2;
 
-            var yBMin = Math.Max(yPixel - yBHalf, imageSection.Y);
-            var xBMin = Math.Max(xPixel - xBHalf, imageSection.X);
-            var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imageSection.YLength);
-            var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imageSection.XLength);
+            var yBMin = Math.Max(yPixel - yBHalf, imgSection.Y);
+            var xBMin = Math.Max(xPixel - xBHalf, imgSection.X);
+            var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imgSection.YLength);
+            var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imgSection.XLength);
             for (int i = yBMin; i < yBMax; i++)
                 for(int j = xBMin; j < xBMax; j++)
                 {
-                    var yLocal = i - imageSection.Y;
-                    var xLocal = j - imageSection.X;
+                    var yLocal = i - imgSection.Y;
+                    var xLocal = j - imgSection.X;
                     var yBUpdate = i + yBHalf - yPixel;
                     var xBUpdate = j + xBHalf - xPixel;
                     b[yLocal, xLocal] += bUpdate[yBUpdate, xBUpdate] * xDiff;
