@@ -70,8 +70,7 @@ namespace Single_Reference.Deconvolution
                     var tmp = FFT.FFTDebug(psfCache, 1.0);
                     var tmp2 = IDG.Multiply(tmp, PsfCorr);
                     var bUpdate = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
-                    UpdateB(b, bUpdate, yPsfHalf, xPixel, xOld - xNew);
-                    //FitsIO.Write(b, "b_after.fits");
+                    UpdateB(b, bUpdate, yPixel, xPixel, xOld - xNew);
 
                     iter++;
                 }
@@ -129,13 +128,13 @@ namespace Single_Reference.Deconvolution
                     var x = (xPixel + j) - xPsfHalf;
                     if (y >= 0 & y < window.GetLength(0) & x >= 0 & x < window.GetLength(1))
                     {
-                        psfPadded[i+ yPsfHalf, x + xPixel] = psf[i, j];
+                        psfPadded[i+ yPsfHalf, j + xPsfHalf] = psf[i, j];
                     }
                     else
                     {
-                        psfPadded[i + yPsfHalf, x + xPixel] = 0.0;
+                        psfPadded[i + yPsfHalf, j + yPsfHalf] = 0.0;
                     }
-                }          
+                }
         }
 
         public static void UpdateB(double[,] b, double[,] bUpdate, int yPixel, int xPixel, double xDiff)
@@ -149,7 +148,6 @@ namespace Single_Reference.Deconvolution
                     var x = (xPixel + j) - xBHalf;
                     if (y >= 0 & y < b.GetLength(0) & x >= 0 & x < b.GetLength(1))
                         b[y, x] += bUpdate[i, j] * xDiff;
-
                 }
         }
 

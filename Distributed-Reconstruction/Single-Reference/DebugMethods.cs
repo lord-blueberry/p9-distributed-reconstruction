@@ -606,11 +606,8 @@ namespace Single_Reference
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                FitsIO.Write(bPadded, "bNew.fits");
                 var b = GreedyCD2.RemovePadding(bPadded, psfCut);
-                FitsIO.Write(b, "bNew.fits");
                 var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.1, 0.8, 10);
-                
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
