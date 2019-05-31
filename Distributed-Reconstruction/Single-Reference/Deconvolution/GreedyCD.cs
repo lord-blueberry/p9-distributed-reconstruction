@@ -15,7 +15,7 @@ namespace Single_Reference.Deconvolution
             var b = ConvolveFFTPadded(res, psf);
 
             double objective = 0;
-            objective += CalcElasticNetObjective(xImage, integral, lambda, alpha);
+            objective += CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0, 0);
             objective += CalcDataObjective(res);
 
             Console.WriteLine("Objective \t" + objective);
@@ -253,7 +253,7 @@ namespace Single_Reference.Deconvolution
             
 
             double objective = 0;
-            objective += CalcElasticNetObjective(xImage, integral, lambda, alpha);
+            objective += CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0, 0);
             objective += CalcDataObjective(res);
 
 
@@ -348,18 +348,18 @@ namespace Single_Reference.Deconvolution
                     var x = (xPixel + j) - xPsfHalf;
                     if (y >= 0 & y < window.GetLength(0) & x >= 0 & x < window.GetLength(1))
                     {
-                        resPadded[y + resYOffset, x + resXOffset] += psf[i, j] * xDiff;
+                        resPadded[y + yPsfHalf, x + xPsfHalf] += psf[i, j] * xDiff;
                     }
                 }
         }
 
-        public static double CalcElasticNetObjective(double[,] xImage, double[,] aMap, double lambda, double alpha)
+        public static double CalcElasticNetObjective(double[,] xImage, double[,] window, double[,] aMap, double lambda, double alpha, int yOffset, int xOffset)
         {
             double objective = 0;
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
                 {
-                    var a = QueryIntegral2(aMap, i, j, xImage.GetLength(0), xImage.GetLength(1));
+                    var a = QueryIntegral2(aMap, i + yOffset, j + xOffset, window.GetLength(0), window.GetLength(1));
                     objective += lambda * 2 * a * ElasticNetRegularization(xImage[i, j], alpha);
                 }
                     
@@ -417,5 +417,9 @@ namespace Single_Reference.Deconvolution
         #endregion
 
         public static double ElasticNetRegularization(double value, double alpha) => 1.0 / 2.0 * (1 - alpha) * (value * value) + alpha * Math.Abs(value);
+
+
+
+
     }
 }

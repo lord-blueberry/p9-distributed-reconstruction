@@ -65,7 +65,7 @@ namespace Single_Reference.Deconvolution
                     }
                 }
 
-                var objective = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+                var objective = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0,0);
                 objective += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
                 Console.WriteLine("Objective test \t" + objective);
                 Console.WriteLine("--------------------count:" + activeSet.Count + "------------------");
@@ -124,7 +124,7 @@ namespace Single_Reference.Deconvolution
                             B = IDG.Multiply(RES, PSFPaddedCorr);
                             b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
-                            var objective2 = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+                            var objective2 = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0,0);
                             objective2 += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
                             Console.WriteLine("Objective test \t" + objective2);
                         }
@@ -143,7 +143,7 @@ namespace Single_Reference.Deconvolution
                     B = IDG.Multiply(RES, PSFPaddedCorr);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
-                    var objective3 = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+                    var objective3 = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0,0);
                     objective3 += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
                     Console.WriteLine("Objective done iteration \t" + objective3);
 
@@ -213,7 +213,7 @@ namespace Single_Reference.Deconvolution
             var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
             
             double objective = 0;
-            objective += GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+            objective += GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0, 0);
             objective += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
             Console.WriteLine("Objective \t" + objective);
 

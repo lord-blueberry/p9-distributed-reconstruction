@@ -311,7 +311,7 @@ namespace Single_Reference
         }
 
 
-        public static void DebugSimulatedGreedy()
+        public static void DebugSimulatedCyclic()
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
@@ -373,47 +373,51 @@ namespace Single_Reference
                 for (int i = 0; i < xLocal0.GetLength(0); i++)
                     for (int j = 0; j < xLocal0.GetLength(1); j++)
                         xLocal0[i, j] = xImage[i, j];
-                for (int i = 0; i < xLocal0.GetLength(0); i++)
-                    for (int j = 0; j < xLocal0.GetLength(1); j++)
+                for (int i = 0; i < xLocal1.GetLength(0); i++)
+                    for (int j = 0; j < xLocal1.GetLength(1); j++)
                         xLocal1[i, j] = xImage[i, j + 64];
-                for (int i = 0; i < xLocal0.GetLength(0); i++)
-                    for (int j = 0; j < xLocal0.GetLength(1); j++)
+                for (int i = 0; i < xLocal2.GetLength(0); i++)
+                    for (int j = 0; j < xLocal2.GetLength(1); j++)
                         xLocal2[i, j] = xImage[i + 64, j];
-                for (int i = 0; i < xLocal0.GetLength(0); i++)
-                    for (int j = 0; j < xLocal0.GetLength(1); j++)
+                for (int i = 0; i < xLocal3.GetLength(0); i++)
+                    for (int j = 0; j < xLocal3.GetLength(1); j++)
                         xLocal3[i, j] = xImage[i + 64, j + 64];
+
 
                 var dCopy = new double[gridSize, gridSize];
                 for (int i = 0; i < dCopy.GetLength(0); i++)
                     for (int j = 0; j < dCopy.GetLength(1); j++)
                         dCopy[i, j] = dirtyImage[i, j];
                 var rec0 = new DebugCyclic.Rectangle(0, 0, 64, 64);
-                var converged = DebugCyclic.Deconvolve2(xLocal0, dCopy, psfCut, 0.1, 0.8, rec0, 100);
-                FitsIO.Write(xLocal0, "xLocal0.fits");
+                var converged = DebugCyclic.Deconvolve2(xLocal0, dCopy, psfCut, 0.1, 0.8, rec0, 200);
+
+                FitsIO.Write(xLocal0, "xLocal0_" + cycle + ".fits");
 
                 dCopy = new double[gridSize, gridSize];
                 for (int i = 0; i < dCopy.GetLength(0); i++)
                     for (int j = 0; j < dCopy.GetLength(1); j++)
                         dCopy[i, j] = dirtyImage[i, j];
                 var rec1 = new DebugCyclic.Rectangle(0, 64, 64, 128);
-                converged = DebugCyclic.Deconvolve2(xLocal1, dCopy, psfCut, 0.1, 0.8, rec1, 100);
-                FitsIO.Write(xLocal1, "xLocal1.fits");
+                converged = DebugCyclic.Deconvolve2(xLocal1, dCopy, psfCut, 0.1, 0.8, rec1, 200);
+
+                FitsIO.Write(xLocal1, "xLocal1_" + cycle + ".fits");
 
                 dCopy = new double[gridSize, gridSize];
                 for (int i = 0; i < dCopy.GetLength(0); i++)
                     for (int j = 0; j < dCopy.GetLength(1); j++)
                         dCopy[i, j] = dirtyImage[i, j];
                 var rec2 = new DebugCyclic.Rectangle(64, 0, 128, 64);
-                converged = DebugCyclic.Deconvolve2(xLocal2, dCopy, psfCut, 0.1, 0.8, rec2, 100);
-                FitsIO.Write(xLocal2, "xLocal2.fits");
+                converged = DebugCyclic.Deconvolve2(xLocal2, dCopy, psfCut, 0.1, 0.8, rec2, 200);
+                FitsIO.Write(xLocal2, "xLocal2_" + cycle + ".fits");
+
 
                 dCopy = new double[gridSize, gridSize];
                 for (int i = 0; i < dCopy.GetLength(0); i++)
                     for (int j = 0; j < dCopy.GetLength(1); j++)
                         dCopy[i, j] = dirtyImage[i, j];
                 var rec3 = new DebugCyclic.Rectangle(64, 64, 128, 128);
-                converged = DebugCyclic.Deconvolve2(xLocal3, dCopy, psfCut, 0.1, 0.8, rec3, 100);
-                FitsIO.Write(xLocal3, "xLocal3.fits");
+                converged = DebugCyclic.Deconvolve2(xLocal3, dCopy, psfCut, 0.1, 0.8, rec3, 200);
+                FitsIO.Write(xLocal3, "xLocal3_" + cycle + ".fits");
 
 
                 for (int i = 0; i < xLocal0.GetLength(0); i++)
@@ -421,14 +425,13 @@ namespace Single_Reference
                         xImage[i, j] = xLocal0[i, j];
                 for (int i = 0; i < xLocal0.GetLength(0); i++)
                     for (int j = 0; j < xLocal0.GetLength(1); j++)
-                        xImage[i, j+64] = xLocal1[i, j];
+                        xImage[i, j + 64] = xLocal1[i, j];
                 for (int i = 0; i < xLocal0.GetLength(0); i++)
                     for (int j = 0; j < xLocal0.GetLength(1); j++)
-                        xImage[i+64, j] = xLocal2[i, j];
+                        xImage[i + 64, j] = xLocal2[i, j];
                 for (int i = 0; i < xLocal0.GetLength(0); i++)
                     for (int j = 0; j < xLocal0.GetLength(1); j++)
-                        xImage[i + 64, j+64] = xLocal3[i, j];
-
+                        xImage[i + 64, j + 64] = xLocal3[i, j];
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -457,6 +460,186 @@ namespace Single_Reference
                 FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
             }
         }
+
+
+        public static void DebugSimulatedGreedy()
+        {
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+            double norm = 2.0;
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            var visibilitiesCount = visibilities.Length;
+            int gridSize = 128;
+            int subgridsize = 8;
+            int kernelSize = 4;
+            int max_nr_timesteps = 64;
+            double cellSize = 2.0 / 3600.0 * PI / 180.0;
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+
+            var watchTotal = new Stopwatch();
+            var watchForward = new Stopwatch();
+            var watchBackwards = new Stopwatch();
+            var watchDeconv = new Stopwatch();
+
+            watchTotal.Start();
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+            var psfCut = CutImg(psf);
+            FitsIO.Write(psf, "psf.fits");
+            FitsIO.Write(psfCut, "psfCut.fits");
+
+
+            var xImage = new double[gridSize, gridSize];
+            var residualVis = visibilities;
+            //var truth = new double[gridSize, gridSize];
+            //truth[30, 30] = 1.0;
+            //var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
+            //var residualVis = truthVis;
+            for (int cycle = 0; cycle < 4; cycle++)
+            {
+                //FORWARD
+                watchForward.Start();
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
+                var dirtyImage = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
+                watchForward.Stop();
+
+                //DECONVOLVE
+                watchDeconv.Start();
+                //var converged = GreedyCD.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 300);
+                //var converged = GreedyCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.10, 0.8, 200);
+                //var converged = CyclicCD2.Deconvolve(xImage, dirtyImage, psf, 0.10, 0.8, 100);
+                var rec = new DebugCyclic.Rectangle(0, 0, 128, 128);
+                var converged = DebugCyclic.DeconvolveGreedy3(xImage, dirtyImage, psfCut, 0.1, 0.8, rec, 1000);
+                if (converged)
+                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
+                else
+                    Console.WriteLine("-------------------------------not converged----------------------");
+                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
+                FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
+                watchDeconv.Stop();
+
+                //BACKWARDS
+                watchBackwards.Start();
+                FFT.Shift(xImage);
+                var xGrid = FFT.GridFFT(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                watchBackwards.Stop();
+
+                var hello = FFT.FFTDebug(xImage, 1.0);
+                hello = IDG.Multiply(hello, psfGrid);
+                var hImg = FFT.IFFTDebug(hello, 128 * 128);
+                //FFT.Shift(hImg);
+                FitsIO.Write(hImg, "modelDirty_FFT.fits");
+
+                var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
+                FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
+            }
+        }
+
+        public static void DebugSimulatedGreedy2()
+        {
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+            double norm = 2.0;
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            var visibilitiesCount = visibilities.Length;
+            int gridSize = 128;
+            int subgridsize = 8;
+            int kernelSize = 4;
+            int max_nr_timesteps = 64;
+            double cellSize = 2.0 / 3600.0 * PI / 180.0;
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+
+            var watchTotal = new Stopwatch();
+            var watchForward = new Stopwatch();
+            var watchBackwards = new Stopwatch();
+            var watchDeconv = new Stopwatch();
+
+            watchTotal.Start();
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+            var psfCut = CutImg(psf);
+            FitsIO.Write(psf, "psf.fits");
+            FitsIO.Write(psfCut, "psfCut.fits");
+
+
+            var xImage = new double[gridSize, gridSize];
+            var residualVis = visibilities;
+            //var truth = new double[gridSize, gridSize];
+            //truth[30, 30] = 1.0;
+            //var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
+            //var residualVis = truthVis;
+            for (int cycle = 0; cycle < 4; cycle++)
+            {
+                //FORWARD
+                watchForward.Start();
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
+                var dirtyImage = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
+                watchForward.Stop();
+
+                //DECONVOLVE
+                watchDeconv.Start();
+                /*
+                var rec = new DebugCyclic.Rectangle(0, 0, 128, 128);
+                var converged = DebugCyclic.DeconvolveGreedy3(xImage, dirtyImage, psfCut, 0.1, 0.8, rec, 10);
+                */
+
+                
+                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(dirtyImage, psfCut);
+                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
+                var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
+                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                FitsIO.Write(bPadded, "bNew.fits");
+                var b = GreedyCD2.RemovePadding(bPadded, psfCut);
+                FitsIO.Write(b, "bNew.fits");
+                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.1, 0.8, 10);
+                
+
+                if (converged)
+                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
+                else
+                    Console.WriteLine("-------------------------------not converged----------------------");
+                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
+                FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
+                watchDeconv.Stop();
+
+                //BACKWARDS
+                watchBackwards.Start();
+                FFT.Shift(xImage);
+                var xGrid = FFT.GridFFT(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                watchBackwards.Stop();
+
+                var hello = FFT.FFTDebug(xImage, 1.0);
+                hello = IDG.Multiply(hello, psfGrid);
+                var hImg = FFT.IFFTDebug(hello, 128 * 128);
+                //FFT.Shift(hImg);
+                FitsIO.Write(hImg, "modelDirty_FFT.fits");
+
+                var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
+                FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
+            }
+        }
+
 
         public static void DebugFullPipeline()
         {
@@ -715,6 +898,8 @@ namespace Single_Reference
         {
             return (x - (subgridSize / 2)) * imageSize / subgridSize;
         }
+
+
 
     }
 }

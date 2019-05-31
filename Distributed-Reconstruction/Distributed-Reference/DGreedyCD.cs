@@ -57,9 +57,6 @@ namespace Distributed_Reference
             }
         }
 
-        
-    
-
 
         public static bool Deconvolve(Intracommunicator comm, double[,] xImage, double[,] res, double[,] psf, double lambda, double alpha, Rectangle rec, int maxIteration = 100, double[,] dirtyCopy = null)
         {
@@ -86,7 +83,7 @@ namespace Distributed_Reference
             FFT.Shift(b);
 
             double objective = 0;
-            objective += GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+            objective += GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, rec.Y, rec.X);
             objective += GreedyCD.CalcDataObjective(res);
 
             if(comm.Rank ==0)
@@ -164,6 +161,105 @@ namespace Distributed_Reference
                     B = IDG.Multiply(RES, PSFPadded);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                     FFT.Shift(b);
+                    iter++;
+                }
+            }
+
+            return converged;
+        }
+
+
+        public static bool Deconvolve2(Intracommunicator comm, double[,] xImage, double[,] res, double[,] psf, double lambda, double alpha, DGreedyCD.Rectangle rec, int maxIteration = 100, double[,] dirtyCopy = null)
+        {
+            var yPsfHalf = psf.GetLength(0) / 2;
+            var xPsfHalf = psf.GetLength(1) / 2;
+
+            var integral = GreedyCD.CalcPSf2Integral(psf);
+            var resPadded = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
+            for (int y = 0; y < res.GetLength(0); y++)
+                for (int x = 0; x < res.GetLength(1); x++)
+                    resPadded[y + yPsfHalf, x + xPsfHalf] = res[y, x];
+
+            //invert the PSF, since we actually do want to correlate the psf with the residuals. (The FFT already inverts the psf, so we need to invert it again to not invert it. Trust me.)
+            var psfPadded = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
+            var psfYOffset = res.GetLength(0) / 2;
+            var psfXOffset = res.GetLength(1) / 2;
+            for (int y = 0; y < psf.GetLength(0); y++)
+                for (int x = 0; x < psf.GetLength(1); x++)
+                    psfPadded[y + psfYOffset + 1, x + psfXOffset + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
+            FFT.Shift(psfPadded);
+            var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
+
+            var RES = FFT.FFTDebug(resPadded, 1.0);
+            var B = IDG.Multiply(RES, PSFPadded);
+            var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+
+            double objective = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, rec.Y, rec.X);
+            objective = comm.Allreduce(objective, (aC, bC) => aC + bC);
+            objective += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
+            if (comm.Rank == 0)
+            {
+                Console.WriteLine("Objective \t" + objective);
+            }
+
+            int iter = 0;
+            bool converged = false;
+            double epsilon = 1e-4;
+            while (!converged & iter < maxIteration)
+            {
+                var yPixel = -1;
+                var xPixel = -1;
+                var xMax = 0.0;
+                var xNew = 0.0;
+                for (int y = rec.Y; y < rec.YLength; y++)
+                    for (int x = rec.X; x < rec.XLength; x++)
+                    {
+                        var yLocal = y - rec.Y;
+                        var xLocal = x - rec.X;
+                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, res.GetLength(0), res.GetLength(1));
+                        var old = xImage[yLocal, xLocal];
+                        var xTmp = old + b[y + yPsfHalf, x + xPsfHalf] / currentA;
+                        xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
+
+                        var xDiff = old - xTmp;
+
+                        if (Math.Abs(xDiff) > xMax)
+                        {
+                            yPixel = y;
+                            xPixel = x;
+                            xMax = Math.Abs(xDiff);
+                            xNew = xTmp;
+                        }
+                    }
+
+                //exchange max
+                var yLocal2 = yPixel - rec.Y;
+                var xLocal2 = xPixel - rec.X;
+                DGreedyCD.Candidate candidate = null;
+                var xOld = 0.0;
+                if (xMax > 0.0)
+                {
+                    xOld = xImage[yLocal2, xLocal2];
+                    candidate = new DGreedyCD.Candidate(xMax, xOld - xNew, yPixel, xPixel);
+                }
+                else
+                {
+                    candidate = new DGreedyCD.Candidate(0.0, 0, -1, -1);
+                }
+
+                var maxCandidate = comm.Allreduce(candidate, (aC, bC) => aC.OImprov > bC.OImprov ? aC : bC);
+                converged = Math.Abs(maxCandidate.OImprov) < epsilon;
+                if (!converged)
+                {
+                    if (maxCandidate.YPixel == yPixel && maxCandidate.XPixel == xPixel)
+                        xImage[yLocal2, xLocal2] = xNew;
+
+                    if (comm.Rank == 0)
+                        Console.WriteLine(iter + "\t" + Math.Abs(candidate.XDiff) + "\t" + maxCandidate.YPixel + "\t" + maxCandidate.XPixel);
+                    GreedyCD.UpdateResiduals2(resPadded, res, psf, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff, yPsfHalf, xPsfHalf);
+                    RES = FFT.FFTDebug(resPadded, 1.0);
+                    B = IDG.Multiply(RES, PSFPadded);
+                    b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                     iter++;
                 }
             }

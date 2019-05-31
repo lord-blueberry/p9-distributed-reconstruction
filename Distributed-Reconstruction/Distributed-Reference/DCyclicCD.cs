@@ -22,17 +22,18 @@ namespace Distributed_Reference
 
         public class Rectangle
         {
-            public int X { get; private set; }
             public int Y { get; private set; }
-            public int XLength { get; private set; }
-            public int YLength { get; private set; }
+            public int X { get; private set; }
 
-            public Rectangle(int x, int y, int xLen, int yLen)
+            public int YLength { get; private set; }
+            public int XLength { get; private set; }
+
+            public Rectangle(int y, int x, int yLen, int xLen)
             {
-                X = x;
                 Y = y;
-                XLength = xLen;
+                X = x;
                 YLength = yLen;
+                XLength = xLen;
             }
         }
 
@@ -56,7 +57,7 @@ namespace Distributed_Reference
             FFT.Shift(psfPadded);
             var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
 
-            DeconvolveGreedy2(comm, xImage, resPadded, res, psf, PSFPadded, integral, lambda, alpha, rec, 100);
+            //DeconvolveGreedy2(comm, xImage, resPadded, res, psf, PSFPadded, integral, lambda, alpha, rec, 100);
 
             var xCummulatedDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
             int iter = 0;
@@ -64,7 +65,7 @@ namespace Distributed_Reference
             double epsilon = 1e-4;
             while (!converged & iter < maxIteration)
             {
-                double objective = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+                double objective = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, rec.Y, rec.X);
                 objective = comm.Allreduce(objective, (aC, bC) => aC + bC);
                 objective += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
                 if (comm.Rank == 0)
@@ -183,7 +184,7 @@ namespace Distributed_Reference
                 iter++;
             }
 
-            double objective2 = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+            double objective2 = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, rec.Y, rec.X);
             objective2 = comm.Allreduce(objective2, (aC, bC) => aC + bC);
             objective2 += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
             if (comm.Rank == 0)
@@ -208,7 +209,7 @@ namespace Distributed_Reference
             var B = IDG.Multiply(RES, PSFPadded);
             var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
-            double objective = GreedyCD.CalcElasticNetObjective(xImage, integral, lambda, alpha);
+            double objective = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, rec.Y, rec.X);
             objective = comm.Allreduce(objective, (aC, bC) => aC + bC);
             objective += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
             if (comm.Rank == 0)
