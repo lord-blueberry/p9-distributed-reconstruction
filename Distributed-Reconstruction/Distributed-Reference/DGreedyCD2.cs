@@ -4,6 +4,7 @@ using System.Text;
 using MPI;
 using Single_Reference.Deconvolution;
 using Single_Reference.IDGSequential;
+using Single_Reference;
 using static Distributed_Reference.Communication;
 
 namespace Distributed_Reference
@@ -52,7 +53,7 @@ namespace Distributed_Reference
                         var xLocal = x - imgSection.X;
                         var currentA = GreedyCD.QueryIntegral2(integral, y, x, totalSize.YLength, totalSize.XLength);
                         var old = xImage[yLocal, xLocal];
-                        var xTmp = old + b[y, x] / currentA;
+                        var xTmp = old + b[yLocal, xLocal] / currentA;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
 
                         var xDiff = old - xTmp;
@@ -81,26 +82,28 @@ namespace Distributed_Reference
                     candidate = new Candidate(0.0, 0, -1, -1);
                 }
                 var maxCandidate = comm.Allreduce(candidate, (aC, bC) => aC.XDiffMax > bC.XDiffMax ? aC : bC);
-                converged = Math.Abs(candidate.XDiffMax) < epsilon;
+                converged = Math.Abs(maxCandidate.XDiffMax) < epsilon;
                 if (!converged)
                 {
                     if (maxCandidate.YPixel == yPixel && maxCandidate.XPixel == xPixel)
                         xImage[yLocal2, xLocal2] = xNew;
 
-                    Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yLocal2 + "\t" + xLocal2);
+                    if(comm.Rank == 0)
+                        Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + maxCandidate.YPixel + "\t" + maxCandidate.XPixel);
 
-                    if (yPixel - yPsfHalf >= 0 & yPixel + yPsfHalf < totalSize.YLength & xPixel - xPsfHalf >= 0 & xPixel + xPsfHalf < totalSize.XLength)
+                    if (maxCandidate.YPixel - yPsfHalf >= 0 & maxCandidate.YPixel + yPsfHalf < totalSize.YLength & maxCandidate.XPixel - xPsfHalf >= 0 & maxCandidate.XPixel + xPsfHalf < totalSize.XLength)
                     {
-                        UpdateB(b, bUpdateCache, imgSection, yPixel, xPixel, xOld - xNew);
+                        UpdateB(b, bUpdateCache, imgSection, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff);
                     }
                     else
                     {
-                        SetPsf(maskedPsf, totalSize, psf, yPixel, xPixel);
+                        SetPsf(maskedPsf, totalSize, psf, maxCandidate.YPixel, maxCandidate.XPixel);
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
                         tmp2 = IDG.Multiply(tmp, PsfCorr);
                         bUpdateMasked = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
-                        UpdateB(b, bUpdateMasked, imgSection, yPixel, xPixel, xOld - xNew);
+                        UpdateB(b, bUpdateMasked, imgSection, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff);
                     }
+                    
                     iter++;
                 }
             }

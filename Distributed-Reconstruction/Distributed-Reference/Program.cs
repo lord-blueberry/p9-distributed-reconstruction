@@ -6,7 +6,8 @@ namespace Distributed_Reference
     {
         static void Main(string[] args)
         {
-            RunningMethods.RunSimulated(args);
+            //RunningMethods.RunSimulated(args);
+            RunningMethods.RunTinyMeerKAT(args);
         }
     }
 }

@@ -135,17 +135,17 @@ namespace Single_Reference
                 FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
 
                 watchDeconv.Start();
-                var lambdaStart = 0.5;
-                var lambdaEnd = 0.05;
-                var lambda = (lambdaStart - lambdaEnd) * (maxCycle -1 - cycle) + lambdaStart;
+                var lambdaStart = 2.5;
+                var lambdaEnd = 0.1;
+                var lambda = lambdaStart - (lambdaStart - lambdaEnd) / (maxCycle) * (cycle + 1);
 
-                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, dirtyImage.GetLength(0), dirtyImage.GetLength(1));
+                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                 var b = GreedyCD2.RemovePadding(bPadded, psfCut);
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.1, 0.8, 1000);
+                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, lambda, 0.4, 10000);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!! with lambda "+ lambda +"------------------------");
@@ -520,7 +520,7 @@ namespace Single_Reference
                 //DECONVOLVE
                 watchDeconv.Start();
 
-                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(dirtyImage, psfCut);
+                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);

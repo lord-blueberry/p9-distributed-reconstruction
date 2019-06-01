@@ -91,25 +91,34 @@ namespace Distributed_Reference
                 var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psfCut = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
+                Complex[,] PsfCorrelation = null;
+                if (comm.Rank == 0)
+                    PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
 
                 var halfComm = comm.Size / 2;
-                var yResOffset = comm.Rank % 2 * (gridSize / halfComm);
-                var xResOffset = comm.Rank / 2 * (gridSize / halfComm);
-                var rectangle = new DGreedyCD.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
+                var yResOffset = comm.Rank / 2 * (gridSize / halfComm);
+                var xResOffset = comm.Rank % 2 * (gridSize / halfComm);
+                var imgSection = new Communication.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
+                var totalImage = new Communication.Rectangle(0, 0, c.GridSize, c.GridSize);
 
                 var residualVis = visibilities;
                 var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
-                var maxCycle = 1;
+                var maxCycle = 5;
                 for (int cycle = 0; cycle < maxCycle; cycle++)
                 {
-                    var imageLocal = Forward(comm, c, metadata, residualVis, uvw, frequencies, watchForward);
+                    var b = ForwardCalculateB(comm, c, metadata, residualVis, uvw, frequencies, PsfCorrelation, psfCut, watchForward);
+                    var bLocal = GetImgSection(b, imgSection);
+                    var bCopy = new double[c.GridSize, c.GridSize];
+                    for (int i = 0; i < c.GridSize; i++)
+                        for (int j = 0; j < c.GridSize; j++)
+                            bCopy[i, j] = b[i, j];
                     if (comm.Rank == 0)
-                    {
                         watchDeconv.Start();
-                        FitsIO.Write(imageLocal, "dirty_" + cycle + ".fits");
-                    }
-                    var lambda = 0.1 * (maxCycle - cycle);
-                    var converged = DGreedyCD.Deconvolve2(comm, xLocal, imageLocal, psfCut, lambda, 0.8, rectangle, 1000);
+
+                    var lambdaStart = 2.5;
+                    var lambdaEnd = 0.1;
+                    var lambda = lambdaStart - (lambdaStart - lambdaEnd) / (maxCycle) * (cycle + 1);
+                    var converged = DGreedyCD2.Deconvolve(comm, imgSection, totalImage, xLocal, bLocal, psfCut, lambda, 0.4, 10000);
                     if (comm.Rank == 0)
                     {
                         if (converged)
@@ -155,7 +164,6 @@ namespace Distributed_Reference
             }
         }
 
-
         public static void RunSimulated(string[] args)
         {
             using (var env = new MPI.Environment(ref args, MPI.Threading.Serialized))
@@ -163,7 +171,7 @@ namespace Distributed_Reference
                 var proc = Process.GetCurrentProcess();
                 var name = proc.ProcessName;
                 Console.WriteLine(" name: " + name);
-                //System.Threading.Thread.Sleep(17000);
+                System.Threading.Thread.Sleep(17000);
 
                 var comm = Communicator.world;
                 int sum = comm.Rank;
@@ -246,23 +254,31 @@ namespace Distributed_Reference
                     PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
 
                 var halfComm = comm.Size / 2;
-                var yResOffset = comm.Rank % 2 * (gridSize / halfComm);
-                var xResOffset = comm.Rank / 2 * (gridSize / halfComm);
+                var yResOffset = comm.Rank / 2 * (gridSize / halfComm);
+                var xResOffset = comm.Rank % 2 * (gridSize / halfComm);
                 var imgSection = new Communication.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
                 var totalImage = new Communication.Rectangle(0, 0, c.GridSize, c.GridSize);
 
                 var residualVis = visibilities;
                 var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
-                var maxCycle = 4;
+                var maxCycle = 1;
                 for (int cycle = 0; cycle < maxCycle; cycle++)
                 {
                     var b = ForwardCalculateB(comm, c, metadata, residualVis, uvw, frequencies, PsfCorrelation, psfCut, watchForward);
                     var bLocal = GetImgSection(b, imgSection);
+                    var bCopy = new double[c.GridSize, c.GridSize];
+                    for (int i = 0; i < c.GridSize; i++)
+                        for (int j = 0; j < c.GridSize; j++)
+                            bCopy[i, j] = b[i, j];
                     if (comm.Rank == 0)
                         watchDeconv.Start();
-                        
-                    var lambda = 0.1 * (maxCycle - cycle);
-                    var converged = DGreedyCD2.Deconvolve(comm, imgSection, totalImage, xLocal, bLocal, psfCut, lambda, 0.8, 1000);
+
+                    var lambdaStart = 2.5;
+                    var lambdaEnd = 0.1;
+                    var lambda = lambdaStart - (lambdaStart - lambdaEnd) / (maxCycle) * (cycle + 1);
+                    var converged = DGreedyCD2.Deconvolve(comm, imgSection, totalImage, xLocal, bLocal, psfCut, 0.1, 0.8, 1000);
+                    
+                    //xLocal[0, 0] = 10.0 * (comm.Rank+1);
                     if (comm.Rank == 0)
                     {
                         if (converged)
@@ -326,7 +342,7 @@ namespace Distributed_Reference
             if (comm.Rank == 0)
             {
                 var dirtyImage = FFT.GridIFFT(grid_total, c.VisibilitiesCount);
-                FFT.Shift(image);
+                FFT.Shift(dirtyImage);
                 watchIdg.Stop();
 
                 //remove spheroidal

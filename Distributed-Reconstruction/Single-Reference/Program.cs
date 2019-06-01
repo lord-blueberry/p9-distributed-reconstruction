@@ -6,9 +6,11 @@ namespace Single_Reference
     {
         static void Main()
         {
+            
+
             //Deconvolution.NaiveGreedyCD.Run();
-            DebugMethods.DebugSimulatedGreedy2();
-            //DebugMethods.MeerKATFull();
+            //DebugMethods.DebugSimulatedGreedy2();
+            DebugMethods.MeerKATFull();
         }
     }
 }
