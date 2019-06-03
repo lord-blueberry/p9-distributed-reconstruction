@@ -89,7 +89,7 @@ namespace Distributed_Reference
                         xImage[yLocal2, xLocal2] = xNew;
 
                     if(comm.Rank == 0)
-                        Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + maxCandidate.YPixel + "\t" + maxCandidate.XPixel);
+                        Console.WriteLine(iter + "\t" + Math.Abs(maxCandidate.XDiff) + "\t" + maxCandidate.YPixel + "\t" + maxCandidate.XPixel);
 
                     if (maxCandidate.YPixel - yPsfHalf >= 0 & maxCandidate.YPixel + yPsfHalf < totalSize.YLength & maxCandidate.XPixel - xPsfHalf >= 0 & maxCandidate.XPixel + xPsfHalf < totalSize.XLength)
                     {
@@ -97,11 +97,13 @@ namespace Distributed_Reference
                     }
                     else
                     {
+                        /*
                         SetPsf(maskedPsf, totalSize, psf, maxCandidate.YPixel, maxCandidate.XPixel);
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
                         tmp2 = IDG.Multiply(tmp, PsfCorr);
                         bUpdateMasked = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
-                        UpdateB(b, bUpdateMasked, imgSection, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff);
+                        UpdateB(b, bUpdateMasked, imgSection, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff);*/
+                        UpdateB(b, bUpdateCache, imgSection, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff);
                     }
                     
                     iter++;

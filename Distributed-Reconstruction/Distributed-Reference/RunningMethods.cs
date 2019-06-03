@@ -71,8 +71,8 @@ namespace Distributed_Reference
 
                 int gridSize = 1024;
                 //int gridSize = 128;
-                int subgridsize = 16;
-                int kernelSize = 8;
+                int subgridsize = 32;
+                int kernelSize = 16;
                 int max_nr_timesteps = 512;
                 double cellSize = 2.5 / 3600.0 * PI / 180.0;
                 //double cellSize = 2.0 / 3600.0 * PI / 180.0;
@@ -333,24 +333,33 @@ namespace Distributed_Reference
 
         public static double[,] ForwardCalculateB(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, Complex[,] PsfCorrelation, double[,] psfCut, Stopwatch watchIdg)
         {
+            Stopwatch another = new Stopwatch();
+            comm.Barrier();
             if (comm.Rank == 0)
+            {
                 watchIdg.Start();
-
+            }
+                
+            
             var localGrid = IDG.Grid(c, metadata, visibilities, uvw, frequencies);
             double[,] image = null;
+            if(comm.Rank == 0)
+                another.Start();
             var grid_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
+                another.Stop();
                 var dirtyImage = FFT.GridIFFT(grid_total, c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
-                watchIdg.Stop();
-
+                
                 //remove spheroidal
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                 image = GreedyCD2.RemovePadding(bPadded, psfCut);
+                watchIdg.Stop();
+                Console.WriteLine("communication time: " + another.Elapsed);
             }
 
             comm.Broadcast<double[,]>(ref image, 0);

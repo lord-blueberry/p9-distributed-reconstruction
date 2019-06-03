@@ -106,8 +106,8 @@ namespace Single_Reference
             var visibilitiesCount = visCount2;
 
             int gridSize = 1024;
-            int subgridsize = 16;
-            int kernelSize = 4;
+            int subgridsize = 32;
+            int kernelSize = 16;
             //cell = image / grid
             int max_nr_timesteps = 512;
             double scaleArcSec = 2.5 / 3600.0 * PI / 180.0;
@@ -158,9 +158,6 @@ namespace Single_Reference
                 var modelVis = IDG.ToVisibilities(c, metadata, xImage, uvw, frequencies);
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
-
-                var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
-                FitsIO.Write(imgRec, "model" + cycle + ".fits");
             }
             watchBackwards.Stop();
             watchTotal.Stop();

@@ -82,11 +82,13 @@ namespace Single_Reference.Deconvolution
                     }
                     else
                     {
+                        /*
                         SetPsf(maskedPsf, xImage, psf, yPixel, xPixel);
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
                         tmp2 = IDG.Multiply(tmp, PsfCorr);
                         bUpdateMasked = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
-                        UpdateB(b, bUpdateMasked, imageSection, yPixel, xPixel, xOld - xNew);
+                        UpdateB(b, bUpdateMasked, imageSection, yPixel, xPixel, xOld - xNew);*/
+                        UpdateB(b, bUpdateCache, imageSection, yPixel, xPixel, xOld - xNew);
                     }
                     iter++;
                 }

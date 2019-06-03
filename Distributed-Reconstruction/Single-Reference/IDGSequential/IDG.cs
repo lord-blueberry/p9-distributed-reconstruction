@@ -56,9 +56,9 @@ namespace Single_Reference.IDGSequential
             FFT.Shift(img);
 
             //remove spheroidal from grid
-            for (int y = 0; y < img.GetLength(0); y++)
+            /*for (int y = 0; y < img.GetLength(0); y++)
                 for (int x = 0; x < img.GetLength(1); x++)
-                    img[y, x] = img[y, x] / c.GridSpheroidal[y, x];
+                    img[y, x] = img[y, x] / c.GridSpheroidal[y, x];*/
 
             return img;
         }
@@ -87,9 +87,9 @@ namespace Single_Reference.IDGSequential
             FFT.Shift(psf);
 
             //remove spheroidal from grid
-            for (int y = 0; y < psf.GetLength(0); y++)
+            /*for (int y = 0; y < psf.GetLength(0); y++)
                 for (int x = 0; x < psf.GetLength(1); x++)
-                    psf[y, x] = psf[y, x] / c.GridSpheroidal[y, x];
+                    psf[y, x] = psf[y, x] / c.GridSpheroidal[y, x];*/
 
             return psf;
         }
