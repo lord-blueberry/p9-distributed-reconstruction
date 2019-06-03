@@ -13,7 +13,28 @@ using System.IO;
 namespace Distributed_Reference
 {
     class RunningMethods
-    {
+    { 
+
+        public static void RunTest(string[] args)
+        {
+            using (var env = new MPI.Environment(ref args, MPI.Threading.Serialized))
+            {
+                var proc = Process.GetCurrentProcess();
+                var name = proc.ProcessName;
+                Console.WriteLine(" name: " + name);
+                System.Threading.Thread.Sleep(17000);
+
+                var comm = Communicator.world;
+                int sum = comm.Rank;
+                var total = comm.Reduce(sum, (a, b) => a + b, 0);
+                if (comm.Rank == 0)
+                {
+                    Console.WriteLine("testing mpi");
+                    Console.WriteLine(total);
+                }
+            }
+        }
+
         public static void RunTinyMeerKAT(string[] args)
         {
             using (var env = new MPI.Environment(ref args, MPI.Threading.Serialized))
