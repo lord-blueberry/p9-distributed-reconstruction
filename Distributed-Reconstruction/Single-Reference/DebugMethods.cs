@@ -54,24 +54,24 @@ namespace Single_Reference
             var I = new Complex(0, 1);
             var subgr = 16;
             var wavenr = MathFunctions.FrequencyToWavenumber(frequency);
-            wavenr[0] = wavenr[0] ;
+            wavenr[0] = wavenr[0];
             var image = new Complex[subgr, subgr];
-            for(int i = 0; i < visibilities.GetLength(1); i++)
+            for (int i = 0; i < visibilities.GetLength(1); i++)
                 for (int y = 0; y < subgr; y++)
                     for (int x = 0; x < subgr; x++)
                     {
                         var l = ComputeL(x, subgr, imageSize);
                         var m = ComputeL(y, subgr, imageSize);
                         double phaseindex = uvw[0, i, 0] * l + uvw[0, i, 1] * m;
-                        double phase = -(phaseindex * wavenr[0]*2*PI);
+                        double phase = -(phaseindex * wavenr[0] * 2 * PI);
                         var cpl = new Complex(Cos(phase), Sin(phase));
-                        var tmp =  Complex.Exp(-2*PI*I * wavenr[0] * (uvw[0,i,0] *l + uvw[0, i, 1] * m));
+                        var tmp = Complex.Exp(-2 * PI * I * wavenr[0] * (uvw[0, i, 0] * l + uvw[0, i, 1] * m));
                         tmp = visibilities[0, i, 0] * tmp;
                         image[y, x] += tmp;
                     }
 
             var visi2 = new Complex[visibilities.GetLength(1)];
-            var norm = 1.0 /(subgr * subgr);
+            var norm = 1.0 / (subgr * subgr);
             for (int i = 0; i < visibilities.GetLength(1); i++)
                 for (int y = 0; y < subgr; y++)
                     for (int x = 0; x < subgr; x++)
@@ -92,19 +92,19 @@ namespace Single_Reference
         #region full
         public static void MeerKATFull()
         {
-            /*
+
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
             var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
-            */
+            /*
             var frequencies = FitsIO.ReadFrequencies(@"freq.fits");
             var uvw = FitsIO.ReadUVW("uvw0.fits");
             var flags = FitsIO.ReadFlags("flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities("vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
-
+            */
             var visCount2 = 0;
             for (int i = 0; i < flags.GetLength(0); i++)
                 for (int j = 0; j < flags.GetLength(1); j++)
@@ -114,8 +114,8 @@ namespace Single_Reference
             var visibilitiesCount = visCount2;
 
             int gridSize = 1024;
-            int subgridsize = 32;
-            int kernelSize = 16;
+            int subgridsize = 12;
+            int kernelSize = 4;
             //cell = image / grid
             int max_nr_timesteps = 512;
             double scaleArcSec = 2.5 / 3600.0 * PI / 180.0;
@@ -130,35 +130,40 @@ namespace Single_Reference
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
             var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies);
             FitsIO.Write(psf, "psf.fits");
-            var psfCut = CutImg(psf);
+            var psfCut = CutImg(psf, 2);
+            FitsIO.Write(psfCut, "psfCut.fits");
+            var maxSidelobe = GetMaxSidelobeLevel(psf);
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
             var maxCycle = 5;
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
+                
                 watchForward.Start();
                 var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
                 watchForward.Stop();
                 FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
 
                 watchDeconv.Start();
-                var lambdaStart = 2.5;
-                var lambdaEnd = 0.1;
-                var lambda = lambdaStart - (lambdaStart - lambdaEnd) / (maxCycle) * (cycle + 1);
-
+                var sideLobe = maxSidelobe * GetMax(dirtyImage);
+                Console.WriteLine("sideLobeLevel: " + sideLobe);
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                 var b = GreedyCD2.RemovePadding(bPadded, psfCut);
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, lambda, 0.4, 10000);
-
+                var lambda = 0.4;
+                var alpha = 0.2;
+                var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
+                var converged = GreedyCD2.DeconvolvePath(xImage, b, psfCut, currentLambda, 5.0, alpha, 5, 1000);
+                //var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, currentLambda, alpha, 5000);
                 if (converged)
-                    Console.WriteLine("-----------------------------CONVERGED!!!! with lambda "+ lambda +"------------------------");
+                    Console.WriteLine("-----------------------------CONVERGED!!!! with lambda " + currentLambda + "------------------------");
                 else
-                    Console.WriteLine("-------------------------------not converged with lambda " + lambda + "----------------------");
+                    Console.WriteLine("-------------------------------not converged with lambda " + currentLambda + "----------------------");
+                
                 watchDeconv.Stop();
                 FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
 
@@ -263,8 +268,8 @@ namespace Single_Reference
                         maxB = Math.Max(maxB, b[i, j]);
                         maxAbsB = Math.Max(maxAbsB, Math.Abs(b[i, j]));
                     }
-                        
-                Console.WriteLine("max b: " +maxB);
+
+                Console.WriteLine("max b: " + maxB);
                 Console.WriteLine("maxAbs b: " + maxAbsB);
                 Console.WriteLine("");
                 Console.WriteLine("");
@@ -564,9 +569,9 @@ namespace Single_Reference
         #endregion
 
         #region helpers
-        private static double[,] CutImg(double[,] image)
+        private static double[,] CutImg(double[,] image, int factor = 2)
         {
-            var output = new double[image.GetLength(0) / 2, image.GetLength(1) / 2];
+            var output = new double[image.GetLength(0) / factor, image.GetLength(1) / factor];
             var yOffset = image.GetLength(0) / 2 - output.GetLength(0) / 2;
             var xOffset = image.GetLength(1) / 2 - output.GetLength(1) / 2;
 
@@ -574,6 +579,28 @@ namespace Single_Reference
                 for (int x = 0; x < output.GetLength(0); x++)
                     output[y, x] = image[yOffset + y, xOffset + x];
             return output;
+        }
+
+        public static double GetMaxSidelobeLevel(double[,] psf, int factor = 2)
+        {
+            var yOffset = psf.GetLength(0) / 2 - (psf.GetLength(0) / factor) / 2;
+            var xOffset = psf.GetLength(1) / 2 - (psf.GetLength(1) / factor) / 2;
+
+            double output = 0.0;
+            for (int y = 0; y < psf.GetLength(0); y++)
+                for (int x = 0; x < psf.GetLength(1); x++)
+                    if (!(y >= yOffset & y < (yOffset + psf.GetLength(0) / factor)) | !(x >= xOffset & x < (xOffset + psf.GetLength(1) / factor)))
+                        output = Math.Max(output, psf[y, x]);
+            return output;
+        }
+
+        public static double GetMax(double[,] image)
+        {
+            double max = 0.0;
+            for (int y = 0; y < image.GetLength(0); y++)
+                for (int x = 0; x < image.GetLength(1); x++)
+                    max = Math.Max(max, image[y, x]);
+            return max;
         }
 
         public static double[,] Convolve(double[,] image, double[,] kernel)
@@ -698,33 +725,6 @@ namespace Single_Reference
         }
         #endregion
 
-
-        public static void TestConvergence1()
-        {
-            var imSize = 32;
-            var psfSize = 4;
-            var psf = new double[psfSize, psfSize];
-
-            var psfSum = 8.0;
-            psf[1, 1] = 1 / psfSum;
-            psf[1, 2] = 2 / psfSum;
-            psf[1, 3] = 3 / psfSum;
-            psf[2, 1] = 3 / psfSum;
-            psf[2, 2] = 8 / psfSum;
-            psf[2, 3] = 2 / psfSum;
-            psf[3, 1] = 5 / psfSum;
-            psf[3, 2] = 3 / psfSum;
-            psf[3, 3] = 2 / psfSum;
-
-            var groundTruth = new double[imSize, imSize];
-            groundTruth[17, 17] = 15.0;
-            groundTruth[16, 17] = 3.0;
-            groundTruth[15, 17] = 2.0;
-            groundTruth[16, 16] = 5.0;
-            var convolved = Convolve(groundTruth, psf);
-            var reconstruction = new double[imSize, imSize];
-            CDClean.Deconvolve(reconstruction, convolved, psf, 0.1);
-        }
 
         private static double ComputeL(int x, int subgridSize, float imageSize)
         {
