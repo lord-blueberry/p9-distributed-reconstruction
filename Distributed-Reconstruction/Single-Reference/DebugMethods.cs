@@ -92,12 +92,22 @@ namespace Single_Reference
         #region full
         public static void MeerKATFull()
         {
-
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
             var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
             var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            for(int i = 1; i < 8; i++)
+            {
+                var uvw0 = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw" + i + ".fits");
+                var flags0 = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags" + i + ".fits", uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
+                var visibilities0 = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis" + i + ".fits", uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length, norm);
+                uvw = Stitch(uvw, uvw0);
+                flags = Stitch(flags, flags0);
+                visibilities = Stitch(visibilities, visibilities0);
+            }
+
             /*
             var frequencies = FitsIO.ReadFrequencies(@"freq.fits");
             var uvw = FitsIO.ReadUVW("uvw0.fits");
@@ -114,7 +124,7 @@ namespace Single_Reference
             var visibilitiesCount = visCount2;
 
             int gridSize = 1024;
-            int subgridsize = 12;
+            int subgridsize = 16;
             int kernelSize = 4;
             //cell = image / grid
             int max_nr_timesteps = 512;
@@ -139,7 +149,6 @@ namespace Single_Reference
             var maxCycle = 5;
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
-                
                 watchForward.Start();
                 var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
                 watchForward.Stop();
@@ -154,10 +163,10 @@ namespace Single_Reference
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                 var b = GreedyCD2.RemovePadding(bPadded, psfCut);
-                var lambda = 0.4;
-                var alpha = 0.2;
+                var lambda = 0.8;
+                var alpha = 0.05;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
-                var converged = GreedyCD2.DeconvolvePath(xImage, b, psfCut, currentLambda, 5.0, alpha, 5, 1000);
+                var converged = GreedyCD2.DeconvolvePath(xImage, b, psfCut, currentLambda, 2.0, alpha, 5, 1000, 2e-5);
                 //var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, currentLambda, alpha, 5000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!! with lambda " + currentLambda + "------------------------");
@@ -328,7 +337,6 @@ namespace Single_Reference
             FitsIO.Write(b, "b_" + 0 + ".fits");
         }
 
-
         public static void DebugSimulatedCyclic()
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
@@ -491,7 +499,7 @@ namespace Single_Reference
             int gridSize = 128;
             int subgridsize = 8;
             int kernelSize = 4;
-            int max_nr_timesteps = 64;
+            int max_nr_timesteps = 512;
             double cellSize = 2.0 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
@@ -506,6 +514,7 @@ namespace Single_Reference
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
             var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
+            
             var psfCut = CutImg(psf);
             FitsIO.Write(psf, "psf.fits");
             FitsIO.Write(psfCut, "psfCut.fits");
@@ -513,11 +522,13 @@ namespace Single_Reference
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            //var truth = new double[gridSize, gridSize];
-            //truth[30, 30] = 1.0;
-            //var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
-            //var residualVis = truthVis;
-            for (int cycle = 0; cycle < 4; cycle++)
+            /*var truth = new double[gridSize, gridSize];
+            truth[30, 30] = 1.0;
+            truth[35, 36] = 1.5;
+            var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
+            visibilities = truthVis;
+            var residualVis = truthVis;*/
+            for (int cycle = 0; cycle < 8; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -536,7 +547,7 @@ namespace Single_Reference
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                 var b = GreedyCD2.RemovePadding(bPadded, psfCut);
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.1, 0.8, 10);
+                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.05, 1.0, 2000);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -567,6 +578,54 @@ namespace Single_Reference
         }
 
         #endregion
+
+        public static double[,,] Stitch(double[,,] x, double[,,] y)
+        {
+            var output = new double[x.GetLength(0) + y.GetLength(0), x.GetLength(1), x.GetLength(2)];
+            for (int i = 0; i < x.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i, j, k] = x[i, j, k];
+
+            for (int i = 0; i < y.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i + x.GetLength(0), j, k] = y[i, j, k];
+
+            return output;
+        }
+
+        public static bool[,,] Stitch(bool[,,] x, bool[,,] y)
+        {
+            var output = new bool[x.GetLength(0) + y.GetLength(0), x.GetLength(1), x.GetLength(2)];
+            for (int i = 0; i < x.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i, j, k] = x[i, j, k];
+
+            for (int i = 0; i < y.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i + x.GetLength(0), j, k] = y[i, j, k];
+
+            return output;
+        }
+
+        public static Complex[,,] Stitch(Complex[,,] x, Complex[,,] y)
+        {
+            var output = new Complex[x.GetLength(0) + y.GetLength(0), x.GetLength(1), x.GetLength(2)];
+            for (int i = 0; i < x.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i, j, k] = x[i, j, k];
+
+            for (int i = 0; i < y.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i + x.GetLength(0), j, k] = y[i, j, k];
+
+            return output;
+        }
 
         #region helpers
         private static double[,] CutImg(double[,] image, int factor = 2)

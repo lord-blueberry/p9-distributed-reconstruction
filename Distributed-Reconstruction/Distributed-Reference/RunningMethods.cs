@@ -98,12 +98,10 @@ namespace Distributed_Reference
                 flags = flagstmp;
 
                 int gridSize = 1024;
-                //int gridSize = 128;
-                int subgridsize = 32;
-                int kernelSize = 16;
+                int subgridsize = 16;
+                int kernelSize = 4;
                 int max_nr_timesteps = 512;
                 double cellSize = 2.5 / 3600.0 * PI / 180.0;
-                //double cellSize = 2.0 / 3600.0 * PI / 180.0;
 
                 comm.Barrier();
                 var watchTotal = new Stopwatch();
