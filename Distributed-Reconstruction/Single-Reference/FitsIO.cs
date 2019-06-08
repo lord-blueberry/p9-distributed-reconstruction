@@ -230,5 +230,55 @@ namespace Single_Reference
             return output;
         }
         #endregion
+
+        #region stitching
+        public static double[,,] Stitch(double[,,] x, double[,,] y)
+        {
+            var output = new double[x.GetLength(0) + y.GetLength(0), x.GetLength(1), x.GetLength(2)];
+            for (int i = 0; i < x.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i, j, k] = x[i, j, k];
+
+            for (int i = 0; i < y.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i + x.GetLength(0), j, k] = y[i, j, k];
+
+            return output;
+        }
+
+        public static bool[,,] Stitch(bool[,,] x, bool[,,] y)
+        {
+            var output = new bool[x.GetLength(0) + y.GetLength(0), x.GetLength(1), x.GetLength(2)];
+            for (int i = 0; i < x.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i, j, k] = x[i, j, k];
+
+            for (int i = 0; i < y.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i + x.GetLength(0), j, k] = y[i, j, k];
+
+            return output;
+        }
+
+        public static Complex[,,] Stitch(Complex[,,] x, Complex[,,] y)
+        {
+            var output = new Complex[x.GetLength(0) + y.GetLength(0), x.GetLength(1), x.GetLength(2)];
+            for (int i = 0; i < x.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i, j, k] = x[i, j, k];
+
+            for (int i = 0; i < y.GetLength(0); i++)
+                for (int j = 0; j < x.GetLength(1); j++)
+                    for (int k = 0; k < x.GetLength(2); k++)
+                        output[i + x.GetLength(0), j, k] = y[i, j, k];
+
+            return output;
+        }
+        #endregion
     }
 }
