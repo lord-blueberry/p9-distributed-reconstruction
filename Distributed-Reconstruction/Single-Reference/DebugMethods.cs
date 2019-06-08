@@ -13,6 +13,78 @@ namespace Single_Reference
 {
     class DebugMethods
     {
+        public static void CreateL1L2()
+        {
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+            double norm = 2.0;
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            var visibilitiesCount = visibilities.Length;
+            int gridSize = 64;
+            int subgridsize = 8;
+            int kernelSize = 4;
+            int max_nr_timesteps = 512;
+            double cellSize = 4.0 / 3600.0 * PI / 180.0;
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+            var max = 0.0;
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                    max = Math.Max(max, psf[i, j]);
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                    psf[i, j] = psf[i, j] / max;
+
+            var psfCut = CutImg(psf);
+            
+            FitsIO.Write(psf, "psf.fits");
+            FitsIO.Write(psfCut, "psfCut.fits");
+
+            var xImage = new double[gridSize, gridSize];
+            //var residualVis = visibilities;
+            var truth = new double[gridSize, gridSize];
+            truth[32, 32] = 2.0;
+            var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
+            visibilities = truthVis;
+            var residualVis = truthVis;
+            for (int cycle = 0; cycle < 8; cycle++)
+            {
+                //FORWARD
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
+                var dirtyImage = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
+
+                //DECONVOLVE
+                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
+                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
+                var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
+                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                var b = GreedyCD2.RemovePadding(bPadded, psfCut);
+                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.1, 1.0, 2000,0.001);
+
+                if (converged)
+                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
+                else
+                    Console.WriteLine("-------------------------------not converged----------------------");
+                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
+                FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
+
+                FFT.Shift(xImage);
+                var xGrid = FFT.GridFFT(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+            }
+        }
+    
 
         #region full
         public static void MeerKATFull()
@@ -154,8 +226,6 @@ namespace Single_Reference
             FFT.Shift(b);
             FitsIO.Write(b, "b_" + 0 + ".fits");
         }
-
-
 
         public static void DebugSimulatedGreedy2()
         {
