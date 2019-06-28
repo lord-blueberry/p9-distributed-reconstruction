@@ -11,11 +11,58 @@ namespace Distributed_Reference
 {
     class DGreedyCD2
     {
-        public static bool Deconvolve(Intracommunicator comm, Communication.Rectangle imgSection, Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha, int maxIteration = 1000)
+        public static bool DeconvolvePath(Intracommunicator comm, Rectangle imgSection, Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10, int maxIteration = 100, double epsilon = 1e-4)
+        {
+            var integral = GreedyCD.CalcPSf2Integral(psf);
+            var aMap = new double[b.GetLength(0), b.GetLength(1)];
+            for (int y = imgSection.Y; y < imgSection.YLength; y++)
+                for (int x = imgSection.X; x < imgSection.XLength; x++)
+                {
+                    var yLocal = y - imgSection.Y;
+                    var xLocal = x - imgSection.X;
+                    aMap[yLocal, xLocal] = GreedyCD.QueryIntegral2(integral, y, x, totalSize.YLength, totalSize.XLength);
+                }
+                    
+
+            var converged = false;
+            for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
+            {
+                var xMaxAbsDiff = 0.0;
+                var xMaxDiff = 0.0;
+                for (int y = 0; y < b.GetLength(0); y++)
+                    for (int x = 0; x < b.GetLength(1); x++)
+                    {
+                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, b.GetLength(0), b.GetLength(1));
+                        var xDiff = b[y, x] / currentA;
+
+                        if (Math.Abs(xDiff) > xMaxAbsDiff)
+                        {
+                            xMaxAbsDiff = Math.Abs(xDiff);
+                            xMaxDiff = xDiff;
+                        }
+                    }
+
+                var lambdaMax = 1 / alpha * xMaxDiff;
+                if (lambdaMax / lambdaMin > lambdaFactor)
+                {
+                    Console.WriteLine("-----------------------------GreedyCD2 with lambda " + lambdaMax / lambdaFactor + "------------------------");
+                    converged = Deconvolve(comm, imgSection, totalSize, xImage, aMap, b, psf, lambdaMax / lambdaFactor, alpha, maxIteration, epsilon);
+                }
+                else
+                {
+                    Console.WriteLine("-----------------------------GreedyCD2 with lambda " + lambdaMin + "------------------------");
+                    converged = Deconvolve(comm, imgSection, totalSize, xImage, aMap, b, psf, lambdaMin, alpha, maxIteration, epsilon);
+                    if (converged)
+                        break;
+                }
+            }
+            return converged;
+        }
+
+        public static bool Deconvolve(Intracommunicator comm, Rectangle imgSection, Rectangle totalSize, double[,] xImage, double[,] aMap, double[,] b, double[,] psf, double lambda, double alpha, int maxIteration = 1000, double epsilon = 1e-4)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
-            var integral = GreedyCD.CalcPSf2Integral(psf);
 
             //invert the PSF, since we actually do want to correlate the psf with the residuals. (The FFT already inverts the psf, so we need to invert it again to not invert it. Trust me.)
             var psfTmp = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
@@ -35,11 +82,9 @@ namespace Distributed_Reference
 
             //masked psf update. When the psf is masked by the image borders
             var maskedPsf = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
-            double[,] bUpdateMasked;
 
             int iter = 0;
             bool converged = false;
-            double epsilon = 1e-4;
             while (!converged & iter < maxIteration)
             {
                 var yPixel = -1;
@@ -51,13 +96,12 @@ namespace Distributed_Reference
                     {
                         var yLocal = y - imgSection.Y;
                         var xLocal = x - imgSection.X;
-                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, totalSize.YLength, totalSize.XLength);
+                        var currentA = aMap[yLocal, xLocal];
                         var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[yLocal, xLocal] / currentA;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
 
                         var xDiff = old - xTmp;
-
                         if (Math.Abs(xDiff) > xMax)
                         {
                             yPixel = y;
@@ -81,6 +125,7 @@ namespace Distributed_Reference
                 {
                     candidate = new Candidate(0.0, 0, -1, -1);
                 }
+
                 var maxCandidate = comm.Allreduce(candidate, (aC, bC) => aC.XDiffMax > bC.XDiffMax ? aC : bC);
                 converged = Math.Abs(maxCandidate.XDiffMax) < epsilon;
                 if (!converged)

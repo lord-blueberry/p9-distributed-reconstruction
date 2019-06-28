@@ -32,13 +32,11 @@ namespace Single_Reference.Deconvolution
                 var lambdaMax = 1 / alpha * xMaxDiff;
                 if (lambdaMax / lambdaMin > lambdaFactor)
                 {
-                    FitsIO.Write(b, "bDebug.fits");
                     Console.WriteLine("-----------------------------GreedyCD2 with lambda " + lambdaMax / lambdaFactor + "------------------------");
                     converged = Deconvolve(xImage, b, psf, lambdaMax / lambdaFactor, alpha, maxIteration, epsilon);
                 }
                 else
                 {
-                    FitsIO.Write(b, "bDebug.fits");
                     Console.WriteLine("-----------------------------GreedyCD2 with lambda " + lambdaMin + "------------------------");
                     converged = Deconvolve(xImage, b, psf, lambdaMin, alpha, maxIteration, epsilon);
                     if(converged)
@@ -126,12 +124,12 @@ namespace Single_Reference.Deconvolution
                     else
                     {
                         
-                        SetPsf(maskedPsf, xImage, psf, yPixel, xPixel);
+                        /*SetPsf(maskedPsf, xImage, psf, yPixel, xPixel);
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
                         tmp2 = IDG.Multiply(tmp, PsfCorr);
                         bUpdateMasked = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
-                        UpdateB(b, bUpdateMasked, imageSection, yPixel, xPixel, xOld - xNew);
-                        //UpdateB(b, bUpdateCache, imageSection, yPixel, xPixel, xOld - xNew);
+                        UpdateB(b, bUpdateMasked, imageSection, yPixel, xPixel, xOld - xNew);*/
+                        UpdateB(b, bUpdateCache, imageSection, yPixel, xPixel, xOld - xNew);
                     }
                     iter++;
                 }

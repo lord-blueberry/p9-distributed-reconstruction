@@ -22,11 +22,11 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 64;
+            int gridSize = 1024;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 512;
-            double cellSize = 4.0 / 3600.0 * PI / 180.0;
+            double cellSize = 0.25 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
@@ -49,11 +49,11 @@ namespace Single_Reference
             var xImage = new double[gridSize, gridSize];
             //var residualVis = visibilities;
             var truth = new double[gridSize, gridSize];
-            truth[32, 32] = 2.0;
+            truth[512, 512] = 2.0;
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;
-            for (int cycle = 0; cycle < 8; cycle++)
+            for (int cycle = 0; cycle < 5; cycle++)
             {
                 //FORWARD
                 var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
@@ -68,7 +68,7 @@ namespace Single_Reference
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                 var b = GreedyCD2.RemovePadding(bPadded, psfCut);
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.1, 1.0, 2000,0.001);
+                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 1.0, 0.1, 2000,0.00001);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -85,7 +85,6 @@ namespace Single_Reference
             }
         }
     
-
         #region full
         public static void MeerKATFull()
         {
@@ -188,43 +187,81 @@ namespace Single_Reference
             File.WriteAllText("watches_single.txt", timetable);
         }
 
-        public static void PrintFits()
+        public static void DebugSimulatedMixed()
         {
-            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
-            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_mixed\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_mixed\uvw.fits");
             var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
             double norm = 2.0;
-            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
-
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_mixed\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 64;
+
+            int gridSize = 1024;
             int subgridsize = 16;
-            int kernelSize = 8;
-            int max_nr_timesteps = 64;
-            double cellSize = 2.0 / 3600.0 * PI / 180.0;
-            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+            int kernelSize = 4;
+            //cell = image / grid
+            int max_nr_timesteps = 512;
+            double scaleArcSec = 0.5 / 3600.0 * PI / 180.0;
 
+            var watchTotal = new Stopwatch();
+            var watchForward = new Stopwatch();
+            var watchBackwards = new Stopwatch();
+            var watchDeconv = new Stopwatch();
+            watchTotal.Start();
+
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psfGrid2 = IDG.Multiply(psfGrid, psfGrid);
-            var psf2 = FFT.GridIFFT(psfGrid2, c.VisibilitiesCount);
-            FFT.Shift(psf2);
-            //psf = CutImg(psf);
-            FitsIO.Write(psf2, "psf2.fits");
-
-            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
-            FFT.Shift(psf);
+            var psf = IDG.CalculatePSF(c, metadata, uvw, flags, frequencies);
             FitsIO.Write(psf, "psf.fits");
+            var psfCut = CutImg(psf, 2);
+            FitsIO.Write(psfCut, "psfCut.fits");
+            var maxSidelobe = GetMaxSidelobeLevel(psf);
 
-            var dirtyGrid = IDG.Grid(c, metadata, visibilities, uvw, frequencies);
-            var dirtyImage = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
-            FFT.Shift(dirtyImage);
-            FitsIO.Write(dirtyImage, "dirty_" + 0 + ".fits");
+            var xImage = new double[gridSize, gridSize];
+            var residualVis = visibilities;
+            var maxCycle = 10;
+            for (int cycle = 0; cycle < maxCycle; cycle++)
+            {
+                watchForward.Start();
+                var dirtyImage = IDG.ToImage(c, metadata, residualVis, uvw, frequencies);
+                watchForward.Stop();
+                FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
 
-            var bGrid = IDG.Multiply(dirtyGrid, psfGrid);
-            var b = FFT.GridIFFT(bGrid, c.VisibilitiesCount);
-            FFT.Shift(b);
-            FitsIO.Write(b, "b_" + 0 + ".fits");
+                watchDeconv.Start();
+                var sideLobe = maxSidelobe * GetMax(dirtyImage);
+                Console.WriteLine("sideLobeLevel: " + sideLobe);
+                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
+                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
+                var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
+                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                var b = GreedyCD2.RemovePadding(bPadded, psfCut);
+                var lambda = 100.0;
+                var alpha = 0.95;
+                var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
+                var converged = GreedyCD2.DeconvolvePath(xImage, b, psfCut, currentLambda, 5.0, alpha, 5, 6000, 1e-3);
+                //var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, currentLambda, alpha, 5000);
+                if (converged)
+                    Console.WriteLine("-----------------------------CONVERGED!!!! with lambda " + currentLambda + "------------------------");
+                else
+                    Console.WriteLine("-------------------------------not converged with lambda " + currentLambda + "----------------------");
+
+                watchDeconv.Stop();
+                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
+
+                watchBackwards.Start();
+                var modelVis = IDG.ToVisibilities(c, metadata, xImage, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                watchBackwards.Stop();
+            }
+            watchBackwards.Stop();
+            watchTotal.Stop();
+
+            var timetable = "total elapsed: " + watchTotal.Elapsed;
+            timetable += "\n" + "idg forward elapsed: " + watchForward.Elapsed;
+            timetable += "\n" + "idg backwards elapsed: " + watchBackwards.Elapsed;
+            timetable += "\n" + "devonvolution: " + watchDeconv.Elapsed;
+            File.WriteAllText("watches_single.txt", timetable);
         }
 
         public static void DebugSimulatedGreedy2()
