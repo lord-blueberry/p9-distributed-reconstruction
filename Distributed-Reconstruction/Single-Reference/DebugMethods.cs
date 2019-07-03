@@ -11,7 +11,7 @@ using System.IO;
 
 namespace Single_Reference
 {
-    class DebugMethods
+    public class DebugMethods
     {
         public static void CreateL1L2()
         {

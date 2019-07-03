@@ -22,8 +22,7 @@ namespace Distributed_Reference
                     var xLocal = x - imgSection.X;
                     aMap[yLocal, xLocal] = GreedyCD.QueryIntegral2(integral, y, x, totalSize.YLength, totalSize.XLength);
                 }
-                    
-
+            
             var converged = false;
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
@@ -32,8 +31,7 @@ namespace Distributed_Reference
                 for (int y = 0; y < b.GetLength(0); y++)
                     for (int x = 0; x < b.GetLength(1); x++)
                     {
-                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, b.GetLength(0), b.GetLength(1));
-                        var xDiff = b[y, x] / currentA;
+                        var xDiff = b[y, x] / aMap[y, x];
 
                         if (Math.Abs(xDiff) > xMaxAbsDiff)
                         {
@@ -41,8 +39,10 @@ namespace Distributed_Reference
                             xMaxDiff = xDiff;
                         }
                     }
+                    
 
                 var lambdaMax = 1 / alpha * xMaxDiff;
+                lambdaMax = comm.Allreduce(lambdaMax, (x, y) => x+y);
                 if (lambdaMax / lambdaMin > lambdaFactor)
                 {
                     Console.WriteLine("-----------------------------GreedyCD2 with lambda " + lambdaMax / lambdaFactor + "------------------------");

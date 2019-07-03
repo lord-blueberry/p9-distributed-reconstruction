@@ -8,7 +8,8 @@ namespace Distributed_Reference
         {
             //RunningMethods.RunSimulated(args);
             //RunningMethods.RunTinyMeerKAT(args);
-            RunningMethods.RunTest(args);
+            //RunningMethods.RunTest(args);
+            RunningMethods.RunTinyMeerKAT(args);
         }
     }
 }
