@@ -118,7 +118,7 @@ namespace Distributed_Reference
                     var lambda = 0.8;
                     var alpha = 0.05;
                     var currentLambda = Math.Max(1.0 / alpha * forwardPass.Item2, lambda);
-                    var converged = DGreedyCD2.DeconvolvePath(comm, imgSection, totalImage, xLocal, bLocal, psfCut, currentLambda, 2.0, alpha, 5, 10000, 2e-5);
+                    var converged = DGreedyCD2.DeconvolvePath(comm, imgSection, totalImage, xLocal, bLocal, psfCut, currentLambda, 4.0, alpha, 5, 1000, 2e-5);
                     if (comm.Rank == 0)
                     {
                         if (converged)

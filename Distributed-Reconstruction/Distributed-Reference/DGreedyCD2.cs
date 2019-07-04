@@ -134,7 +134,7 @@ namespace Distributed_Reference
                         xImage[yLocal2, xLocal2] = xNew;
 
                     if(comm.Rank == 0)
-                        Console.WriteLine(iter + "\t" + Math.Abs(maxCandidate.XDiff) + "\t" + maxCandidate.YPixel + "\t" + maxCandidate.XPixel);
+                        Console.WriteLine(iter + "\t" + maxCandidate.XDiff + "\t" + maxCandidate.YPixel + "\t" + maxCandidate.XPixel);
 
                     if (maxCandidate.YPixel - yPsfHalf >= 0 & maxCandidate.YPixel + yPsfHalf < totalSize.YLength & maxCandidate.XPixel - xPsfHalf >= 0 & maxCandidate.XPixel + xPsfHalf < totalSize.XLength)
                     {

@@ -142,7 +142,7 @@ namespace Single_Reference
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
-            var maxCycle = 5;
+            var maxCycle = 2;
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
                 watchForward.Start();
@@ -162,7 +162,7 @@ namespace Single_Reference
                 var lambda = 0.8;
                 var alpha = 0.05;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
-                var converged = GreedyCD2.DeconvolvePath(xImage, b, psfCut, currentLambda, 2.0, alpha, 5, 1000, 2e-5);
+                var converged = GreedyCD2.DeconvolvePath(xImage, b, psfCut, currentLambda, 4.0, alpha, 5, 1000, 2e-5);
                 //var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, currentLambda, alpha, 5000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!! with lambda " + currentLambda + "------------------------");
