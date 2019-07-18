@@ -124,9 +124,9 @@ namespace Single_Reference.IDGSequential
             return outputGrids;
         }
 
-        private static double MetersToPixels(double meters, double imageSize, double frequency) => meters * imageSize * (frequency / MathFunctions.SPEED_OF_LIGHT);
+        public static double MetersToPixels(double meters, double imageSize, double frequency) => meters * imageSize * (frequency / MathFunctions.SPEED_OF_LIGHT);
 
-        private static double MetersToLambda(double meters, double frequency) => meters * (frequency / MathFunctions.SPEED_OF_LIGHT);
+        public static double MetersToLambda(double meters, double frequency) => meters * (frequency / MathFunctions.SPEED_OF_LIGHT);
         
         
         private class Datapoint
@@ -153,7 +153,7 @@ namespace Single_Reference.IDGSequential
         /// </summary>
         private class Subgrid
         {
-            private GriddingConstants param;
+            private GriddingConstants c;
             private double uMin;
             private double uMax;
             private double vMin;
@@ -164,9 +164,9 @@ namespace Single_Reference.IDGSequential
             public int VPixel { get; set; }
             public int WIndex { get; set; }
 
-            public Subgrid(GriddingConstants p)
+            public Subgrid(GriddingConstants c)
             {
-                this.param = p;
+                this.c = c;
                 this.Reset();
             }
 
@@ -189,12 +189,12 @@ namespace Single_Reference.IDGSequential
                     return false;
 
                 int wIndex_ = 0;
-                if (param.WStep != 0.0)
-                    wIndex_ = (int)System.Math.Floor(vis.wLambda / param.WStep);
+                if (c.WStep != 0.0)
+                    wIndex_ = (int)System.Math.Floor(vis.wLambda / c.WStep);
 
                 // if this is not the first sample, it should map to the
                 // same w_index as the others, if not, return false
-                if (Double.IsInfinity(this.uMin) && this.WIndex != wIndex_)
+                if (!Double.IsInfinity(this.uMin) && this.WIndex != wIndex_)
                     return false;
 
                 //compute candidate values
@@ -205,7 +205,7 @@ namespace Single_Reference.IDGSequential
                 double uvWidth_ = System.Math.Max(uMax_ - uMin_, vMax_ - vMin_);
 
                 //check if visibility fits 
-                if((uvWidth_ + param.KernelSize) >= param.SubgridSize) {
+                if((uvWidth_ + c.KernelSize) >= c.SubgridSize) {
                     return false;
                 }
                 else
@@ -228,9 +228,9 @@ namespace Single_Reference.IDGSequential
                 // Return whether the subgrid fits in grid and w-stack
                 //TODO: HACKED value here, uvMinPixels >= 0
                 return uvMinPixels >= 1 &&
-                    uvMaxPixels <= (param.GridSize - param.SubgridSize) &&
-                    WIndex >= -param.WLayerCount &&
-                    WIndex < param.WLayerCount;
+                    uvMaxPixels <= (c.GridSize - c.SubgridSize) &&
+                    WIndex >= -c.WLayerCount &&
+                    WIndex < c.WLayerCount;
             }
 
             private void ComputeCoordinates()
@@ -239,12 +239,12 @@ namespace Single_Reference.IDGSequential
                 VPixel = (int)System.Math.Round((vMax + vMin) / 2);
 
                 // Shift center from middle of grid to top left
-                UPixel += (param.GridSize / 2);
-                VPixel += (param.GridSize / 2);
+                UPixel += (c.GridSize / 2);
+                VPixel += (c.GridSize / 2);
 
                 // Shift from middle of subgrid to top left
-                UPixel -= (param.SubgridSize) / 2;
-                VPixel -= (param.SubgridSize) / 2;
+                UPixel -= (c.SubgridSize) / 2;
+                VPixel -= (c.SubgridSize) / 2;
             }
 
             public void Finish()

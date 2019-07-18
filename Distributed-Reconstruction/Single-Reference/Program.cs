@@ -9,8 +9,8 @@ namespace Single_Reference
 
             //DebugMethods.DebugSimulatedMixed();
             //Deconvolution.NaiveGreedyCD.Run();
-            //DebugMethods.DebugSimulatedGreedy2();
-            DebugMethods.MeerKATFull();
+            DebugMethods.DebugSimulatedWStack();
+            //DebugMethods.MeerKATFull();
         }
     }
 }

@@ -23,7 +23,7 @@ namespace Single_Reference.IDGSequential
         public float ImageSize { get; }
 
         public int WLayerCount { get; }
-        public float WStep { get; }
+        public double WStep { get; }
         public float WStepLambda { get; }
 
         public float[,] SubgridSpheroidal { get; }
@@ -31,10 +31,10 @@ namespace Single_Reference.IDGSequential
 
         public long VisibilitiesCount { get; }
 
-        public Complex[,] SubgridsPrecomputedPhasor { get; }
+        public Complex[,] SubgridsPrecomputed { get; }
 
 
-        public GriddingConstants(long visCount, int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float scale, int wLayerCount, float wStep)
+        public GriddingConstants(long visCount, int gridSize, int subgridSize, int kernelSize, int maxTimesteps, float scaleArcSec, int wLayerCount, double wStep)
         {
             this.VisibilitiesCount = visCount;
             this.GridSize = gridSize;
@@ -43,8 +43,8 @@ namespace Single_Reference.IDGSequential
 
             this.MaxTimestepsPerSubgrid = maxTimesteps;
 
-            this.ScaleArcSec = scale;
-            this.ImageSize = scale * gridSize;
+            this.ScaleArcSec = scaleArcSec;
+            this.ImageSize = scaleArcSec * gridSize;
 
             this.WLayerCount = wLayerCount;
             this.WStep = wStep;
@@ -54,17 +54,17 @@ namespace Single_Reference.IDGSequential
 
             if(wStep == 0.0)
             {
-                SubgridsPrecomputedPhasor = null;
+                SubgridsPrecomputed = null;
             } 
             else
             {
-                SubgridsPrecomputedPhasor = new Complex[SubgridSize, SubgridSize];
-                Parallel.For(0, SubgridsPrecomputedPhasor.GetLength(0), (y) =>
+                SubgridsPrecomputed = new Complex[SubgridSize, SubgridSize];
+                Parallel.For(0, SubgridsPrecomputed.GetLength(0), (y) =>
                 {
-                    for (int x = 0; x < SubgridsPrecomputedPhasor.GetLength(1); x++)
+                    for (int x = 0; x < SubgridsPrecomputed.GetLength(1); x++)
                     {
                         double phase = Math.PI * (x + y - SubgridSize) / SubgridSize;
-                        SubgridsPrecomputedPhasor[y, x] = new Complex(Math.Cos(phase), Math.Sin(phase));
+                        SubgridsPrecomputed[y, x] = new Complex(Math.Cos(phase), Math.Sin(phase));
                     }
                 });
             }
