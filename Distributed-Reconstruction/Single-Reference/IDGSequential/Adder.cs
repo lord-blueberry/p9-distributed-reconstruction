@@ -21,7 +21,7 @@ namespace Single_Reference.IDGSequential
                 for (int subgrid = 0; subgrid < blSubgridsData.Count; subgrid++)
                 {
                     var meta = blMeta[subgrid];
-                    var data = blSubgridsData[subgrid];
+                    var subgridData = blSubgridsData[subgrid];
 
                     int gridX = meta.UPixel;
                     int gridY = meta.VPixel;
@@ -39,7 +39,7 @@ namespace Single_Reference.IDGSequential
                                 double phase = PI * (x + y - c.SubgridSize) / c.SubgridSize;
 
                                 Complex phasor = new Complex(Cos(phase), Sin(phase));
-                                grid[gridY + y, gridX + x] += data[ySrc, xSrc] * phasor;
+                                grid[gridY + y, gridX + x] += subgridData[ySrc, xSrc] * phasor;
                             }
                         }
 
@@ -67,8 +67,8 @@ namespace Single_Reference.IDGSequential
                 for (int subgrid = 0; subgrid < blMeta.Count; subgrid++)
                 {
                     var meta = blMeta[subgrid];
-                    var data = new Complex[c.SubgridSize, c.SubgridSize];
-                    blSubgridsData.Add(data);
+                    var subgridData = new Complex[c.SubgridSize, c.SubgridSize];
+                    blSubgridsData.Add(subgridData);
 
                     int gridX = meta.UPixel;
                     int gridY = meta.VPixel;
@@ -84,7 +84,7 @@ namespace Single_Reference.IDGSequential
                                 double phase = -PI * (x + y - c.SubgridSize) / c.SubgridSize;
 
                                 var phasor = new Complex(Cos(phase), Sin(phase));
-                                data[yDst, xDst] = grid[gridY + y, gridX + x] * phasor;
+                                subgridData[yDst, xDst] = grid[gridY + y, gridX + x] * phasor;
                             }
                         }
                     }
