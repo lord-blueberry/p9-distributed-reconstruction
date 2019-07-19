@@ -32,7 +32,6 @@ namespace Single_Reference.IDGSequential
                             visibilities[i, j, k] = new Complex(0, 0);
                     }
 
-
             return Grid(c, metadata, visibilities, uvw, frequencies);
         }
 
@@ -135,6 +134,16 @@ namespace Single_Reference.IDGSequential
                             outputVis[i, j] = visGrid0[i, j] * visGrid1[i, j];
 
             return outputVis;
+        }
+
+        public static Complex[,,] GridW(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
+        {
+            var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
+            var ftgridded = FFT.SubgridFFT(c, gridded);
+            var grid = AdderWStack.AddHack(c, metadata, ftgridded);
+            FFT.Shift(grid);
+
+            return grid;
         }
     }
 }
