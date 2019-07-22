@@ -105,7 +105,7 @@ namespace Single_Reference.IDGSequential
                             {
                                 var phasor = c.SubgridsPrecomputed[y, x];
 
-                                var value = grid[y, x];
+                                var value = grid[ySrc, xSrc];
                                 value = negativeW ? Complex.Conjugate(value) : value;
                                 subgridData[yDst, xDst] = phasor * value;
                             }
