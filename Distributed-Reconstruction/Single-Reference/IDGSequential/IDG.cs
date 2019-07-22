@@ -145,5 +145,15 @@ namespace Single_Reference.IDGSequential
 
             return grid;
         }
+
+        public static Complex[,,] DeGridW(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,] grid, double[,,] uvw, double[] frequencies)
+        {
+            FFT.Shift(grid);
+            var ftGridded = AdderWStack.SplitHack(c, metadata, grid);
+            var gridded = FFT.SubgridIFFT(c, ftGridded);
+            var visibilities = Gridder.BackwardsHack(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
+
+            return visibilities;
+        }
     }
 }
