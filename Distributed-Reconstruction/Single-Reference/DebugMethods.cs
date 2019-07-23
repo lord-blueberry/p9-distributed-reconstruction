@@ -297,14 +297,16 @@ namespace Single_Reference
             maxW = Partitioner.MetersToLambda(maxW, frequencies[frequencies.Length - 1]);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 512;
+            int gridSize = 2048;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 1024;
-            double cellSize = 0.5 / 3600.0 * PI / 180.0;
+            double cellSize = 5 / 3600.0 * PI / 180.0;
             int wLayerCount = 8;
-            double wStep = maxW / (wLayerCount - 1);
+            double wStep = maxW / (wLayerCount);
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
+            var c2 = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0);
+            var metadata2 = Partitioner.CreatePartition(c2, uvw, frequencies);
 
             var watchTotal = new Stopwatch();
             var watchForward = new Stopwatch();
@@ -324,78 +326,24 @@ namespace Single_Reference
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
             var psfGrid = IDG.GridW(c, metadata, psfVis, uvw, frequencies);
             var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
-            var psfGridAdded = FFT.GridFFT(psf);
+            //var psfGridAdded = FFT.GridFFT(psf);
             FFT.Shift(psf);
 
-            var psfCut = CutImg(psf);
-            FitsIO.Write(psf, "psf.fits");
-            FitsIO.Write(psfCut, "psfCut.fits");
+            var psf2Grid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf2 = FFT.GridIFFT(psf2Grid, c.VisibilitiesCount);
+            FFT.Shift(psf2);
+            FitsIO.Write(psf2, "psf2222.fits");
+            FitsIO.Write(psf, "psf");
 
-            var xImage = new double[gridSize, gridSize];
-            var residualVis = visibilities;
-            /*var truth = new double[gridSize, gridSize];
-            truth[30, 30] = 1.0;
-            truth[35, 36] = 1.5;
-            var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
-            visibilities = truthVis;
-            var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 5; cycle++)
-            {
-                //FORWARD
-                watchForward.Start();
-                var dirtyGrid = IDG.GridW(c, metadata, residualVis, uvw, frequencies);
-                var dirtyImage = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
-                FFT.Shift(dirtyImage);
-                FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
-                watchForward.Stop();
+            var psfSum = new double[gridSize, gridSize];
+            for (int k = 0; k < wLayerCount; k++)
+                for (int i = 0; i < gridSize; i++)
+                    for (int j = 0; j < gridSize; j++)
+                        psfSum[i, j] += psf[k, i, j];
 
-                //DECONVOLVE
-                watchDeconv.Start();
+            FitsIO.Write(psfSum, "psfSum.fits");
 
-                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
-                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
-                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
-                var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = GreedyCD2.RemovePadding(bPadded, psfCut);
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.1, 0.20, 1);
-
-                if (converged)
-                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
-                else
-                    Console.WriteLine("-------------------------------not converged----------------------");
-                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
-                FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
-                watchDeconv.Stop();
-
-                //BACKWARDS
-                watchBackwards.Start();
-                FFT.Shift(xImage);
-                var xGrid = FFT.GridFFT(xImage);
-                FFT.Shift(xImage);
-                var modelVis = IDG.DeGridW(c, metadata, xGrid, uvw, frequencies);
-                residualVis = IDG.Substract(visibilities, modelVis, flags);
-                watchBackwards.Stop();
-
-
-                var recGrid = IDG.GridW(c, metadata, modelVis, uvw, frequencies);
-                var imgRec = FFT.GridIFFT(recGrid, c.VisibilitiesCount);
-                FFT.Shift(imgRec);
-
-                FitsIO.Write(imgRec, "noWForwards" + cycle + ".fits");
-
-                var hello = FFT.FFTDebug(xImage, 1.0);
-                hello = IDG.Multiply(hello, psfGridAdded);
-                var hImg = FFT.IFFTDebug(hello, 128 * 128);
-                //FFT.Shift(hImg);
-                FitsIO.Write(hImg, "modelDirty_FFT.fits");
-
-                //var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
-                //FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
-            }
         }
-
-
         #endregion
 
 

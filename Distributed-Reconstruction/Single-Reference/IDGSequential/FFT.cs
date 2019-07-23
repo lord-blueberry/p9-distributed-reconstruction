@@ -119,9 +119,9 @@ namespace Single_Reference.IDGSequential
             return output;
         }
 
-        public static double[,] GridIFFT(Complex[,,] grid, long visibilityCount)
+        public static double[,,] GridIFFT(Complex[,,] grid, long visibilityCount)
         {
-            double[,] output = new double[grid.GetLength(1), grid.GetLength(2)];
+            var output = new double[grid.GetLength(0), grid.GetLength(1), grid.GetLength(2)];
             using (var imageSpace = new AlignedArrayComplex(16, grid.GetLength(1), grid.GetLength(2)))
             using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
             {
@@ -141,7 +141,7 @@ namespace Single_Reference.IDGSequential
                     {
                         for (int x = 0; x < grid.GetLength(2); x++)
                         {
-                            output[y, x] += imageSpace[y, x].Real / visibilityCount;
+                            output[k, y, x] += imageSpace[y, x].Real / visibilityCount;
                         }
                     }
                 }
@@ -170,6 +170,7 @@ namespace Single_Reference.IDGSequential
 
             return output;
         }
+
 
 
         /// <summary>
@@ -237,6 +238,28 @@ namespace Single_Reference.IDGSequential
             }
         }
 
+        public static void Shift(double[,,] grid)
+        {
+            for (int k = 0; k < grid.GetLength(0); k++)
+            {
+                // Interchange entries in 4 quadrants, 1 <--> 3 and 2 <--> 4
+                var n2 = grid.GetLength(1) / 2;
+                for (int i = 0; i < n2; i++)
+                {
+                    for (int j = 0; j < n2; j++)
+                    {
+                        var tmp13 = grid[k, i, j];
+                        grid[k, i, j] = grid[k, i + n2, j + n2];
+                        grid[k, i + n2, j + n2] = tmp13;
+
+                        var tmp24 = grid[k, i + n2, j];
+                        grid[k, i + n2, j] = grid[k, i, j + n2];
+                        grid[k, i, j + n2] = tmp24;
+                    }
+                }
+            }
+        }
+
         public static void Shift(Complex[,,] grid)
         {
             for(int k = 0; k < grid.GetLength(0); k++)
@@ -257,7 +280,6 @@ namespace Single_Reference.IDGSequential
                     }
                 }
             }
-
         }
 
         public static void Shift(double[,] grid)
