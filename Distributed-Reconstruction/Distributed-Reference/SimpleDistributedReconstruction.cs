@@ -17,12 +17,12 @@ namespace Distributed_Reference
     {
         private class DirtyImage
         {
-            public double[,] Dirty;
+            public double[,] Image;
             public double MaxSidelobeLevel;
 
             public DirtyImage(double[,] dirty, double maxLevel)
             {
-                Dirty = dirty;
+                Image = dirty;
                 MaxSidelobeLevel = maxLevel;
             }
         }
@@ -36,10 +36,7 @@ namespace Distributed_Reference
 
             var metadata = Partitioner.CreatePartition(c, local.UVW, local.Frequencies);
 
-            var halfComm = comm.Size / 2;
-            var yResOffset = comm.Rank / 2 * (c.GridSize / halfComm);
-            var xResOffset = comm.Rank % 2 * (c.GridSize / halfComm);
-            var imgSection = new Communication.Rectangle(yResOffset, xResOffset, yResOffset + c.GridSize / halfComm, xResOffset + c.GridSize / halfComm);
+            var imgSection = CalculateLocalImageSection(comm.Rank, comm.Size, c.GridSize, c.GridSize);
             var totalImage = new Communication.Rectangle(0, 0, c.GridSize, c.GridSize);
 
             //calculate psf and prepare for correlation in the Fourier space
@@ -47,15 +44,21 @@ namespace Distributed_Reference
             var psfCut = CutImg(psf);
             Complex[,] PsfCorrelation = null;
             var maxSidelobe = DebugMethods.GetMaxSidelobeLevel(psf);
+            
             if (comm.Rank == 0)
+            {
                 PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
+                reconstructed = 
+            }
+            
+
 
             var residualVis = local.Visibilities;
-            var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
+            var xLocal = new double[imgSection.YEnd - imgSection.Y, imgSection.XEnd - imgSection.X];
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
                 var dirtyImage = ForwardCalculateB(comm, c, metadata, residualVis, local.UVW, local.Frequencies, PsfCorrelation, psfCut, maxSidelobe, watchForward);
-                var bLocal = GetImgSection(dirtyImage.Dirty, imgSection);
+                var bLocal = GetImgSection(dirtyImage.Image, imgSection);
                 if (comm.Rank == 0)
                     watchDeconv.Start();
 
@@ -80,7 +83,8 @@ namespace Distributed_Reference
                 if (comm.Rank == 0)
                 {
                     watchBackward.Start();
-                    var x = StitchX(comm, c, totalX);
+                    var x = new double[c.GridSize, c.GridSize];
+                    StitchImage(totalX, x, comm.Size);
                     FitsIO.Write(x, "xImage_" + cycle + ".fits");
                     FFT.Shift(x);
                     modelGrid = FFT.GridFFT(x);
@@ -93,16 +97,37 @@ namespace Distributed_Reference
 
             double[][,] gatherX = null;
             comm.Gather(xLocal, 0, ref gatherX);
-            var reconstructionGlobal = StitchX(comm, c, gatherX);
+            double[,] reconstructed = null;
+            if (comm.Rank == 0) 
+            {
+                reconstructed = new double[c.GridSize, c.GridSize]; ;
+                StitchImage(gatherX, reconstructed, comm.Size);
+            }
             
-            return reconstructionGlobal;
+            return reconstructed;
         }
 
+        private static Communication.Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
+        {
+            var yPatchCount = (int)Math.Floor(Math.Sqrt(nodeCount));
+            var xPatchCount = (nodeCount / yPatchCount);
+
+            var yIdx = nodeId / xPatchCount;
+            var xIdx = nodeId % xPatchCount;
+
+            var yPatchOffset = yIdx * (ySize / yPatchCount);
+            var xPatchOffset = xIdx * (xSize / xPatchCount);
+
+            var yPatchEnd = yIdx + 1 < yPatchCount ? yPatchOffset + ySize / yPatchCount : ySize;
+            var xPatchEnd = xIdx + 1 < xPatchCount ? xPatchOffset + xSize / xPatchCount : xSize;
+
+            return new Communication.Rectangle(yPatchOffset, xPatchOffset, yPatchEnd, xPatchEnd);
+        }
 
         private static double[,] GetImgSection(double[,] b, Communication.Rectangle imgSection)
         {
-            var yLen = imgSection.YLength - imgSection.Y;
-            var xLen = imgSection.XLength - imgSection.X;
+            var yLen = imgSection.YEnd - imgSection.Y;
+            var xLen = imgSection.XEnd - imgSection.X;
 
             var bLocal = new double[yLen, xLen];
             for (int i = 0; i < yLen; i++)
@@ -148,25 +173,25 @@ namespace Distributed_Reference
         }
 
 
-        private static double[,] StitchX(Intracommunicator comm, GriddingConstants c, double[][,] totalX)
+        private static void StitchImage(double[][,] totalX, double[,] stitched, int nodeCount)
         {
-            var halfComm = comm.Size / 2;
-            var stitched = new double[c.GridSize, c.GridSize];
-            int patchIdx = 0;
-            for (int patchRows = 0; patchRows < halfComm; patchRows++)
+            var yPatchCount = (int)Math.Floor(Math.Sqrt(nodeCount));
+            var xPatchCount = (nodeCount / yPatchCount);
+            int yOffset = 0;
+            for (int yIdx = 0; yIdx < yPatchCount; yIdx++)
             {
-                for (int patchColumns = 0; patchColumns < halfComm; patchColumns++)
+                int xOffset = 0;
+                int patchIdx = yIdx * yPatchCount;
+                for (int xIdx = 0; xIdx < xPatchCount; xIdx++)
                 {
-                    int yOffset = patchRows * (c.GridSize / halfComm);
-                    int xOffset = patchColumns * (c.GridSize / halfComm);
-                    var patch = totalX[patchIdx++];
-                    for (int y = 0; y < (c.GridSize / halfComm); y++)
-                        for (int x = 0; x < (c.GridSize / halfComm); x++)
+                    var patch = totalX[patchIdx+xIdx];
+                    for (int y = 0; y < patch.GetLength(0); y++)
+                        for (int x = 0; x < patch.GetLength(1); x++)
                             stitched[yOffset + y, xOffset + x] = patch[y, x];
+                    xOffset += patch.GetLength(1);
                 }
+                yOffset += totalX[patchIdx].GetLength(0);
             }
-
-            return stitched;
         }
 
 

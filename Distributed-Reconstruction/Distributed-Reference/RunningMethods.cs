@@ -257,13 +257,13 @@ namespace Distributed_Reference
                     PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
 
                 var integral = GreedyCD.CalcPSf2Integral(psfCut);
-                var aMapLocal = new double[imgSection.YLength, imgSection.XLength];
-                for (int y = imgSection.Y; y < imgSection.YLength; y++)
-                    for (int x = imgSection.X; x < imgSection.XLength; x++)
+                var aMapLocal = new double[imgSection.YEnd, imgSection.XEnd];
+                for (int y = imgSection.Y; y < imgSection.YEnd; y++)
+                    for (int x = imgSection.X; x < imgSection.XEnd; x++)
                     {
                         var yPixel = y - imgSection.Y;
                         var xPixel = x - imgSection.X;
-                        aMapLocal[yPixel, xPixel] = GreedyCD.QueryIntegral2(integral, y, x, totalImage.YLength, totalImage.XLength);
+                        aMapLocal[yPixel, xPixel] = GreedyCD.QueryIntegral2(integral, y, x, totalImage.YEnd, totalImage.XEnd);
                     }
 
                 var residualVis = visibilities;
@@ -421,13 +421,13 @@ namespace Distributed_Reference
                     PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
 
                 var integral = GreedyCD.CalcPSf2Integral(psfCut);
-                var aMapLocal = new double[imgSection.YLength, imgSection.XLength];
-                for (int y = imgSection.Y; y < imgSection.YLength; y++)
-                    for (int x = imgSection.X; x < imgSection.XLength; x++)
+                var aMapLocal = new double[imgSection.YEnd, imgSection.XEnd];
+                for (int y = imgSection.Y; y < imgSection.YEnd; y++)
+                    for (int x = imgSection.X; x < imgSection.XEnd; x++)
                     {
                         var yPixel = y - imgSection.Y;
                         var xPixel = x - imgSection.X;
-                        aMapLocal[yPixel, xPixel] = GreedyCD.QueryIntegral2(integral, y, x, totalImage.YLength, totalImage.XLength);
+                        aMapLocal[yPixel, xPixel] = GreedyCD.QueryIntegral2(integral, y, x, totalImage.YEnd, totalImage.XEnd);
                     }
 
                 var residualVis = visibilities;
@@ -573,8 +573,8 @@ namespace Distributed_Reference
 
         public static double[,] GetImgSection(double[,] b, Communication.Rectangle imgSection)
         {
-            var yLen = imgSection.YLength - imgSection.Y;
-            var xLen = imgSection.XLength - imgSection.X;
+            var yLen = imgSection.YEnd - imgSection.Y;
+            var xLen = imgSection.XEnd - imgSection.X;
 
             var bLocal = new double[yLen, xLen];
             for (int i = 0; i < yLen; i++)

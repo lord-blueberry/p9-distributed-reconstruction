@@ -11,15 +11,15 @@ namespace Distributed_Reference
             public int Y { get; private set; }
             public int X { get; private set; }
 
-            public int YLength { get; private set; }
-            public int XLength { get; private set; }
+            public int YEnd { get; private set; }
+            public int XEnd { get; private set; }
 
-            public Rectangle(int y, int x, int yLen, int xLen)
+            public Rectangle(int y, int x, int yEnd, int xEnd)
             {
                 Y = y;
                 X = x;
-                YLength = yLen;
-                XLength = xLen;
+                YEnd = yEnd;
+                XEnd = xEnd;
             }
         }
 

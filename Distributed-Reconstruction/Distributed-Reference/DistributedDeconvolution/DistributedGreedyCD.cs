@@ -14,12 +14,12 @@ namespace Distributed_Reference.DistributedDeconvolution
         {
             var integral = Single_Reference.Deconvolution.GreedyCD.CalcPSf2Integral(psf);
             var aMap = new double[b.GetLength(0), b.GetLength(1)];
-            for (int y = imgSection.Y; y < imgSection.YLength; y++)
-                for (int x = imgSection.X; x < imgSection.XLength; x++)
+            for (int y = imgSection.Y; y < imgSection.YEnd; y++)
+                for (int x = imgSection.X; x < imgSection.XEnd; x++)
                 {
                     var yLocal = y - imgSection.Y;
                     var xLocal = x - imgSection.X;
-                    aMap[yLocal, xLocal] = Single_Reference.Deconvolution.GreedyCD.QueryIntegral2(integral, y, x, totalSize.YLength, totalSize.XLength);
+                    aMap[yLocal, xLocal] = Single_Reference.Deconvolution.GreedyCD.QueryIntegral2(integral, y, x, totalSize.YEnd, totalSize.XEnd);
                 }
             
             var converged = false;
@@ -71,7 +71,7 @@ namespace Distributed_Reference.DistributedDeconvolution
             var PsfCorr = FFT.FFTDebug(psfTmp, 1.0);
 
             psfTmp = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
-            SetPsf(psfTmp, totalSize, psf, totalSize.YLength / 2, totalSize.XLength / 2);
+            SetPsf(psfTmp, totalSize, psf, totalSize.YEnd / 2, totalSize.XEnd / 2);
             var tmp = FFT.FFTDebug(psfTmp, 1.0);
             var tmp2 = IDG.Multiply(tmp, PsfCorr);
 
@@ -89,8 +89,8 @@ namespace Distributed_Reference.DistributedDeconvolution
                 var xPixel = -1;
                 var xMax = 0.0;
                 var xNew = 0.0;
-                for (int y = imgSection.Y; y < imgSection.YLength; y++)
-                    for (int x = imgSection.X; x < imgSection.XLength; x++)
+                for (int y = imgSection.Y; y < imgSection.YEnd; y++)
+                    for (int x = imgSection.X; x < imgSection.XEnd; x++)
                     {
                         var yLocal = y - imgSection.Y;
                         var xLocal = x - imgSection.X;
@@ -134,7 +134,7 @@ namespace Distributed_Reference.DistributedDeconvolution
                     if(comm.Rank == 0)
                         Console.WriteLine(iter + "\t" + maxCandidate.XDiff + "\t" + maxCandidate.YPixel + "\t" + maxCandidate.XPixel);
 
-                    if (maxCandidate.YPixel - yPsfHalf >= 0 & maxCandidate.YPixel + yPsfHalf < totalSize.YLength & maxCandidate.XPixel - xPsfHalf >= 0 & maxCandidate.XPixel + xPsfHalf < totalSize.XLength)
+                    if (maxCandidate.YPixel - yPsfHalf >= 0 & maxCandidate.YPixel + yPsfHalf < totalSize.YEnd & maxCandidate.XPixel - xPsfHalf >= 0 & maxCandidate.XPixel + xPsfHalf < totalSize.XEnd)
                     {
                         UpdateB(b, bUpdateCache, imgSection, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff);
                     }
@@ -165,7 +165,7 @@ namespace Distributed_Reference.DistributedDeconvolution
                 {
                     var y = (yPixel + i) - yPsfHalf;
                     var x = (xPixel + j) - xPsfHalf;
-                    if (y >= 0 & y < window.YLength & x >= 0 & x < window.XLength)
+                    if (y >= 0 & y < window.YEnd & x >= 0 & x < window.XEnd)
                     {
                         psfPadded[i + yPsfHalf, j + xPsfHalf] = psf[i, j];
                     }
@@ -183,8 +183,8 @@ namespace Distributed_Reference.DistributedDeconvolution
 
             var yBMin = Math.Max(yPixel - yBHalf, imgSection.Y);
             var xBMin = Math.Max(xPixel - xBHalf, imgSection.X);
-            var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imgSection.YLength);
-            var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imgSection.XLength);
+            var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imgSection.YEnd);
+            var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imgSection.XEnd);
             for (int i = yBMin; i < yBMax; i++)
                 for(int j = xBMin; j < xBMax; j++)
                 {
