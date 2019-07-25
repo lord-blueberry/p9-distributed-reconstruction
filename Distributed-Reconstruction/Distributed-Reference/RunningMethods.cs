@@ -430,8 +430,6 @@ namespace Distributed_Reference
                         aMapLocal[yPixel, xPixel] = GreedyCD.QueryIntegral2(integral, y, x, totalImage.YLength, totalImage.XLength);
                     }
 
-                
-
                 var residualVis = visibilities;
                 var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
                 var maxCycle = 1;
@@ -477,7 +475,6 @@ namespace Distributed_Reference
                     if (comm.Rank == 0)
                         watchBackward.Stop();
                 }
-
             }
         }
 

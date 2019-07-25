@@ -40,7 +40,6 @@ namespace Distributed_Reference
                         }
                     }
                     
-
                 var lambdaMax = 1 / alpha * xMaxDiff;
                 lambdaMax = comm.Allreduce(lambdaMax, (x, y) => x+y);
                 if (lambdaMax / lambdaMin > lambdaFactor)

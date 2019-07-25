@@ -41,5 +41,10 @@ namespace Distributed_Reference
                 XPixel = x;
             }
         }
+
+        public static Tuple<int,int> SplitIntoPatches(int gridSize, int nodesCount)
+        {
+            return null;
+        }
     }
 }
