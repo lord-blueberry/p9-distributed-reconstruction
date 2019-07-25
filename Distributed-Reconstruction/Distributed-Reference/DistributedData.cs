@@ -37,9 +37,9 @@ namespace Distributed_Reference
         public static LocalDataset LoadSubsetTinyMeerKAT(Intracommunicator comm, string folder)
         {
             var frequencies = FitsIO.ReadFrequencies(System.IO.Path.Combine(folder, "freq.fits"));
-            var uvw = FitsIO.ReadUVW(System.IO.Path.Combine(folder, "uvw" + comm.Rank + ".fits"));
-            var flags = FitsIO.ReadFlags(System.IO.Path.Combine(folder, "flags" + comm.Rank + ".fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
-            var visibilities = FitsIO.ReadVisibilities(System.IO.Path.Combine(folder, "vis" + comm.Rank + ".fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, 2.0);
+            var uvw = FitsIO.ReadUVW(System.IO.Path.Combine(folder, "uvw0.fits"));
+            var flags = FitsIO.ReadFlags(System.IO.Path.Combine(folder, "flags0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+            var visibilities = FitsIO.ReadVisibilities(System.IO.Path.Combine(folder, "vis0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, 2.0);
 
             return new LocalDataset(frequencies, uvw, flags, visibilities);
         }
@@ -56,9 +56,9 @@ namespace Distributed_Reference
             for (int i = beginIdx + 1; i < beginIdx + 8 / comm.Size; i++)
             {
                 Console.WriteLine("Rank {0} reads idx {1} ", comm.Rank, i);
-                var uvw0 = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw" + i + ".fits");
-                var flags0 = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags" + i + ".fits", uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
-                var visibilities0 = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis" + i + ".fits", uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length, 2.0);
+                var uvw0 = FitsIO.ReadUVW(System.IO.Path.Combine(folder, "uvw" + i + ".fits"));
+                var flags0 = FitsIO.ReadFlags(System.IO.Path.Combine(folder, "flags" + i + ".fits"), uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
+                var visibilities0 = FitsIO.ReadVisibilities(System.IO.Path.Combine(folder, "vis" + i + ".fits"), uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length, 2.0);
                 uvw = FitsIO.Stitch(uvw, uvw0);
                 flags = FitsIO.Stitch(flags, flags0);
                 visibilities = FitsIO.Stitch(visibilities, visibilities0);
@@ -66,5 +66,6 @@ namespace Distributed_Reference
 
             return new LocalDataset(frequencies, uvw, flags, visibilities);
         }
+
     }
 }
