@@ -99,6 +99,21 @@ namespace Distributed_Reference
         }
 
 
+        private static double[,] GetImgSection(double[,] b, Communication.Rectangle imgSection)
+        {
+            var yLen = imgSection.YLength - imgSection.Y;
+            var xLen = imgSection.XLength - imgSection.X;
+
+            var bLocal = new double[yLen, xLen];
+            for (int i = 0; i < yLen; i++)
+                for (int j = 0; j < xLen; j++)
+                    bLocal[i, j] = b[i + imgSection.Y, j + imgSection.X];
+
+            return bLocal;
+        }
+
+
+
         private static DirtyImage ForwardCalculateB(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, Complex[,] PsfCorrelation, double[,] psfCut, double maxSidelobe, Stopwatch watchIdg)
         {
             Stopwatch another = new Stopwatch();
@@ -133,7 +148,7 @@ namespace Distributed_Reference
         }
 
 
-        public static double[,] StitchX(Intracommunicator comm, GriddingConstants c, double[][,] totalX)
+        private static double[,] StitchX(Intracommunicator comm, GriddingConstants c, double[][,] totalX)
         {
             var halfComm = comm.Size / 2;
             var stitched = new double[c.GridSize, c.GridSize];
