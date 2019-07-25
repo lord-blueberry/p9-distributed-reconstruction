@@ -42,9 +42,5 @@ namespace Distributed_Reference
             }
         }
 
-        public static Tuple<int,int> SplitIntoPatches(int gridSize, int nodesCount)
-        {
-            return null;
-        }
     }
 }

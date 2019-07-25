@@ -8,7 +8,7 @@ using static System.Math;
 using System.Numerics;
 using System.Collections.Generic;
 using System.IO;
-
+using Distributed_Reference.DistributedDeconvolution;
 
 namespace Distributed_Reference
 {
@@ -118,7 +118,7 @@ namespace Distributed_Reference
                     var lambda = 0.8;
                     var alpha = 0.05;
                     var currentLambda = Math.Max(1.0 / alpha * forwardPass.Item2, lambda);
-                    var converged = DGreedyCD2.DeconvolvePath(comm, imgSection, totalImage, xLocal, bLocal, psfCut, currentLambda, 4.0, alpha, 5, 1000, 2e-5);
+                    var converged = DistributedGreedyCD.DeconvolvePath(comm, imgSection, totalImage, xLocal, bLocal, psfCut, currentLambda, 4.0, alpha, 5, 1000, 2e-5);
                     if (comm.Rank == 0)
                     {
                         if (converged)
@@ -280,7 +280,7 @@ namespace Distributed_Reference
                     var lambdaStart = 2.5;
                     var lambdaEnd = 0.1;
                     var lambda = lambdaStart - (lambdaStart - lambdaEnd) / (maxCycle) * (cycle + 1);
-                    var converged = DGreedyCD2.Deconvolve(comm, imgSection, totalImage, xLocal, aMapLocal, bLocal, psfCut, lambda, 0.4, 10000);
+                    var converged = DistributedGreedyCD.Deconvolve(comm, imgSection, totalImage, xLocal, aMapLocal, bLocal, psfCut, lambda, 0.4, 10000);
                     if (comm.Rank == 0)
                     {
                         if (converged)
@@ -443,7 +443,7 @@ namespace Distributed_Reference
                     var lambdaStart = 2.5;
                     var lambdaEnd = 0.1;
                     var lambda = lambdaStart - (lambdaStart - lambdaEnd) / (maxCycle) * (cycle + 1);
-                    var converged = DGreedyCD2.Deconvolve(comm, imgSection, totalImage, xLocal, aMapLocal, bLocal, psfCut, 0.1, 0.8, 1000);
+                    var converged = DistributedGreedyCD.Deconvolve(comm, imgSection, totalImage, xLocal, aMapLocal, bLocal, psfCut, 0.1, 0.8, 1000);
                     
                     //xLocal[0, 0] = 10.0 * (comm.Rank+1);
                     if (comm.Rank == 0)

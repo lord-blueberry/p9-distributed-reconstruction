@@ -4,23 +4,22 @@ using System.Text;
 using MPI;
 using Single_Reference.Deconvolution;
 using Single_Reference.IDGSequential;
-using Single_Reference;
 using static Distributed_Reference.Communication;
 
-namespace Distributed_Reference
+namespace Distributed_Reference.DistributedDeconvolution
 {
-    class DGreedyCD2
+    class DistributedGreedyCD
     {
         public static bool DeconvolvePath(Intracommunicator comm, Rectangle imgSection, Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10, int maxIteration = 100, double epsilon = 1e-4)
         {
-            var integral = GreedyCD.CalcPSf2Integral(psf);
+            var integral = Single_Reference.Deconvolution.GreedyCD.CalcPSf2Integral(psf);
             var aMap = new double[b.GetLength(0), b.GetLength(1)];
             for (int y = imgSection.Y; y < imgSection.YLength; y++)
                 for (int x = imgSection.X; x < imgSection.XLength; x++)
                 {
                     var yLocal = y - imgSection.Y;
                     var xLocal = x - imgSection.X;
-                    aMap[yLocal, xLocal] = GreedyCD.QueryIntegral2(integral, y, x, totalSize.YLength, totalSize.XLength);
+                    aMap[yLocal, xLocal] = Single_Reference.Deconvolution.GreedyCD.QueryIntegral2(integral, y, x, totalSize.YLength, totalSize.XLength);
                 }
             
             var converged = false;
@@ -98,7 +97,7 @@ namespace Distributed_Reference
                         var currentA = aMap[yLocal, xLocal];
                         var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[yLocal, xLocal] / currentA;
-                        xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
+                        xTmp = Single_Reference.Deconvolution.GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
 
                         var xDiff = old - xTmp;
                         if (Math.Abs(xDiff) > xMax)
