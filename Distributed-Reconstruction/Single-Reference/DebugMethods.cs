@@ -87,7 +87,7 @@ namespace Single_Reference
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = GreedyCD2.RemovePadding(bPadded, psfCut);
+                var b = CommonMethods.PSF.RemovePadding(bPadded, psfCut);
                 var lambda = 0.8;
                 var alpha = 0.05;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -164,7 +164,7 @@ namespace Single_Reference
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = GreedyCD2.RemovePadding(bPadded, psfCut);
+                var b = CommonMethods.PSF.RemovePadding(bPadded, psfCut);
                 var lambda = 100.0;
                 var alpha = 0.95;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -251,8 +251,98 @@ namespace Single_Reference
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = GreedyCD2.RemovePadding(bPadded, psfCut);
+                var b = CommonMethods.PSF.RemovePadding(bPadded, psfCut);
                 var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.1  , 0.20, 2000);
+
+                if (converged)
+                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
+                else
+                    Console.WriteLine("-------------------------------not converged----------------------");
+                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
+                FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
+                watchDeconv.Stop();
+
+                //BACKWARDS
+                watchBackwards.Start();
+                FFT.Shift(xImage);
+                var xGrid = FFT.GridFFT(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                watchBackwards.Stop();
+
+                var hello = FFT.FFTDebug(xImage, 1.0);
+                hello = IDG.Multiply(hello, psfGrid);
+                var hImg = FFT.IFFTDebug(hello, 128 * 128);
+                //FFT.Shift(hImg);
+                FitsIO.Write(hImg, "modelDirty_FFT.fits");
+
+                var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
+                FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
+            }
+        }
+
+        public static void DebugILGPU()
+        {
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+            double norm = 2.0;
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            var visibilitiesCount = visibilities.Length;
+            int gridSize = 256;
+            int subgridsize = 8;
+            int kernelSize = 4;
+            int max_nr_timesteps = 1024;
+            double cellSize = 1.0 / 3600.0 * PI / 180.0;
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+
+            var watchTotal = new Stopwatch();
+            var watchForward = new Stopwatch();
+            var watchBackwards = new Stopwatch();
+            var watchDeconv = new Stopwatch();
+
+            watchTotal.Start();
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+
+            var psfCut = CutImg(psf);
+            FitsIO.Write(psf, "psf.fits");
+            FitsIO.Write(psfCut, "psfCut.fits");
+
+            var xImage = new double[gridSize, gridSize];
+            var residualVis = visibilities;
+            /*var truth = new double[gridSize, gridSize];
+            truth[30, 30] = 1.0;
+            truth[35, 36] = 1.5;
+            var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
+            visibilities = truthVis;
+            var residualVis = truthVis;*/
+            for (int cycle = 0; cycle < 8; cycle++)
+            {
+                //FORWARD
+                watchForward.Start();
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
+                var dirtyImage = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
+                watchForward.Stop();
+
+                //DECONVOLVE
+                watchDeconv.Start();
+
+                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
+                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
+                var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
+                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                var b = CommonMethods.PSF.RemovePadding(bPadded, psfCut);
+
+                var converged = GPUDeconvolution.GreedyCD.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -503,13 +593,6 @@ namespace Single_Reference
             return count;
         }
         #endregion
-
-
-        private static double ComputeL(int x, int subgridSize, float imageSize)
-        {
-            return (x - (subgridSize / 2)) * imageSize / subgridSize;
-        }
-
 
 
     }

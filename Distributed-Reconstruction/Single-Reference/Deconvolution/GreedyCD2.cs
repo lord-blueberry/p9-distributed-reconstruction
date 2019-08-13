@@ -65,8 +65,8 @@ namespace Single_Reference.Deconvolution
             FFT.Shift(psfTmp);
             var PsfCorr = FFT.FFTDebug(psfTmp, 1.0);
 
-            psfTmp = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
-            SetPsf(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
+            psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
+            CommonMethods.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
             var tmp = FFT.FFTDebug(psfTmp, 1.0);
             var tmp2 = IDG.Multiply(tmp, PsfCorr);
 
@@ -123,8 +123,8 @@ namespace Single_Reference.Deconvolution
                     }
                     else
                     {
-                        
-                        /*SetPsf(maskedPsf, xImage, psf, yPixel, xPixel);
+
+                        /*CommonMethods.PSF.SetPSFInWindow(maskedPsf, xImage, psf, yPixel, xPixel);
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
                         tmp2 = IDG.Multiply(tmp, PsfCorr);
                         bUpdateMasked = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
@@ -162,38 +162,6 @@ namespace Single_Reference.Deconvolution
             var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
 
             return PSFPadded;
-        }
-
-        public static double[,] RemovePadding(double[,] img, double[,] psf)
-        {
-            var yPsfHalf = psf.GetLength(0) / 2;
-            var xPsfHalf = psf.GetLength(1) / 2;
-            var imgNoPadding = new double[img.GetLength(0) - psf.GetLength(0), img.GetLength(1) - psf.GetLength(1)];
-            for (int y = 0; y < imgNoPadding.GetLength(0); y++)
-                for (int x = 0; x < imgNoPadding.GetLength(1); x++)
-                    imgNoPadding[y, x] = img[y + yPsfHalf, x + xPsfHalf];
-
-            return imgNoPadding;
-        }
-
-        private static void SetPsf(double[,] psfPadded, double[,] window, double[,] psf, int yPixel, int xPixel)
-        {
-            var yPsfHalf = psf.GetLength(0) / 2;
-            var xPsfHalf = psf.GetLength(1) / 2;
-            for (int i = 0; i < psf.GetLength(0); i++)
-                for (int j = 0; j < psf.GetLength(1); j++)
-                {
-                    var y = (yPixel + i) - yPsfHalf;
-                    var x = (xPixel + j) - xPsfHalf;
-                    if (y >= 0 & y < window.GetLength(0) & x >= 0 & x < window.GetLength(1))
-                    {
-                        psfPadded[i+ yPsfHalf, j + xPsfHalf] = psf[i, j];
-                    }
-                    else
-                    {
-                        psfPadded[i + yPsfHalf, j + yPsfHalf] = 0.0;
-                    }
-                }
         }
 
         private static void UpdateB(double[,] b, double[,] bUpdate, DebugCyclic.Rectangle imageSection, int yPixel, int xPixel, double xDiff)

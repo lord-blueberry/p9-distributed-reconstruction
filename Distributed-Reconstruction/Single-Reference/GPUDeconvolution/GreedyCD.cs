@@ -91,15 +91,15 @@ namespace Single_Reference.GPUDeconvolution
         }
         #endregion
 
-        private static void Iteration(Accelerator accelerator)
+        private static void Iteration(Accelerator accelerator, double[,] xImageInput, double[,]candidateInput, double[,] aMapInput, double[,] psf2Input, float lambda, float aplpha)
         {
             var shrinkKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>>(ShrinkKernel);
             var maxIndexKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>, ArrayView<float>>(MaxIndexKernel);
             var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
             var resetKernel = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>>(ResetIndicesKernel);
 
-            var size = new Index2(32, 32);
-            var psfSize = new Index2(16, 16);
+            var size = new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1));
+            var psfSize = new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1));
 
             using (var xImage = accelerator.Allocate <float>(size))
             using (var xCandidates = accelerator.Allocate<float>(size))
@@ -110,21 +110,16 @@ namespace Single_Reference.GPUDeconvolution
             using (var maxIndices = accelerator.Allocate<int>(2))
             using (var lambdaAlpha = accelerator.Allocate<float>(2))
             {
-                xImage.MemSetToZero();
-                xCandidates.MemSetToZero();
-                psf2.MemSetToZero();
-
-                xCandidates[new Index2(20, 20)] = 4.0f;
-                psf2[new Index2(8, 8)] = 2f;
-                psf2[new Index2(7, 7)] = 1f;
-                psf2[new Index2(7, 8)] = 1f;
-                psf2[new Index2(7, 9)] = 1f;
+                CopyToBuffer(xImage, xImageInput);
+                CopyToBuffer(xCandidates, candidateInput);
+                CopyToBuffer(aMap, aMapInput);
+                CopyToBuffer(psf2, psf2Input);
 
                 maxIndices[0] = -1;
                 maxIndices[1] = -1;
 
-                lambdaAlpha[0] = 0.1f;
-                lambdaAlpha[1] = 1.0f;
+                lambdaAlpha[0] = lambda;
+                lambdaAlpha[1] = aplpha;
 
                 shrinkKernel(size, xImage.View, xCandidates.View, shrinked.View, lambdaAlpha.View);
 
@@ -134,10 +129,10 @@ namespace Single_Reference.GPUDeconvolution
                     accelerator.Reduce(shrinked.View.AsLinearView(), maxCandidate.View, new ShuffleDownFloat(), new MaxFloat());
                 accelerator.Synchronize();
 
-                //up to here is good
-
                 maxIndexKernel(size, xImage.View, xCandidates.View, shrinked.View, maxCandidate.View, maxIndices.View, lambdaAlpha.View);
                 accelerator.Synchronize();
+                var indices = maxIndices.GetAsArray();
+                var maxDiff = maxCandidate.GetAsArray();
 
                 updateCandidatesKernel(psfSize, xCandidates.View, aMap.View, psf2.View, maxCandidate.View, maxIndices.View);
                 accelerator.Synchronize();
@@ -151,11 +146,40 @@ namespace Single_Reference.GPUDeconvolution
                 var maxI = maxIndices.GetAsArray();
             }
         }
-        
 
+        private static void CopyToBuffer(MemoryBuffer2D<float> buffer, double[,] image)
+        {
+            for (int i = 0; i < image.GetLength(0); i++)
+                for (int j = 0; j < image.GetLength(1); j++)
+                    buffer[new Index2(i, j)] = (float)image[i, j];
+        }
 
+        public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha)
+        {
+            using (var context = new Context())
+            {
+                // Create custom CPU context with a warp size > 1
+                using (var accelerator = new CPUAccelerator(context, 4, 4))
+                {
+                    Console.WriteLine($"Performing operations on {accelerator}");
 
+                    var yPsfHalf = psf.GetLength(0) / 2;
+                    var xPsfHalf = psf.GetLength(1) / 2;
 
+                    var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
+                    var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
+
+                    for (int y = 0; y < b.GetLength(0); y++)
+                        for (int x = 0; x < b.GetLength(1); x++)
+                            b[y, x] = b[y, x] / aMap[y, x];
+
+                    Iteration(accelerator, xImage, b, aMap, psf2, (float)lambda, (float)alpha);
+                }
+            }
+
+            return true;
+        }
+    
         public static void Test()
         {
             using (var context = new Context())
@@ -165,7 +189,7 @@ namespace Single_Reference.GPUDeconvolution
                 {
                     Console.WriteLine($"Performing operations on {accelerator}");
 
-                    Iteration(accelerator);
+                    //Iteration(accelerator);
                     //Reduce(accelerator);
                     //AtomicReduce(accelerator);
                 }

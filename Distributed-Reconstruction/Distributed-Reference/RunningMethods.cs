@@ -521,7 +521,7 @@ namespace Distributed_Reference
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                image = GreedyCD2.RemovePadding(bPadded, psfCut);
+                image = CommonMethods.PSF.RemovePadding(bPadded, psfCut);
                 watchIdg.Stop();
             }
             comm.Broadcast(ref maxSideLobeLevel, 0);
