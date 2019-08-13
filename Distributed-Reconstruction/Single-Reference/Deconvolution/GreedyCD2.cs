@@ -176,7 +176,7 @@ namespace Single_Reference.Deconvolution
             return imgNoPadding;
         }
 
-        public static void SetPsf(double[,] psfPadded, double[,] window, double[,] psf, int yPixel, int xPixel)
+        private static void SetPsf(double[,] psfPadded, double[,] window, double[,] psf, int yPixel, int xPixel)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -196,7 +196,7 @@ namespace Single_Reference.Deconvolution
                 }
         }
 
-        public static void UpdateB(double[,] b, double[,] bUpdate, DebugCyclic.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
+        private static void UpdateB(double[,] b, double[,] bUpdate, DebugCyclic.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
             var xBHalf = bUpdate.GetLength(1) / 2;
