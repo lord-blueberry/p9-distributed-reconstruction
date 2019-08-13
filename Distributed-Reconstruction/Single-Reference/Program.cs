@@ -6,7 +6,7 @@ namespace Single_Reference
     {
         static void Main()
         {
-            //DebugMethods.DebugSimulatedGreedy2();
+            DebugMethods.DebugSimulatedGreedy2();
             DebugMethods.DebugILGPU();
 
             //DebugMethods.DebugSimulatedMixed();

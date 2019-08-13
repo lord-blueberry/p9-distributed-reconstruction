@@ -331,10 +331,11 @@ namespace Single_Reference.GPUDeconvolution
                 lambdaAlpha[0] = lambda;
                 lambdaAlpha[1] = aplpha;
 
-                shrinkKernel(size, xImage.View, xCandidates.View, shrinked.View, lambdaAlpha.View);
-
                 for(int i = 0; i < 100; i++)
                 {
+                    shrinkKernel(size, xImage.View, xCandidates.View, shrinked.View, lambdaAlpha.View);
+                    accelerator.Synchronize();
+
                     if (accelerator.AcceleratorType == AcceleratorType.CPU)
                         accelerator.Reduce(shrinked.View.AsLinearView(), maxCandidate.View, new ShuffleDownFloat(), new AtomicMaxFloat());
                     else
@@ -343,8 +344,8 @@ namespace Single_Reference.GPUDeconvolution
 
                     maxIndexKernel(size, xImage.View, xCandidates.View, shrinked.View, maxCandidate.View, maxIndices.View, lambdaAlpha.View);
                     accelerator.Synchronize();
-                    var indices = maxIndices.GetAsArray();
-                    var maxDiff = maxCandidate.GetAsArray();
+                    //var indices = maxIndices.GetAsArray();
+                    //var maxDiff = maxCandidate.GetAsArray();
 
                     updateCandidatesKernel(psfSize, xCandidates.View, aMap.View, psf2.View, maxCandidate.View, maxIndices.View);
                     accelerator.Synchronize();

@@ -233,7 +233,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 8; cycle++)
+            for (int cycle = 0; cycle < 1; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
