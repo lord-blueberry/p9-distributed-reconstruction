@@ -196,20 +196,6 @@ namespace Single_Reference.Deconvolution
                 }
         }
 
-        public static void UpdateB(double[,] b, double[,] bUpdate, int yPixel, int xPixel, double xDiff)
-        {
-            var yBHalf = bUpdate.GetLength(0) / 2;
-            var xBHalf = bUpdate.GetLength(1) / 2;
-            for (int i = 0; i < bUpdate.GetLength(0); i++)
-                for (int j = 0; j < bUpdate.GetLength(1); j++)
-                {
-                    var y = (yPixel + i) - yBHalf;
-                    var x = (xPixel + j) - xBHalf;
-                    if (y >= 0 & y < b.GetLength(0) & x >= 0 & x < b.GetLength(1))
-                        b[y, x] += bUpdate[i, j] * xDiff;
-                }
-        }
-
         public static void UpdateB(double[,] b, double[,] bUpdate, DebugCyclic.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
