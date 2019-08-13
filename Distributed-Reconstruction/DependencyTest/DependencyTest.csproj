@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -16,7 +16,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ILGPU" Version="0.5.1" />
+    <PackageReference Include="ILGPU" Version="0.3.0" />
+    <PackageReference Include="ILGPU.Lightning" Version="0.3.0" />
   </ItemGroup>
 
 </Project>
