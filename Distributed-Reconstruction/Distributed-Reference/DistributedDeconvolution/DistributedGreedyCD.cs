@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Text;
 using MPI;
-using Single_Reference.Deconvolution;
 using Single_Reference.IDGSequential;
 using static Distributed_Reference.Communication;
 

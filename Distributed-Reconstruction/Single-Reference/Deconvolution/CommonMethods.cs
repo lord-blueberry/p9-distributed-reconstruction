@@ -11,5 +11,15 @@ namespace Single_Reference.Deconvolution
             //ShrinkPositive(value, lambda * alpha) / (1 + lambda * (1 - alpha));
             return 0.0;
         }
+
+        public static void CalcPsfScan()
+        {
+
+        }
+
+        public static void QueryScan()
+        {
+
+        }
     }
 }
