@@ -61,10 +61,10 @@ namespace Single_Reference.GPUDeconvolution
                         var lambda = lambdaAlpha[0];
                         var alpha = lambdaAlpha[1];
                         var xNew = GPUShrinkElasticNet(xImage[index] + xCandidate[index], lambda, alpha);
+                        maxAbsDiff[0] = xImage[index] - xNew;
 
                         //update result
                         xImage[index] = xNew;
-                        maxAbsDiff[0] = xImage[index] - xNew;
                     }
                 }
             }
@@ -80,7 +80,8 @@ namespace Single_Reference.GPUDeconvolution
             var indexCandidate = index.Add(new Index2(maxIndices[1], maxIndices[0])).Subtract(psf2.Extent / 2);
             if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(xCandidates.Extent))
             {
-                xCandidates[indexCandidate] += (psf2[index] * maxDiff[0]) / aMap[index];
+                var update = (psf2[index] * maxDiff[0]) / aMap[indexCandidate];
+                xCandidates[indexCandidate] += (psf2[index] * maxDiff[0]) / aMap[indexCandidate];
             }
         }
 
@@ -101,6 +102,8 @@ namespace Single_Reference.GPUDeconvolution
             var size = new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1));
             var psfSize = new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1));
 
+            FitsIO.Write(candidateInput, "candidateInputBefore.fits");
+
             using (var xImage = accelerator.Allocate <float>(size))
             using (var xCandidates = accelerator.Allocate<float>(size))
             using (var shrinked = accelerator.Allocate<float>(size))
@@ -115,6 +118,7 @@ namespace Single_Reference.GPUDeconvolution
                 CopyToBuffer(aMap, aMapInput);
                 CopyToBuffer(psf2, psf2Input);
 
+                FitsIO.Write(CopyToImage(xCandidates.GetAsArray(), size), "candidatesAfter.fits");
                 maxIndices[0] = -1;
                 maxIndices[1] = -1;
 
@@ -153,7 +157,7 @@ namespace Single_Reference.GPUDeconvolution
         {
             for (int i = 0; i < image.GetLength(0); i++)
                 for (int j = 0; j < image.GetLength(1); j++)
-                    buffer[new Index2(i, j)] = (float)image[i, j];
+                    buffer[new Index2(j, i)] = (float)image[i, j];
         }
 
         private static double[,] CopyToImage(float[] img, Index2 size)
