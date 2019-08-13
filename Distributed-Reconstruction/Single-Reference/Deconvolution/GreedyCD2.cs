@@ -50,11 +50,7 @@ namespace Single_Reference.Deconvolution
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
-            var integral = GreedyCD.CalcPSf2Integral(psf);
-            var aMap = new double[b.GetLength(0), b.GetLength(1)];
-            for (int y = 0; y < b.GetLength(0); y++)
-                for (int x = 0; x < b.GetLength(1); x++)
-                    aMap[y, x] = GreedyCD.QueryIntegral2(integral, y, x, b.GetLength(0), b.GetLength(1));
+            var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
             var imageSection = new DebugCyclic.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
 
             //invert the PSF, since we actually do want to correlate the psf with the residuals. (The FFT already inverts the psf, so we need to invert it again to not invert it. Trust me.)

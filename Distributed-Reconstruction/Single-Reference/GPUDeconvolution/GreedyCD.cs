@@ -143,6 +143,8 @@ namespace Single_Reference.GPUDeconvolution
                 var x = xImage.GetAsArray();
                 var candidate = xCandidates.GetAsArray();
                 var p = psf2.GetAsArray();
+                FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
+                FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
                 var maxI = maxIndices.GetAsArray();
             }
         }
@@ -152,6 +154,20 @@ namespace Single_Reference.GPUDeconvolution
             for (int i = 0; i < image.GetLength(0); i++)
                 for (int j = 0; j < image.GetLength(1); j++)
                     buffer[new Index2(i, j)] = (float)image[i, j];
+        }
+
+        private static double[,] CopyToImage(float[] img, Index2 size)
+        {
+            var output = new double[size.Y, size.X];
+            var index = 0;
+            for(int y = 0; y < size.Y; y++)
+            {
+                for (int x = 0; x < size.X; x++)
+                    output[y, x] = img[index + x];
+                index += size.X;
+            }
+
+            return output;
         }
 
         public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha)

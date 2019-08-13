@@ -87,7 +87,7 @@ namespace Single_Reference
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = CommonMethods.PSF.RemovePadding(bPadded, psfCut);
+                var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
                 var lambda = 0.8;
                 var alpha = 0.05;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -164,7 +164,7 @@ namespace Single_Reference
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = CommonMethods.PSF.RemovePadding(bPadded, psfCut);
+                var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
                 var lambda = 100.0;
                 var alpha = 0.95;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -251,7 +251,7 @@ namespace Single_Reference
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = CommonMethods.PSF.RemovePadding(bPadded, psfCut);
+                var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
                 var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.1  , 0.20, 2000);
 
                 if (converged)
@@ -340,7 +340,7 @@ namespace Single_Reference
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = CommonMethods.PSF.RemovePadding(bPadded, psfCut);
+                var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
 
                 var converged = GPUDeconvolution.GreedyCD.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
 

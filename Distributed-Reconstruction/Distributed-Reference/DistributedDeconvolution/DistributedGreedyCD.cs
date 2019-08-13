@@ -4,6 +4,7 @@ using System.Text;
 using MPI;
 using Single_Reference.IDGSequential;
 using static Distributed_Reference.Communication;
+using Single_Reference;
 
 namespace Distributed_Reference.DistributedDeconvolution
 {
@@ -11,14 +12,14 @@ namespace Distributed_Reference.DistributedDeconvolution
     {
         public static bool DeconvolvePath(Intracommunicator comm, Rectangle imgSection, Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10, int maxIteration = 100, double epsilon = 1e-4)
         {
-            var integral = Single_Reference.Deconvolution.GreedyCD.CalcPSf2Integral(psf);
+            var integral = CommonMethods.PSF.CalcScan(psf);
             var aMap = new double[b.GetLength(0), b.GetLength(1)];
             for (int y = imgSection.Y; y < imgSection.YEnd; y++)
                 for (int x = imgSection.X; x < imgSection.XEnd; x++)
                 {
                     var yLocal = y - imgSection.Y;
                     var xLocal = x - imgSection.X;
-                    aMap[yLocal, xLocal] = Single_Reference.Deconvolution.GreedyCD.QueryIntegral2(integral, y, x, totalSize.YEnd, totalSize.XEnd);
+                    aMap[yLocal, xLocal] = CommonMethods.PSF.QueryScan(integral, y, x, totalSize.YEnd, totalSize.XEnd);
                 }
             
             var converged = false;
@@ -155,7 +156,7 @@ namespace Distributed_Reference.DistributedDeconvolution
             return converged;
         }
 
-        public static void SetPsf(double[,] psfPadded, Rectangle window, double[,] psf, int yPixel, int xPixel)
+        private static void SetPsf(double[,] psfPadded, Rectangle window, double[,] psf, int yPixel, int xPixel)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -175,7 +176,7 @@ namespace Distributed_Reference.DistributedDeconvolution
                 }
         }
 
-        public static void UpdateB(double[,] b, double[,] bUpdate, Rectangle imgSection, int yPixel, int xPixel, double xDiff)
+        private static void UpdateB(double[,] b, double[,] bUpdate, Rectangle imgSection, int yPixel, int xPixel, double xDiff)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
             var xBHalf = bUpdate.GetLength(1) / 2;

@@ -91,7 +91,7 @@ namespace Single_Reference
                 psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
                 SetPSFInWindow(psfTmp, image, psf, image.GetLength(0) / 2, image.GetLength(1) / 2);
                 var tmp = FFT.FFTDebug(psfTmp, 1.0);
-                var tmp2 = Visibilities.Multiply(tmp, PsfCorr);
+                var tmp2 = Fourier2D.Multiply(tmp, PsfCorr);
 
                 var psf2 = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
 
@@ -117,7 +117,10 @@ namespace Single_Reference
                         }
                     }
             }
+        }
 
+        public static class Residuals
+        {
             public static double[,] PadImage(double[,] image, double[,] psf)
             {
                 var yPsfHalf = psf.GetLength(0) / 2;
@@ -141,7 +144,29 @@ namespace Single_Reference
 
                 return imgNoPadding;
             }
+        }
 
+        public static class Fourier2D 
+        {
+            public static Complex[,] Multiply(Complex[,] vis0, Complex[,] vis1)
+            {
+                var outputVis = new Complex[vis0.GetLength(0), vis0.GetLength(1)];
+                for (int i = 0; i < vis0.GetLength(0); i++)
+                    for (int j = 0; j < vis0.GetLength(1); j++)
+                        outputVis[i, j] = vis0[i, j] * vis1[i, j];
+
+                return outputVis;
+            }
+
+            public static void FFT()
+            {
+
+            }
+
+            public static void IFFT()
+            {
+
+            }
         }
 
         public static class Visibilities
@@ -160,15 +185,7 @@ namespace Single_Reference
                 return residualVis;
             }
 
-            public static Complex[,] Multiply(Complex[,] vis0, Complex[,] vis1)
-            {
-                var outputVis = new Complex[vis0.GetLength(0), vis0.GetLength(1)];
-                for (int i = 0; i < vis0.GetLength(0); i++)
-                    for (int j = 0; j < vis0.GetLength(1); j++)
-                        outputVis[i, j] = vis0[i, j] * vis1[i, j];
 
-                return outputVis;
-            }
         }
     }
 }
