@@ -6,8 +6,8 @@ namespace Single_Reference
     {
         static void Main()
         {
-
-            GPUDeconvolution.GreedyCD.Test();
+            //DebugMethods.DebugSimulatedGreedy2();
+            DebugMethods.DebugILGPU();
 
             //DebugMethods.DebugSimulatedMixed();
             //Deconvolution.NaiveGreedyCD.Run();

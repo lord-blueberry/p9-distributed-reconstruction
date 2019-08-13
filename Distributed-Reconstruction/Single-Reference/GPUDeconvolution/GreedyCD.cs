@@ -145,7 +145,7 @@ namespace Single_Reference.GPUDeconvolution
                 var p = psf2.GetAsArray();
                 FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
                 FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
-                var maxI = maxIndices.GetAsArray();
+                
             }
         }
 

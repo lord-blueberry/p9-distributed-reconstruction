@@ -128,6 +128,13 @@ namespace Single_Reference.Deconvolution
                         UpdateB(b, bUpdateCache, imageSection, yPixel, xPixel, xOld - xNew);
                     }
                     iter++;
+
+                    var candidates = new double[b.GetLength(0), b.GetLength(1)];
+                    for (int y = 0; y < b.GetLength(0); y++)
+                        for (int x = 0; x < b.GetLength(1); x++)
+                            candidates[y,x] = b[y, x] / aMap[y, x];
+                    FitsIO.Write(candidates, "candidatesGreedy2.fits");
+                    FitsIO.Write(xImage, "xImageGreedy2.fits");
                 }
             }
 

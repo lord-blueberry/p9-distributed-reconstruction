@@ -323,7 +323,7 @@ namespace Single_Reference.Deconvolution
                     var xOld = xImage[yLocal2, xLocal2];
                     xImage[yLocal2, xLocal2] = xNew;
 
-                    FitsIO.Write(GreedyCD2.RemovePadding(b, psf), "b_greedyTrue.fits");
+                    FitsIO.Write(CommonMethods.Residuals.RemovePadding(b, psf), "b_greedyTrue.fits");
                     Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yLocal2 + "\t" + xLocal2);
                     GreedyCD.UpdateResiduals2(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
                     RES = FFT.FFTDebug(resPadded, 1.0);
