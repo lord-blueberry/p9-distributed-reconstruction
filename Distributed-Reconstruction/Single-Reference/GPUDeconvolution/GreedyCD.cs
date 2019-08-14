@@ -156,7 +156,7 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        private static double[,] CopyToImage(float[] img, Index2 size)
+        public static double[,] CopyToImage(float[] img, Index2 size)
         {
             var output = new double[size.Y, size.X];
             var index = 0;
@@ -184,10 +184,10 @@ namespace Single_Reference.GPUDeconvolution
                     for (int x = 0; x < b.GetLength(1); x++)
                         b[y, x] = b[y, x] / aMap[y, x];
 
-                var gpuId = Accelerator.Accelerators.Where(id => id.AcceleratorType == AcceleratorType.Cuda).First();
-                if(gpuId != null)
+                var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
+                if(gpuIds.Any())
                 {
-                    using (var accelerator = new CudaAccelerator(context, gpuId.DeviceId))
+                    using (var accelerator = new CudaAccelerator(context, gpuIds.First().DeviceId))
                     {
                         Console.WriteLine($"Performing operations on {accelerator}");
                         Iteration(accelerator, ToFloat(xImage), ToFloat(b), ToFloat(aMap), ToFloat(psf2), (float)lambda, (float)alpha);
@@ -222,7 +222,7 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        private static float[,] ToFloat(double[,] img)
+        public static float[,] ToFloat(double[,] img)
         {
             var output = new float[img.GetLength(0), img.GetLength(1)];
             for (int i = 0; i < img.GetLength(0); i++)
