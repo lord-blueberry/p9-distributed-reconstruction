@@ -6,6 +6,7 @@ namespace Single_Reference
     {
         static void Main()
         {
+            Single_Reference.GPUDeconvolution.GreedyCD2.TestRowMajor();
             //DebugMethods.DebugSimulatedGreedy2();
             DebugMethods.DebugILGPU();
 

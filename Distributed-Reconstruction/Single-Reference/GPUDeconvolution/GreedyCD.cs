@@ -147,11 +147,11 @@ namespace Single_Reference.GPUDeconvolution
                     Console.WriteLine("iteration " + i);
                 }
 
-                var x = xImage.GetAsArray();
-                var candidate = xCandidates.GetAsArray();
+                var x = xImage.GetAs2DArray();
+                var candidate = xCandidates.GetAs2DArray();
                 var p = psf2.GetAsArray();
-                FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
-                FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
+                FitsIO.Write(ToDouble(x), "xImageGPU.fits");
+                FitsIO.Write(ToDouble(candidate), "candidateGPU.fits");
             }
         }
 
@@ -212,6 +212,15 @@ namespace Single_Reference.GPUDeconvolution
             for (int i = 0; i < img.GetLength(0); i++)
                 for (int j = 0; j < img.GetLength(1); j++)
                     output[i, j] = (float)img[i, j];
+            return output;
+        }
+
+        private static double[,] ToDouble(float[,] img)
+        {
+            var output = new double[img.GetLength(0), img.GetLength(1)];
+            for (int i = 0; i < img.GetLength(0); i++)
+                for (int j = 0; j < img.GetLength(1); j++)
+                    output[i, j] = img[i, j];
             return output;
         }
 

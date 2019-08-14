@@ -16,6 +16,26 @@ namespace Single_Reference.GPUDeconvolution
     {
         private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => XMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
+        private struct MaxPixel
+        {
+            int y;
+            int x;
+            float xDiff;
+            float xAbsDiff; 
+        }
+
+        private static void SumKernel(Index index,
+            ArrayView2D<float> bMap,
+            ArrayView<float> output)
+        {
+            float sum = 0;
+            for(int i = 0; i < bMap.Extent.X; i++)
+            {
+                sum += bMap[new Index2(index.X, i)];
+            }
+            output[index] = sum;
+        }
+
         #region kernels
         private static void ShrinkReduceKernel(
             GroupedIndex2 indexGroup,
@@ -126,81 +146,54 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        private static void Shrink2(Index2 index,
-            ArrayView2D<float> xImage,
-            ArrayView2D<float> xCandidates,
-            ArrayView<float> maxCandidate,
-            ArrayView<int> maxIndices,
-            ArrayView<float> lambdaAlpha)
+
+        #endregion
+
+        public static void TestRowMajor()
         {
-            //not sure if necessary, but bounds check were always done in the ILGPU examples
-            if (index.InBounds(xImage.Extent))
+            using (var context = new Context())
             {
-                //TODO: fix this line for ximage.size != xCandidates.size
-                var xOld = xImage[index];
-                var xCandidate = xCandidates[index];
-                var lambda = lambdaAlpha[0];
-                var alpha = lambdaAlpha[1];
-
-                var xNew = GPUShrinkElasticNet(xOld + xCandidate, lambda, alpha);
-                var xDiff = xOld - xNew;
-
-                if (maxCandidate[0] == XMath.Abs(xDiff))
+                var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
+                if (gpuIds.Any())
                 {
-                    var oldValue = Atomic.CompareExchange(ref maxIndices[0], -1, index.Y);
-                    if (oldValue == -1)
+                    using (var accelerator = new CudaAccelerator(context, gpuIds.First().DeviceId))
                     {
-                        maxIndices[1] = index.X;
+                        Console.WriteLine($"Performing operations on {accelerator}");
+                    }
+                }
+                else
+                {
+                    using (var accelerator = new CPUAccelerator(context, 4))
+                    {
+                        Console.WriteLine($"Performing operations on {accelerator}");
+                        var k = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView2D<float>, ArrayView<float>>(SumKernel);
+                        var size = new Index2(8192, 8192);
+                        using(var input = accelerator.Allocate<float>(size))
+                        using(var output = accelerator.Allocate<float>(8192))
+                        {
+                            k(new Index(8192), input, output);
+                            accelerator.Synchronize();
+                            var outSum = output.GetAsArray();
+                            var inNotSum = input.GetAs2DArray();
+                        }
 
-                        //retrieve sign of maximum candidat
-                        maxCandidate[0] = xDiff;
-
-                        //update result
-                        xImage[index] = xNew;
                     }
                 }
             }
         }
 
-        private static void UpdateCandidatesKernel(Index2 index,
-            ArrayView2D<float> xCandidates,
-            ArrayView2D<float> aMap,
-            ArrayView2D<float> psf2,
-            ArrayView<float> maxDiff,
-            ArrayView<int> maxIndices)
-        {
-            var indexCandidate = index.Add(new Index2(maxIndices[1], maxIndices[0])).Subtract(psf2.Extent / 2);
-            if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(xCandidates.Extent))
-            {
-                var update = (psf2[index] * maxDiff[0]) / aMap[indexCandidate];
-                xCandidates[indexCandidate] += (psf2[index] * maxDiff[0]) / aMap[indexCandidate];
-            }
-        }
-
-        private static void ResetIndicesKernel(Index index,
-            ArrayView<int> maxIndices,
-            ArrayView<float> maxCandidate)
-        {
-            maxIndices[index] = -1;
-            maxCandidate[0] = 0;
-        }
-        #endregion
-
         private static void Iteration(Accelerator accelerator, float[,] xImageInput, float[,] candidateInput, float[,] aMapInput, float[,] psf2Input, float lambda, float alpha)
         {
             var shrinkKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>>(ShrinkKernel);
-            var maxIndexKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>, ArrayView<float>>(Shrink2);
-            var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
-            var resetKernel = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView<float>>(ResetIndicesKernel);
 
             var size = new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1));
             var psfSize = new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1));
 
             using (var xImage = accelerator.Allocate<float>(size))
             using (var xCandidates = accelerator.Allocate<float>(size))
-            using (var shrinked = accelerator.Allocate<float>(size))
+            //using (var shrinked = accelerator.Allocate<float>(size))
             using (var aMap = accelerator.Allocate<float>(size))
-            using (var psf2 = accelerator.Allocate<float>(psfSize))
+            //using (var psf2 = accelerator.Allocate<float>(psfSize))
             using (var maxCandidate = accelerator.Allocate<float>(1))
             using (var maxIndices = accelerator.Allocate<int>(2))
             using (var lambdaAlpha = accelerator.Allocate<float>(2))
@@ -208,36 +201,23 @@ namespace Single_Reference.GPUDeconvolution
                 xImage.CopyFrom(xImageInput, new Index2(0, 0), new Index2(0, 0), new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1)));
                 xCandidates.CopyFrom(candidateInput, new Index2(0, 0), new Index2(0, 0), new Index2(candidateInput.GetLength(0), candidateInput.GetLength(1)));
                 aMap.CopyFrom(aMapInput, new Index2(0, 0), new Index2(0, 0), new Index2(aMapInput.GetLength(0), aMapInput.GetLength(1)));
-                psf2.CopyFrom(psf2Input, new Index2(0, 0), new Index2(0, 0), new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1)));
+                //psf2.CopyFrom(psf2Input, new Index2(0, 0), new Index2(0, 0), new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1)));
 
                 maxIndices.CopyFrom(-1, new Index(0));
                 maxIndices.CopyFrom(-1, new Index(1));
                 maxCandidate.CopyFrom(0, new Index(0));
 
                 lambdaAlpha.CopyFrom(lambda, new Index(0));
-                lambdaAlpha.CopyFrom(alpha, new Index(0));
+                lambdaAlpha.CopyFrom(alpha, new Index(1));
 
-                for (int i = 0; i < 100; i++)
-                {
-                    shrinkKernel(size, xImage.View, xCandidates.View, maxCandidate.View, lambdaAlpha.View);
-                    accelerator.Synchronize();
+                int i = 0;
+                shrinkKernel(size, xImage.View, xCandidates.View, maxCandidate.View, lambdaAlpha.View);
+                accelerator.Synchronize();
 
-                    maxIndexKernel(size, xImage.View, xCandidates.View, maxCandidate.View, maxIndices.View, lambdaAlpha.View);
-                    accelerator.Synchronize();
-                    var indices = maxIndices.GetAsArray();
-                    var maxDiff = maxCandidate.GetAsArray();
-
-                    updateCandidatesKernel(psfSize, xCandidates.View, aMap.View, psf2.View, maxCandidate.View, maxIndices.View);
-                    accelerator.Synchronize();
-
-                    resetKernel(new Index(2), maxIndices.View, maxCandidate.View);
-                    accelerator.Synchronize();
-                    Console.WriteLine("iteration " + i);
-                }
-
+                Console.WriteLine("iteration " + i);
+                
                 var x = xImage.GetAsArray();
                 var candidate = xCandidates.GetAsArray();
-                var p = psf2.GetAsArray();
                 FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
                 FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
 
@@ -251,7 +231,7 @@ namespace Single_Reference.GPUDeconvolution
             for (int y = 0; y < size.Y; y++)
             {
                 for (int x = 0; x < size.X; x++)
-                    output[y, x] = img[index + x];
+                    output[x, y] = img[index + x];
                 index += size.X;
             }
 
