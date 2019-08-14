@@ -98,7 +98,7 @@ namespace Single_Reference.GPUDeconvolution
         }
         #endregion
 
-        private static void Iteration(Accelerator accelerator, float[,] xImageInput, float[,]candidateInput, float[,] aMapInput, float[,] psf2Input, float lambda, float aplpha)
+        private static void Iteration(Accelerator accelerator, float[,] xImageInput, float[,]candidateInput, float[,] aMapInput, float[,] psf2Input, float lambda, float alpha)
         {
             var shrinkKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>>(ShrinkKernel);
             var maxIndexKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>, ArrayView<float>>(Shrink2);
@@ -117,19 +117,19 @@ namespace Single_Reference.GPUDeconvolution
             using (var maxIndices = accelerator.Allocate<int>(2))
             using (var lambdaAlpha = accelerator.Allocate<float>(2))
             {
-                xImage.CopyFrom(xImageInput, new Index2(0, 0), new Index2(0, 0), new Index2(0, 0));
-                xCandidates.CopyFrom(candidateInput, new Index2(0, 0), new Index2(0, 0), new Index2(0, 0));
-                aMap.CopyFrom(aMapInput, new Index2(0, 0), new Index2(0, 0), new Index2(0, 0));
-                psf2.CopyFrom(psf2Input, new Index2(0, 0), new Index2(0, 0), new Index2(0, 0));
+                xImage.CopyFrom(xImageInput, new Index2(0, 0), new Index2(0, 0), new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1)));
+                xCandidates.CopyFrom(candidateInput, new Index2(0, 0), new Index2(0, 0), new Index2(candidateInput.GetLength(0), candidateInput.GetLength(1)));
+                aMap.CopyFrom(aMapInput, new Index2(0, 0), new Index2(0, 0), new Index2(aMapInput.GetLength(0), aMapInput.GetLength(1)));
+                psf2.CopyFrom(psf2Input, new Index2(0, 0), new Index2(0, 0), new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1)));
 
                 maxIndices.CopyFrom(-1, new Index(0));
                 maxIndices.CopyFrom(-1, new Index(1));
                 maxCandidate.CopyFrom(0, new Index(0));
 
-                lambdaAlpha.View[0] = lambda;
-                lambdaAlpha.View[1] = aplpha;
+                lambdaAlpha.CopyFrom(lambda, new Index(0));
+                lambdaAlpha.CopyFrom(alpha, new Index(0));
 
-                for(int i = 0; i< 100; i++)
+                for (int i = 0; i< 100; i++)
                 {
                     shrinkKernel(size, xImage.View, xCandidates.View, maxCandidate.View, lambdaAlpha.View);
                     accelerator.Synchronize();
@@ -146,7 +146,6 @@ namespace Single_Reference.GPUDeconvolution
                     accelerator.Synchronize();
                     Console.WriteLine("iteration " + i);
                 }
-
 
                 var x = xImage.GetAsArray();
                 var candidate = xCandidates.GetAsArray();
