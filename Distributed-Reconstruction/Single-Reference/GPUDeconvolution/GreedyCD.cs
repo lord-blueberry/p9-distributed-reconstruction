@@ -127,7 +127,7 @@ namespace Single_Reference.GPUDeconvolution
                 maxCandidate.CopyFrom(0, new Index(0));
 
                 lambdaAlpha.CopyFrom(lambda, new Index(0));
-                lambdaAlpha.CopyFrom(alpha, new Index(0));
+                lambdaAlpha.CopyFrom(alpha, new Index(1));
 
                 for (int i = 0; i< 100; i++)
                 {
@@ -152,7 +152,6 @@ namespace Single_Reference.GPUDeconvolution
                 var p = psf2.GetAsArray();
                 FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
                 FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
-                
             }
         }
 
@@ -163,7 +162,7 @@ namespace Single_Reference.GPUDeconvolution
             for(int y = 0; y < size.Y; y++)
             {
                 for (int x = 0; x < size.X; x++)
-                    output[y, x] = img[index + x];
+                    output[x, y] = img[index + x];
                 index += size.X;
             }
 
@@ -206,23 +205,8 @@ namespace Single_Reference.GPUDeconvolution
             return true;
         }
     
-        public static void Test()
-        {
-            using (var context = new Context())
-            {
-                // Create custom CPU context with a warp size > 1
-                using (var accelerator = new CPUAccelerator(context, 4))
-                {
-                    Console.WriteLine($"Performing operations on {accelerator}");
 
-                    //Iteration(accelerator);
-                    //Reduce(accelerator);
-                    //AtomicReduce(accelerator);
-                }
-            }
-        }
-
-        public static float[,] ToFloat(double[,] img)
+        private static float[,] ToFloat(double[,] img)
         {
             var output = new float[img.GetLength(0), img.GetLength(1)];
             for (int i = 0; i < img.GetLength(0); i++)

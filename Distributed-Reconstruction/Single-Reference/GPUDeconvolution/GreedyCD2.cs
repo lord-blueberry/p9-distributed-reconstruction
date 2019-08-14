@@ -35,7 +35,6 @@ namespace Single_Reference.GPUDeconvolution
             var sharedYIndex = SharedMemory.Allocate<int>(nrBLocks);
             var sharedXIndex = SharedMemory.Allocate<int>(nrBLocks);
 
-
             //TODO: WRONG
             int blockIdx = 0;
             var warpIdx = Warp.ComputeWarpIdx(64);
