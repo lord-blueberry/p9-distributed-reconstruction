@@ -10,12 +10,13 @@ using ILGPU.Runtime;
 using ILGPU.Runtime.CPU;
 using ILGPU.ShuffleOperations;
 using System.Linq;
+using ILGPU.Runtime.Cuda;
 
 namespace Single_Reference.GPUDeconvolution
 {
     public class GreedyCD
     {
-        /*
+        
         private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => XMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
         #region kernels
@@ -97,7 +98,7 @@ namespace Single_Reference.GPUDeconvolution
         }
         #endregion
 
-        private static void Iteration(Accelerator accelerator, double[,] xImageInput, double[,]candidateInput, double[,] aMapInput, double[,] psf2Input, float lambda, float aplpha)
+        private static void Iteration(Accelerator accelerator, float[,] xImageInput, float[,]candidateInput, float[,] aMapInput, float[,] psf2Input, float lambda, float aplpha)
         {
             var shrinkKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>>(ShrinkKernel);
             var maxIndexKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>, ArrayView<float>>(Shrink2);
@@ -116,14 +117,14 @@ namespace Single_Reference.GPUDeconvolution
             using (var maxIndices = accelerator.Allocate<int>(2))
             using (var lambdaAlpha = accelerator.Allocate<float>(2))
             {
-                CopyToBuffer(xImage, xImageInput);
-                CopyToBuffer(xCandidates, candidateInput);
-                CopyToBuffer(aMap, aMapInput);
-                CopyToBuffer(psf2, psf2Input);
+                xImage.CopyFrom(xImageInput, new Index2(0, 0), new Index2(0, 0), new Index2(0, 0));
+                xCandidates.CopyFrom(candidateInput, new Index2(0, 0), new Index2(0, 0), new Index2(0, 0));
+                aMap.CopyFrom(aMapInput, new Index2(0, 0), new Index2(0, 0), new Index2(0, 0));
+                psf2.CopyFrom(psf2Input, new Index2(0, 0), new Index2(0, 0), new Index2(0, 0));
 
-                maxIndices.View[0] = -1;
-                maxIndices.View[1] = -1;
-                maxCandidate.View[0] = 0;
+                maxIndices.CopyFrom(-1, new Index(0));
+                maxIndices.CopyFrom(-1, new Index(1));
+                maxCandidate.CopyFrom(0, new Index(0));
 
                 lambdaAlpha.View[0] = lambda;
                 lambdaAlpha.View[1] = aplpha;
@@ -156,13 +157,6 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        private static void CopyToBuffer(MemoryBuffer2D<float> buffer, double[,] image)
-        {
-            for (int i = 0; i < image.GetLength(0); i++)
-                for (int j = 0; j < image.GetLength(1); j++)
-                    buffer.View[new Index2(j, i)] = (float)image[i, j];
-        }
-
         private static double[,] CopyToImage(float[] img, Index2 size)
         {
             var output = new double[size.Y, size.X];
@@ -181,22 +175,32 @@ namespace Single_Reference.GPUDeconvolution
         {
             using (var context = new Context())
             {
-                // Create custom CPU context with a warp size > 1
-                using (var accelerator = new CPUAccelerator(context, 4))
+
+                var yPsfHalf = psf.GetLength(0) / 2;
+                var xPsfHalf = psf.GetLength(1) / 2;
+
+                var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
+                var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
+                for (int y = 0; y < b.GetLength(0); y++)
+                    for (int x = 0; x < b.GetLength(1); x++)
+                        b[y, x] = b[y, x] / aMap[y, x];
+
+                var gpuId = Accelerator.Accelerators.Where(id => id.AcceleratorType == AcceleratorType.Cuda).First();
+                if(gpuId != null)
                 {
-                    Console.WriteLine($"Performing operations on {accelerator}");
-
-                    var yPsfHalf = psf.GetLength(0) / 2;
-                    var xPsfHalf = psf.GetLength(1) / 2;
-
-                    var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
-                    var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
-
-                    for (int y = 0; y < b.GetLength(0); y++)
-                        for (int x = 0; x < b.GetLength(1); x++)
-                            b[y, x] = b[y, x] / aMap[y, x];
-
-                    Iteration(accelerator, xImage, b, aMap, psf2, (float)lambda, (float)alpha);
+                    using (var accelerator = new CudaAccelerator(context, gpuId.DeviceId))
+                    {
+                        Console.WriteLine($"Performing operations on {accelerator}");
+                        Iteration(accelerator, ToFloat(xImage), ToFloat(b), ToFloat(aMap), ToFloat(psf2), (float)lambda, (float)alpha);
+                    }
+                }
+                else
+                {
+                    using (var accelerator = new CPUAccelerator(context, 4))
+                    {
+                        Console.WriteLine($"Performing operations on {accelerator}");
+                        Iteration(accelerator, ToFloat(xImage), ToFloat(b), ToFloat(aMap), ToFloat(psf2), (float)lambda, (float)alpha);
+                    }
                 }
             }
 
@@ -219,11 +223,21 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        */
+        private static float[,] ToFloat(double[,] img)
+        {
+            var output = new float[img.GetLength(0), img.GetLength(1)];
+            for (int i = 0; i < img.GetLength(0); i++)
+                for (int j = 0; j < img.GetLength(1); j++)
+                    output[i, j] = (float)img[i, j];
+            return output;
+        }
+
+
 
 
 
         #region V0.3.0 code
+        /*
         private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => GPUMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
         #region kernels
@@ -389,22 +403,30 @@ namespace Single_Reference.GPUDeconvolution
         {
             using (var context = new Context())
             {
-                // Create custom CPU context with a warp size > 1
-                using (var accelerator = new CPUAccelerator(context, 4, 4))
+                var yPsfHalf = psf.GetLength(0) / 2;
+                var xPsfHalf = psf.GetLength(1) / 2;
+
+                var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
+                var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
+
+                for (int y = 0; y < b.GetLength(0); y++)
+                    for (int x = 0; x < b.GetLength(1); x++)
+                        b[y, x] = b[y, x] / aMap[y, x];
+
+                var gpuId = Accelerator.Accelerators.Where(id => id.AcceleratorType == AcceleratorType.Cuda);
+                if (gpuId != null)
                 {
-                    Console.WriteLine($"Performing operations on {accelerator}");
-
-                    var yPsfHalf = psf.GetLength(0) / 2;
-                    var xPsfHalf = psf.GetLength(1) / 2;
-
-                    var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
-                    var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
-
-                    for (int y = 0; y < b.GetLength(0); y++)
-                        for (int x = 0; x < b.GetLength(1); x++)
-                            b[y, x] = b[y, x] / aMap[y, x];
-
-                    Iteration(accelerator, xImage, b, aMap, psf2, (float)lambda, (float)alpha);
+                    using (var accelerator = new CudaAccelerator(context))
+                    {
+                        Iteration(accelerator, xImage, b, aMap, psf2, (float)lambda, (float)alpha);
+                    }
+                }
+                else
+                {
+                    using (var accelerator = new CPUAccelerator(context, 4, 4))
+                    {
+                        Iteration(accelerator, xImage, b, aMap, psf2, (float)lambda, (float)alpha);
+                    }
                 }
             }
 
@@ -416,6 +438,7 @@ namespace Single_Reference.GPUDeconvolution
             using (var context = new Context())
             {
                 // Create custom CPU context with a warp size > 1
+
                 using (var accelerator = new CPUAccelerator(context, 4, 4))
                 {
                     Console.WriteLine($"Performing operations on {accelerator}");
@@ -426,8 +449,8 @@ namespace Single_Reference.GPUDeconvolution
                 }
             }
         }
-    
-    #endregion
+    */
+        #endregion
 
 
 
