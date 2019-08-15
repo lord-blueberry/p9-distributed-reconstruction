@@ -89,8 +89,8 @@ namespace Single_Reference.GPUDeconvolution
 
             //assign consecutive pixels to threads in a group.
             var pixelCount = (toPixel - fromPixel + Group.Dimension.X - 1) / Group.Dimension.X;
-            var pixelIdx = threadID * pixelCount;
-            var pixelEnd = XMath.Min(pixelIdx + pixelCount, toPixel - fromPixel);
+            var pixelIdx = threadID * pixelCount + fromPixel;
+            var pixelEnd = XMath.Min(pixelIdx + pixelCount, toPixel);
 
             //shrink and save max of the assigned pixels
             float xDiff = 0.0f;
