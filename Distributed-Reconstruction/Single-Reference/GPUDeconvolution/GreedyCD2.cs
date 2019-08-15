@@ -307,28 +307,22 @@ namespace Single_Reference.GPUDeconvolution
                 var test = outTest.GetAsArray();
                 var test2 = outTest2.GetAsArray();
 
-                var s0 = maxDiffShrink.GetAs2DArray();
-                var s1 = maxAbsDiffShrink.GetAs2DArray();
-                var s2 = xIndexShrink.GetAs2DArray();
-                var s3 = yIndexShrink.GetAs2DArray();
-
                 var maxDiffT = 0.0f;
                 var maxAbsDiffT = 0.0f;
                 var xIndexT = -1;
                 var yIndexT = -1;
-                for(int i1 = 0; i1 < s1.GetLength(0); i1++)
-                    //for(int j = 0; j < s1.GetLength(1);j++)
-                    for (int j = 0; j < 1;j++)
-                        if(maxAbsDiffT < s1[i1,j])
-                        {
-                            maxDiffT = s0[i1, j];
-                            maxAbsDiffT = s1[i1, j];
-                            xIndexT = s2[i1, j];
-                            yIndexT = s3[i1, j];
-                        }
+                var bla3 = maxAbsDiff.GetAsArray();
                 var bla0 = maxDiff.GetAsArray();
                 var bla1 = xIndex.GetAsArray();
                 var bla2 = yIndex.GetAsArray();
+                for (int j = 0; j < bla3.Length; j++)
+                    if (maxAbsDiffT < bla3[j])
+                    {
+                        maxDiffT = bla0[ j];
+                        maxAbsDiffT = bla3[j];
+                        xIndexT = bla1[j];
+                        yIndexT = bla2[j];
+                    }
                 var x = xImage.GetAsArray();
                 var candidate = xCandidates.GetAsArray();
                 FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
