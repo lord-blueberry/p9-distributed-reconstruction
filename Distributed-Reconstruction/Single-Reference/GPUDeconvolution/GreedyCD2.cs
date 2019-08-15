@@ -256,9 +256,12 @@ namespace Single_Reference.GPUDeconvolution
             var toPixel = new Index2(xImage.Extent.X, yIdxEnd - 1).ComputeLinearIndex(xImage.Extent);
 
             //assign consecutive pixels to threads in a group.
-            var pixelCount = (toPixel - fromPixel + Group.Dimension.X - 1) / Group.Dimension.X;
-            var pixelIdx = threadID * pixelCount + fromPixel;
-            var pixelEnd = XMath.Min(pixelIdx + pixelCount, toPixel);
+            var pixelCount = (toPixel - fromPixel) / (float)(Group.Dimension.X);
+            var intPixelCount = (int)pixelCount;
+            var spillage = pixelCount - intPixelCount;
+            var pixelIdx = (int)(threadID * pixelCount) + fromPixel;
+            var pixelEnd = (int)((threadID+1) * pixelCount) + fromPixel;
+            pixelEnd = threadID + 1 == Group.DimensionX ? toPixel : pixelEnd;
 
             //shrink and save max of the assigned pixels
             float xDiff = 0.0f;
@@ -284,8 +287,8 @@ namespace Single_Reference.GPUDeconvolution
 
             xDiffOut[gridIdx, threadID] = xDiff;
             xAbsDiffOut[gridIdx, threadID] = xAbsDiff;
-            xIndexOut[gridIdx, threadID] = xIndex;
-            yIndexOut[gridIdx, threadID] = yIndex;
+            xIndexOut[gridIdx, threadID] = pixelIdx;
+            yIndexOut[gridIdx, threadID] = pixelEnd;
         }
 
         #endregion
@@ -368,6 +371,17 @@ namespace Single_Reference.GPUDeconvolution
                 var s2 = xIndexShrink.GetAs2DArray();
                 var s3 = yIndexShrink.GetAs2DArray();
 
+                var maxAbsDiffT = 0.0f;
+                var xIndexT = -1;
+                var yIndexT = -1;
+                for(int i1 = 0; i1 < s1.GetLength(0); i1++)
+                    for(int j = 0; j < s1.GetLength(1);j++)
+                        if(maxAbsDiffT < s1[i1,j])
+                        {
+                            maxAbsDiffT = s1[i1, j];
+                            xIndexT = s2[i1, j];
+                            yIndexT = s3[i1, j];
+                        }
                 var bla0 = maxDiff.GetAsArray();
                 var bla1 = xIndex.GetAsArray();
                 var bla2 = yIndex.GetAsArray();
