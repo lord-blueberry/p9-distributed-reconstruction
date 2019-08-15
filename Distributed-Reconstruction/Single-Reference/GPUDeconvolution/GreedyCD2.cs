@@ -290,12 +290,79 @@ namespace Single_Reference.GPUDeconvolution
                     yIndex = recIndex.Y;
                 }
             }
-            Warp.Barrier();
 
+            Warp.Barrier();
+            var max = xAbsDiff;
+            /*for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
+            {
+                max = XMath.Max(Warp.ShuffleDown(max, offset), max);
+            }*/
+            //warp reduce
+            for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
+            {
+                var oXAbsDiff = Warp.ShuffleDown(xAbsDiff, offset);
+                var oXDiff = Warp.ShuffleDown(xDiff, offset);
+                var oXIndex = Warp.ShuffleDown(xIndex, offset);
+                var oYIndex = Warp.ShuffleDown(yIndex, offset);
+                if (xAbsDiff < oXAbsDiff)
+                {
+                    xAbsDiff = oXAbsDiff;
+                    xDiff = oXDiff;
+                    xIndex = oXIndex;
+                    yIndex = oYIndex;
+                }
+                Warp.Barrier();
+            }
+            Warp.Barrier();
+            if (Warp.IsFirstLane)
+            {
+                sharedXDiff[warpIdx] = xDiff;
+                sharedXAbsDiff[warpIdx] = xAbsDiff;
+                sharedXIndex[warpIdx] = xIndex;
+                sharedYIndex[warpIdx] = yIndex;
+            }
+            Group.Barrier();
+
+            //warp 0 reduce of shared memory
+            var maxShared = Group.Dimension.X / Warp.WarpSize;
+            if (warpIdx == 0 & Warp.LaneIdx + 1 < maxShared)
+            {
+                xDiff = sharedXDiff[Warp.LaneIdx];
+                xAbsDiff = sharedXAbsDiff[Warp.LaneIdx];
+                xIndex = sharedXIndex[Warp.LaneIdx];
+                yIndex = sharedYIndex[Warp.LaneIdx];
+
+                Warp.Barrier();
+                //warp reduce
+                for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
+                {
+                    var oXAbsDiff = Warp.ShuffleDown(xAbsDiff, offset);
+                    var oXDiff = Warp.ShuffleDown(xDiff, offset);
+                    var oXIndex = Warp.ShuffleDown(xIndex, offset);
+                    var oYIndex = Warp.ShuffleDown(yIndex, offset);
+                    if (xAbsDiff < oXAbsDiff)
+                    {
+                        xAbsDiff = oXAbsDiff;
+                        xDiff = oXDiff;
+                        xIndex = oXIndex;
+                        yIndex = oYIndex;
+                    }
+                    Warp.Barrier();
+                }
+                Warp.Barrier();
+                if (Warp.IsFirstLane)
+                {
+                    xDiffOut[gridIdx, 0] = xDiff;
+                    xAbsDiffOut[gridIdx, 0] = xAbsDiff;
+                    xIndexOut[gridIdx, 0] = xIndex;
+                    yIndexOut[gridIdx, 0] = yIndex;
+                }
+            }
+            /*
             xDiffOut[gridIdx, threadID] = xDiff;
             xAbsDiffOut[gridIdx, threadID] = xAbsDiff;
             xIndexOut[gridIdx, threadID] = xIndex;
-            yIndexOut[gridIdx, threadID] = yIndex;
+            yIndexOut[gridIdx, threadID] = yIndex;*/
         }
 
         #endregion
@@ -380,13 +447,16 @@ namespace Single_Reference.GPUDeconvolution
                 var s2 = xIndexShrink.GetAs2DArray();
                 var s3 = yIndexShrink.GetAs2DArray();
 
+                var maxDiffT = 0.0f;
                 var maxAbsDiffT = 0.0f;
                 var xIndexT = -1;
                 var yIndexT = -1;
                 for(int i1 = 0; i1 < s1.GetLength(0); i1++)
-                    for(int j = 0; j < s1.GetLength(1);j++)
+                    //for(int j = 0; j < s1.GetLength(1);j++)
+                    for (int j = 0; j < 1;j++)
                         if(maxAbsDiffT < s1[i1,j])
                         {
+                            maxDiffT = s0[i1, j];
                             maxAbsDiffT = s1[i1, j];
                             xIndexT = s2[i1, j];
                             yIndexT = s3[i1, j];
