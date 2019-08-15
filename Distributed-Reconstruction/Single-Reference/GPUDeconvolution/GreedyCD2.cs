@@ -364,8 +364,9 @@ namespace Single_Reference.GPUDeconvolution
                 var test = outTest.GetAsArray();
 
                 var s0 = maxDiffShrink.GetAs2DArray();
-
-
+                var s1 = maxAbsDiffShrink.GetAs2DArray();
+                var s2 = xIndexShrink.GetAs2DArray();
+                var s3 = yIndexShrink.GetAs2DArray();
 
                 var bla0 = maxDiff.GetAsArray();
                 var bla1 = xIndex.GetAsArray();
