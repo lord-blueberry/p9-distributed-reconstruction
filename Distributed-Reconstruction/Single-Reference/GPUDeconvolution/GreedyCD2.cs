@@ -25,6 +25,30 @@ namespace Single_Reference.GPUDeconvolution
         }
 
         #region kernels
+        private static void TestShuffle(Index index, ArrayView<int> output)
+        {
+            var local = index;
+            /*
+            var d = XMath.Max(Warp.ShuffleDown(local, Warp.WarpSize / 2), local);
+            d = XMath.Max(Warp.ShuffleDown(d, Warp.WarpSize / 4), d);
+            d = XMath.Max(Warp.ShuffleDown(d, Warp.WarpSize / 8), d);
+            d = XMath.Max(Warp.ShuffleDown(d, Warp.WarpSize / 16), d);
+            d = XMath.Max(Warp.ShuffleDown(d, Warp.WarpSize / 32), d);*/
+           
+            var d2 = local;
+            //Warp.Barrier();
+            for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
+            {
+                //d2 = XMath.Max(Warp.ShuffleDown(d2, offset), d2);
+                var tmp = Warp.ShuffleDown(d2, offset);
+                if (d2 < tmp)
+                    d2 = tmp;
+                //Warp.Barrier();
+            }
+            output[local] = d2;
+        }
+
+
         private static void TestKernel(
             GroupedIndex grouped,
             ArrayView2D<float> xImage)
@@ -114,6 +138,7 @@ namespace Single_Reference.GPUDeconvolution
                 }
             }
 
+            Warp.Barrier();
             //warp reduce
             for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
             {
@@ -124,9 +149,10 @@ namespace Single_Reference.GPUDeconvolution
                     xDiff = Warp.ShuffleDown(xDiff, offset);
                     xIndex = Warp.ShuffleDown(xIndex, offset);
                     yIndex = Warp.ShuffleDown(yIndex, offset);
-
                 }
+                Warp.Barrier();
             }
+            Warp.Barrier();
             if (Warp.IsFirstLane)
             {
                 sharedXDiff[warpIdx] = xDiff;
@@ -157,8 +183,9 @@ namespace Single_Reference.GPUDeconvolution
                         yIndex = Warp.ShuffleDown(yIndex, offset);
                         
                     }
+                    Warp.Barrier();
                 }
-
+                Warp.Barrier();
                 if (Warp.IsFirstLane)
                 {
                     xDiffOut[gridIdx] = xDiff;
@@ -169,7 +196,7 @@ namespace Single_Reference.GPUDeconvolution
             }
 
             //if accelerator has no warp, reduce the shared memory the old fashioned way
-            if(Warp.WarpSize == 1)
+            if(Warp.WarpSize >= 1)
             {
                 if (threadID == 0)
                 {
@@ -239,11 +266,11 @@ namespace Single_Reference.GPUDeconvolution
         {
             var maxGroups = accelerator.MaxNumThreads / accelerator.MaxNumThreadsPerGroup;
             var groupThreadIdx = new GroupedIndex(maxGroups, accelerator.MaxNumThreadsPerGroup);
-            maxGroups = 2;
-            groupThreadIdx = new GroupedIndex(maxGroups, 4);
+            //maxGroups = 2;
+            //groupThreadIdx = new GroupedIndex(maxGroups, 4);
 
             var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);
-
+            var testShuffle = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>>(TestShuffle);
 
             
 
@@ -259,6 +286,7 @@ namespace Single_Reference.GPUDeconvolution
             using (var xIndex = accelerator.Allocate<int>(maxGroups))
             using (var yIndex = accelerator.Allocate<int>(maxGroups))
 
+            using (var outTest= accelerator.Allocate<int>(32))
             using (var maxCandidate = accelerator.Allocate<float>(1))
             using (var maxIndices = accelerator.Allocate<int>(2))
             using (var lambdaAlpha = accelerator.Allocate<float>(2))
@@ -277,10 +305,14 @@ namespace Single_Reference.GPUDeconvolution
 
                 int i = 0;
                 shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View);
+                testShuffle(new Index(32), outTest.View);
                 accelerator.Synchronize();
 
                 Console.WriteLine("iteration " + i);
-                
+                var test = outTest.GetAsArray();
+                var bla0 = maxDiff.GetAsArray();
+                var bla1 = xIndex.GetAsArray();
+                var bla2 = yIndex.GetAsArray();
                 var x = xImage.GetAsArray();
                 var candidate = xCandidates.GetAsArray();
                 FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
