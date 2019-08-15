@@ -342,7 +342,8 @@ namespace Single_Reference
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                 var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
 
-                var converged = GPUDeconvolution.GreedyCD.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
+                var converged = GPUDeconvolution.GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
+                //var converged = GPUDeconvolution.GreedyCD.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
