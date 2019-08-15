@@ -244,9 +244,10 @@ namespace Single_Reference.GPUDeconvolution
             var sharedYIndex = SharedMemory.Allocate<int>(warpCount);
 
             //assign y indices to the different threadgroups. y seems to be the major index in ILGPU
-            var yCount = (xImage.Extent.Y + Grid.Dimension.X - 1) / Grid.Dimension.X;
-            var yIdx = gridIdx * yCount;
-            var yIdxEnd = XMath.Min(yIdx + yCount, xImage.Extent.Y);
+            var yCount = xImage.Extent.Y / (float)(Grid.DimensionX);
+            var yIdx = (int)(gridIdx * yCount);
+            var yIdxEnd = (int)((gridIdx+1) * yCount);
+            yIdxEnd = gridIdx + 1 == Grid.DimensionX ? xImage.Extent.Y : yIdxEnd;
 
             //create linear views per group
             var linX = xImage.AsLinearView();
@@ -257,8 +258,6 @@ namespace Single_Reference.GPUDeconvolution
 
             //assign consecutive pixels to threads in a group.
             var pixelCount = (toPixel - fromPixel) / (float)(Group.Dimension.X);
-            var intPixelCount = (int)pixelCount;
-            var spillage = pixelCount - intPixelCount;
             var pixelIdx = (int)(threadID * pixelCount) + fromPixel;
             var pixelEnd = (int)((threadID+1) * pixelCount) + fromPixel;
             pixelEnd = threadID + 1 == Group.DimensionX ? toPixel : pixelEnd;
