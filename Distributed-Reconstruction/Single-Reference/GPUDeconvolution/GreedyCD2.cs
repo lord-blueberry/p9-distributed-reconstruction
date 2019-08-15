@@ -25,9 +25,10 @@ namespace Single_Reference.GPUDeconvolution
         }
 
         #region kernels
-        private static void TestShuffle(Index index, ArrayView<int> output)
+        private static void TestShuffle(Index index, ArrayView<int> output, ArrayView<int> output2)
         {
             var local = index;
+            var l2 = index * 10;
             /*
             var d = XMath.Max(Warp.ShuffleDown(local, Warp.WarpSize / 2), local);
             d = XMath.Max(Warp.ShuffleDown(d, Warp.WarpSize / 4), d);
@@ -36,16 +37,22 @@ namespace Single_Reference.GPUDeconvolution
             d = XMath.Max(Warp.ShuffleDown(d, Warp.WarpSize / 32), d);*/
            
             var d2 = local;
-            //Warp.Barrier();
+            Warp.Barrier();
             for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
             {
                 //d2 = XMath.Max(Warp.ShuffleDown(d2, offset), d2);
                 var tmp = Warp.ShuffleDown(d2, offset);
+                var tmp1 = Warp.ShuffleDown(l2, offset);
                 if (d2 < tmp)
+                {
                     d2 = tmp;
-                //Warp.Barrier();
+                    l2 = tmp1;
+                }
+                    
+                Warp.Barrier();
             }
             output[local] = d2;
+            output2[local] = l2;
         }
 
 
@@ -283,11 +290,12 @@ namespace Single_Reference.GPUDeconvolution
                     yIndex = recIndex.Y;
                 }
             }
+            Warp.Barrier();
 
             xDiffOut[gridIdx, threadID] = xDiff;
             xAbsDiffOut[gridIdx, threadID] = xAbsDiff;
-            xIndexOut[gridIdx, threadID] = pixelIdx;
-            yIndexOut[gridIdx, threadID] = pixelEnd;
+            xIndexOut[gridIdx, threadID] = xIndex;
+            yIndexOut[gridIdx, threadID] = yIndex;
         }
 
         #endregion
@@ -324,7 +332,7 @@ namespace Single_Reference.GPUDeconvolution
 
             var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);
             var shrink = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<int>, ArrayView2D<int>>(ShrinkKernel);
-            var testShuffle = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>>(TestShuffle);
+            var testShuffle = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView<int>>(TestShuffle);
 
             
 
@@ -346,6 +354,7 @@ namespace Single_Reference.GPUDeconvolution
             using (var yIndexShrink = accelerator.Allocate<int>(new Index2(maxGroups, accelerator.MaxNumThreadsPerGroup)))
 
             using (var outTest = accelerator.Allocate<int>(32))
+            using (var outTest2 = accelerator.Allocate<int>(32))
             using (var lambdaAlpha = accelerator.Allocate<float>(2))
             {
                 xImage.CopyFrom(xImageIn, new Index2(0, 0), new Index2(0, 0), new Index2(xImageIn.GetLength(0), xImageIn.GetLength(1)));
@@ -359,11 +368,12 @@ namespace Single_Reference.GPUDeconvolution
                 int i = 0;
                 shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View);
                 shrink(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiffShrink.View, maxAbsDiffShrink.View, xIndexShrink.View, yIndexShrink.View);
-                testShuffle(new Index(32), outTest.View);
+                testShuffle(new Index(32), outTest.View, outTest2.View);
                 accelerator.Synchronize();
 
                 Console.WriteLine("iteration " + i);
                 var test = outTest.GetAsArray();
+                var test2 = outTest2.GetAsArray();
 
                 var s0 = maxDiffShrink.GetAs2DArray();
                 var s1 = maxAbsDiffShrink.GetAs2DArray();
