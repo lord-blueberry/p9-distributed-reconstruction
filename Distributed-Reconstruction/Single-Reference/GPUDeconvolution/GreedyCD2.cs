@@ -16,13 +16,51 @@ namespace Single_Reference.GPUDeconvolution
     {
         private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => XMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
-        private struct MaxPixel
+        #region atomic MaxPixel operation
+        public struct MaxPixel : System.IEquatable<MaxPixel>
         {
-            int y;
-            int x;
-            float xDiff;
-            float xAbsDiff;
+            public float AbsDiff;
+            public int Y;
+            public int X;
+            public int Sign;
+
+            public bool Equals(MaxPixel other)
+            {
+                return AbsDiff == other.AbsDiff
+                    & Y == other.Y
+                    & X == other.X
+                    & Sign == other.Sign;
+            }
         }
+
+        public struct MaxPixelOperation : IAtomicOperation<MaxPixel>
+        {
+            public MaxPixel Operation(MaxPixel current, MaxPixel value)
+            {
+                if (current.AbsDiff < value.AbsDiff)
+                    return value;
+                else
+                    return current;
+            }
+        }
+
+        public struct MaxPixelCompareExchange : ICompareExchangeOperation<MaxPixel>
+        {
+            public MaxPixel CompareExchange(ref MaxPixel target, MaxPixel compare, MaxPixel value)
+            {
+
+                if (target.AbsDiff == compare.AbsDiff)
+                {
+                    target.AbsDiff = value.AbsDiff;
+                    target.X = value.X;
+                    target.Y = value.Y;
+                    target.Sign = value.Sign;
+                    return compare;
+                }
+                return target;
+            }
+        }
+        #endregion
 
         #region kernels
 
@@ -345,6 +383,8 @@ namespace Single_Reference.GPUDeconvolution
                 lambdaAlpha.CopyFrom(alpha, new Index(1));
                 maxReduceThreads.CopyFrom(nextPower2, new Index(0));
 
+                var watch = new System.Diagnostics.Stopwatch();
+                watch.Start();
                 for (int i = 0; i < 1000; i++)
                 {
                     shrinkReduce(groupThreadIdx, xImage.View, bMap.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View);
@@ -366,15 +406,6 @@ namespace Single_Reference.GPUDeconvolution
                             xIndexT = t2[j];
                             yIndexT = t3[j];
                         }
-
-                    var sharedMemoryDebug = shrinkedTmpDebug.GetAs2DArray();
-                    var maxSharedDebug = 0.0f;
-                    for(int y = 0; y < sharedMemoryDebug.GetLength(0); y++)
-                        for(int x = 0; x < sharedMemoryDebug.GetLength(1); x++)
-                            if(maxSharedDebug < sharedMemoryDebug[y, x])
-                            {
-                                maxSharedDebug = sharedMemoryDebug[y, x];
-                            }
                         */
                     reduceAndUpdateX(new Index(nextPower2), maxReduceThreads.View, xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
@@ -382,13 +413,16 @@ namespace Single_Reference.GPUDeconvolution
                     updateBKernel(groupThreadIdx, bMap.View, psf2.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
 
-                    Console.WriteLine("iteration " + i);
+                    //Console.WriteLine("iteration " + i);
                 }
 
+                watch.Stop();
+                Console.WriteLine(watch.Elapsed);
+                var bla = Console.ReadLine();
                 var xOutput = xImage.GetAsArray();
                 var candidate = bMap.GetAsArray();
-                FitsIO.Write(CopyToImage(xOutput, size), "xImageGPU.fits");
-                FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
+                //FitsIO.Write(CopyToImage(xOutput, size), "xImageGPU.fits");
+                //FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
             }
         }
 
