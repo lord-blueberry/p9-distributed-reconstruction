@@ -25,63 +25,6 @@ namespace Single_Reference.GPUDeconvolution
         }
 
         #region kernels
-        private static void ShrinkDebugKernel(
-            GroupedIndex grouped,
-            ArrayView2D<float> xImage,
-            ArrayView2D<float> bMap,
-            ArrayView2D<float> aMap,
-            ArrayView<float> lambdaAlpha,
-            ArrayView2D<float> shrinked)
-        {
-            var gridIdx = grouped.GridIdx;
-            var threadID = grouped.GroupIdx;
-            var warpIdx = threadID / Warp.WarpSize;
-
-            var lambda = lambdaAlpha[0];
-            var alpha = lambdaAlpha[1];
-
-            var yCount = xImage.Extent.Y / (float)(Grid.DimensionX);
-            var yIdx = (int)(gridIdx * yCount);
-            var yIdxEnd = (int)((gridIdx + 1) * yCount);
-            yIdxEnd = gridIdx + 1 == Grid.DimensionX ? xImage.Extent.Y : yIdxEnd;
-
-            //create linear views per group
-            var linX = xImage.AsLinearView();
-            var linB = bMap.AsLinearView();
-            var linA = aMap.AsLinearView();
-            var fromPixel = new Index2(0, yIdx).ComputeLinearIndex(xImage.Extent);
-            var toPixel = new Index2(xImage.Extent.X, yIdxEnd - 1).ComputeLinearIndex(xImage.Extent);
-
-            //assign consecutive pixels to threads in a group.
-            var pixelCount = (toPixel - fromPixel) / (float)(Group.Dimension.X);
-            var pixelIdx = (int)(threadID * pixelCount) + fromPixel;
-            var pixelEnd = (int)((threadID + 1) * pixelCount) + fromPixel;
-            pixelEnd = threadID + 1 == Group.DimensionX ? toPixel : pixelEnd;
-
-            //shrink and save max of the assigned pixels
-            float xDiff = 0.0f;
-            float xAbsDiff = float.MinValue;
-            int xIndex = -1;
-            int yIndex = -1;
-            for (int i = pixelIdx; i < pixelEnd; i++)
-            {
-                var xOld = linX[i];
-                var xNew = xOld + linB[i] / linA[i];
-                xNew = GPUShrinkElasticNet(xNew, lambda, alpha);
-                var tmpDiff = xNew - xOld;
-                var recIndex = Index2.ReconstructIndex(i, xImage.Extent);
-                shrinked[recIndex] = XMath.Abs(tmpDiff);
-
-                if (xAbsDiff < XMath.Abs(tmpDiff))
-                {
-                    xDiff = tmpDiff;
-                    xAbsDiff = XMath.Abs(tmpDiff);
-                    xIndex = recIndex.X;
-                    yIndex = recIndex.Y;
-                    
-                }
-            }
-        }
 
         private static void ShrinkReduceKernel(
             GroupedIndex grouped,
@@ -92,8 +35,7 @@ namespace Single_Reference.GPUDeconvolution
             ArrayView<float> xDiffOut,
             ArrayView<float> xAbsDiffOut,
             ArrayView<int> xIndexOut,
-            ArrayView<int> yIndexOut,
-            ArrayView2D<float> debugOut)
+            ArrayView<int> yIndexOut)
         {
             var gridIdx = grouped.GridIdx;
             var threadID = grouped.GroupIdx;
@@ -114,13 +56,13 @@ namespace Single_Reference.GPUDeconvolution
             var yIdx = (int)(gridIdx * yCount);
             var yIdxEnd = (int)((gridIdx + 1) * yCount);
             yIdxEnd = gridIdx + 1 == Grid.DimensionX ? xImage.Extent.Y : yIdxEnd;
+            var fromPixel = new Index2(0, yIdx).ComputeLinearIndex(xImage.Extent);
+            var toPixel = new Index2(xImage.Extent.X, yIdxEnd - 1).ComputeLinearIndex(xImage.Extent);
 
             //create linear views per group
             var linX = xImage.AsLinearView();
             var linB = bMap.AsLinearView();
             var linA = aMap.AsLinearView();
-            var fromPixel = new Index2(0, yIdx).ComputeLinearIndex(xImage.Extent);
-            var toPixel = new Index2(xImage.Extent.X, yIdxEnd - 1).ComputeLinearIndex(xImage.Extent);
 
             //assign consecutive pixels to threads in a group.
             var pixelCount = (toPixel - fromPixel) / (float)(Group.Dimension.X);
@@ -307,7 +249,47 @@ namespace Single_Reference.GPUDeconvolution
         }
 
 
-        private static void UpdateCandidatesKernel(Index2 index,
+        private static void UpdateBKernel(
+            GroupedIndex grouped,
+            ArrayView2D<float> bMap,
+            ArrayView2D<float> psf2,
+            ArrayView<float> maxDiff,
+            ArrayView<int> maxIndices)
+        {
+            var gridIdx = grouped.GridIdx;
+            var threadID = grouped.GroupIdx;
+
+            //assign y indices to the different threadgroups. y seems to be the major index in ILGPU
+            var yCount = psf2.Extent.Y / (float)(Grid.DimensionX);
+            var yIdx = (int)(gridIdx * yCount);
+            var yIdxEnd = (int)((gridIdx + 1) * yCount);
+            yIdxEnd = gridIdx + 1 == Grid.DimensionX ? psf2.Extent.Y : yIdxEnd;
+            var fromPixel = new Index2(0, yIdx).ComputeLinearIndex(psf2.Extent);
+            var toPixel = new Index2(psf2.Extent.X, yIdxEnd - 1).ComputeLinearIndex(psf2.Extent);
+
+            var linPSF = psf2.AsLinearView();
+
+            //assign consecutive pixels to threads in a group.
+            var pixelCount = (toPixel - fromPixel) / (float)(Group.Dimension.X);
+            var pixelIdx = (int)(threadID * pixelCount) + fromPixel;
+            var pixelEnd = (int)((threadID + 1) * pixelCount) + fromPixel;
+            pixelEnd = threadID + 1 == Group.DimensionX ? toPixel : pixelEnd;
+
+            var offset = new Index2(maxIndices[0], maxIndices[1]).Subtract(psf2.Extent / 2);
+            for (int i = pixelIdx; i < pixelEnd; i++)
+            {
+                var p = linPSF[i];
+                var psfIndex = Index2.ReconstructIndex(i, psf2.Extent);
+                var indexBMap = psfIndex.Add(offset);
+                if(indexBMap.InBounds(bMap.Extent))
+                {
+                    bMap[indexBMap] -= (p * maxDiff[0]);
+                }
+            }
+        }
+
+        private static void UpdateCandidatesKernel(
+            Index2 index,
             ArrayView2D<float> bMap,
             ArrayView2D<float> psf2,
             ArrayView<float> maxDiff,
@@ -326,25 +308,23 @@ namespace Single_Reference.GPUDeconvolution
         {
             var maxGroups = accelerator.MaxNumThreads / accelerator.MaxNumThreadsPerGroup;
             var groupThreadIdx = new GroupedIndex(maxGroups, accelerator.MaxNumThreadsPerGroup);
-            //maxGroups = 2;
-            //groupThreadIdx = new GroupedIndex(maxGroups, 4);
+            maxGroups = 2;
+            groupThreadIdx = new GroupedIndex(maxGroups, 4);
             var nextPower2 = 1 << (63 - CountLeadingZeroBits((UInt64)maxGroups));    //calculate the next smallest power of 2 value for the group size. Used for reduceAndUpdate
 
-            var shrinkDebug = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView2D<float>>(ShrinkDebugKernel);
-            var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView2D<float>>(ShrinkReduceKernel);
+            var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);
             var reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView<float> , ArrayView<int>>(ReduceAndUpdate);
             var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
+            var updateBKernel = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateBKernel);
+
 
             var size = new Index2(xImageIn.GetLength(0), xImageIn.GetLength(1));
             var psfSize = new Index2(psf2In.GetLength(0), psf2In.GetLength(1));
 
             using (var xImage = accelerator.Allocate<float>(size))
-            using (var xCandidates = accelerator.Allocate<float>(size))
+            using (var bMap = accelerator.Allocate<float>(size))
             using (var aMap = accelerator.Allocate<float>(size))
             using (var psf2 = accelerator.Allocate<float>(psfSize))
-
-            using (var shrinked = accelerator.Allocate<float>(size))
-            using(var shrinkedTmpDebug = accelerator.Allocate<float>(new Index2(maxGroups, 32)))
 
             using (var maxDiff = accelerator.Allocate<float>(maxGroups))
             using (var maxAbsDiff = accelerator.Allocate<float>(maxGroups))
@@ -357,7 +337,7 @@ namespace Single_Reference.GPUDeconvolution
             using (var maxReduceThreads = accelerator.Allocate<int>(1))
             {
                 xImage.CopyFrom(xImageIn, new Index2(0, 0), new Index2(0, 0), new Index2(xImageIn.GetLength(0), xImageIn.GetLength(1)));
-                xCandidates.CopyFrom(bMapIn, new Index2(0, 0), new Index2(0, 0), new Index2(bMapIn.GetLength(0), bMapIn.GetLength(1)));
+                bMap.CopyFrom(bMapIn, new Index2(0, 0), new Index2(0, 0), new Index2(bMapIn.GetLength(0), bMapIn.GetLength(1)));
                 aMap.CopyFrom(aMapIn, new Index2(0, 0), new Index2(0, 0), new Index2(aMapIn.GetLength(0), aMapIn.GetLength(1)));
                 psf2.CopyFrom(psf2In, new Index2(0, 0), new Index2(0, 0), new Index2(psf2In.GetLength(0), psf2In.GetLength(1)));
 
@@ -367,29 +347,7 @@ namespace Single_Reference.GPUDeconvolution
 
                 for (int i = 0; i < 1000; i++)
                 {
-                    /*
-                    shrinked.MemSetToZero();
-                    accelerator.Synchronize();
-                    shrinkDebug(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, shrinked.View);
-                    accelerator.Synchronize();
-                    var outputShrinked = CopyToImage(shrinked.GetAsArray(), size);
-                    FitsIO.Write(outputShrinked, "shrinked.fits");
-                    var maxPixelS = 0.0;
-                    var maxXIndexS = -1;
-                    var maxYIndexS = -1;
-                    for(int y = 0; y < outputShrinked.GetLength(0); y++)
-                        for(int x = 0; x < outputShrinked.GetLength(1); x++)
-                        {
-                            if(maxPixelS < outputShrinked[y, x])
-                            {
-                                maxPixelS = outputShrinked[y, x];
-                                maxYIndexS = y;
-                                maxXIndexS = x;
-                                
-                            }
-                        }
-                        */
-                    shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, shrinkedTmpDebug.View);
+                    shrinkReduce(groupThreadIdx, xImage.View, bMap.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View);
                     accelerator.Synchronize();
                     /*
                     var maxDiffT = 0.0f;
@@ -420,50 +378,21 @@ namespace Single_Reference.GPUDeconvolution
                         */
                     reduceAndUpdateX(new Index(nextPower2), maxReduceThreads.View, xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
-                    /*var bla = maxPixel.GetAsArray();
-                    var bla2 = maxIndices.GetAsArray();*/
-                    updateCandidatesKernel(psfSize, xCandidates.View, psf2.View, maxPixel.View, maxIndices.View);
+                    //updateCandidatesKernel(psfSize, bMap.View, psf2.View, maxPixel.View, maxIndices.View);
+                    updateBKernel(groupThreadIdx, bMap.View, psf2.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
 
                     Console.WriteLine("iteration " + i);
                 }
 
                 var xOutput = xImage.GetAsArray();
-                var candidate = xCandidates.GetAsArray();
+                var candidate = bMap.GetAsArray();
                 FitsIO.Write(CopyToImage(xOutput, size), "xImageGPU.fits");
                 FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
             }
         }
 
-        private static int CountLeadingZeroBits(UInt64 input)
-        {
-            if (input == 0) return 64;
 
-            UInt64 n = 1;
-
-            if ((input >> 32) == 0) { n = n + 32; input = input << 32; }
-            if ((input >> 48) == 0) { n = n + 16; input = input << 16; }
-            if ((input >> 56) == 0) { n = n + 8; input = input << 8; }
-            if ((input >> 60) == 0) { n = n + 4; input = input << 4; }
-            if ((input >> 62) == 0) { n = n + 2; input = input << 2; }
-            n = n - (input >> 63);
-
-            return (int)n;
-        }
-
-        public static double[,] CopyToImage(float[] img, Index2 size)
-        {
-            var output = new double[size.Y, size.X];
-            var index = 0;
-            for (int y = 0; y < size.Y; y++)
-            {
-                for (int x = 0; x < size.X; x++)
-                    output[x, y] = img[index + x];
-                index += size.X;
-            }
-
-            return output;
-        }
 
         public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha)
         {
@@ -504,6 +433,37 @@ namespace Single_Reference.GPUDeconvolution
             for (int i = 0; i < img.GetLength(0); i++)
                 for (int j = 0; j < img.GetLength(1); j++)
                     output[i, j] = (float)img[i, j];
+            return output;
+        }
+
+        private static int CountLeadingZeroBits(UInt64 input)
+        {
+            if (input == 0) return 64;
+
+            UInt64 n = 1;
+
+            if ((input >> 32) == 0) { n = n + 32; input = input << 32; }
+            if ((input >> 48) == 0) { n = n + 16; input = input << 16; }
+            if ((input >> 56) == 0) { n = n + 8; input = input << 8; }
+            if ((input >> 60) == 0) { n = n + 4; input = input << 4; }
+            if ((input >> 62) == 0) { n = n + 2; input = input << 2; }
+            n = n - (input >> 63);
+
+            return (int)n;
+        }
+
+
+        public static double[,] CopyToImage(float[] img, Index2 size)
+        {
+            var output = new double[size.Y, size.X];
+            var index = 0;
+            for (int y = 0; y < size.Y; y++)
+            {
+                for (int x = 0; x < size.X; x++)
+                    output[x, y] = img[index + x];
+                index += size.X;
+            }
+
             return output;
         }
     }
