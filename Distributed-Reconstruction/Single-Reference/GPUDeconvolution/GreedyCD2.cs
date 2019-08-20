@@ -286,8 +286,7 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-
-        private static void UpdateBKernel(
+        private static void UpdateBKernelV1(
             GroupedIndex grouped,
             ArrayView2D<float> bMap,
             ArrayView2D<float> psf2,
@@ -326,7 +325,7 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        private static void UpdateCandidatesKernel(
+        private static void UpdateBKernelV0(
             Index2 index,
             ArrayView2D<float> bMap,
             ArrayView2D<float> psf2,
@@ -352,8 +351,8 @@ namespace Single_Reference.GPUDeconvolution
 
             var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);
             var reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView<float> , ArrayView<int>>(ReduceAndUpdate);
-            var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
-            var updateBKernel = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateBKernel);
+            var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateBKernelV0);
+            var updateBKernel = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateBKernelV1);
 
 
             var size = new Index2(xImageIn.GetLength(0), xImageIn.GetLength(1));
@@ -382,7 +381,7 @@ namespace Single_Reference.GPUDeconvolution
                 lambdaAlpha.CopyFrom(lambda, new Index(0));
                 lambdaAlpha.CopyFrom(alpha, new Index(1));
                 maxReduceThreads.CopyFrom(nextPower2, new Index(0));
-
+                Console.WriteLine("Start");
                 var watch = new System.Diagnostics.Stopwatch();
                 watch.Start();
                 for (int i = 0; i < 1000; i++)
@@ -409,8 +408,8 @@ namespace Single_Reference.GPUDeconvolution
                         */
                     reduceAndUpdateX(new Index(nextPower2), maxReduceThreads.View, xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
-                    //updateCandidatesKernel(psfSize, bMap.View, psf2.View, maxPixel.View, maxIndices.View);
-                    updateBKernel(groupThreadIdx, bMap.View, psf2.View, maxPixel.View, maxIndices.View);
+                    updateCandidatesKernel(psfSize, bMap.View, psf2.View, maxPixel.View, maxIndices.View);
+                    //updateBKernel(groupThreadIdx, bMap.View, psf2.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
 
                     //Console.WriteLine("iteration " + i);
@@ -430,12 +429,8 @@ namespace Single_Reference.GPUDeconvolution
 
         public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha)
         {
-            using (var context = new Context())
+            using (var context = new Context(ContextFlags.FastMath, ILGPU.IR.Transformations.OptimizationLevel.Release))
             {
-
-                var yPsfHalf = psf.GetLength(0) / 2;
-                var xPsfHalf = psf.GetLength(1) / 2;
-
                 var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
                 var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
                 var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
