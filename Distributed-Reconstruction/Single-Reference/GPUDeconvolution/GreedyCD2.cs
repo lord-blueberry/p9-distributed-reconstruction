@@ -230,7 +230,6 @@ namespace Single_Reference.GPUDeconvolution
         }
 
 
-
         private static void UpdateCandidatesKernel(Index2 index,
             ArrayView2D<float> bMap,
             ArrayView2D<float> psf2,
@@ -250,8 +249,10 @@ namespace Single_Reference.GPUDeconvolution
         {
             var maxGroups = accelerator.MaxNumThreads / accelerator.MaxNumThreadsPerGroup;
             var groupThreadIdx = new GroupedIndex(maxGroups, accelerator.MaxNumThreadsPerGroup);
-            //maxGroups = 2;
-            //groupThreadIdx = new GroupedIndex(maxGroups, 4);
+            maxGroups = 2;
+            groupThreadIdx = new GroupedIndex(maxGroups, 4);
+            var nexPower2 = 1 << (63 - CountLeadingZeroBits((UInt64)maxGroups));    //calculate the next smallest power of 2 value for the group size. Used for reduceAndUpdate
+
             var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);
             var reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView<float> , ArrayView<int>>(ReduceAndUpdate);
             var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
@@ -281,51 +282,57 @@ namespace Single_Reference.GPUDeconvolution
                 lambdaAlpha.CopyFrom(lambda, new Index(0));
                 lambdaAlpha.CopyFrom(alpha, new Index(1));
 
-                int i = 0;
-                shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View);
-                accelerator.Synchronize();
+                for (int i = 0; i < 100; i++)
+                {
+                    shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View);
+                    accelerator.Synchronize();
 
-                var maxDiffT = 0.0f;
-                var maxAbsDiffT = 0.0f;
-                var xIndexT = -1;
-                var yIndexT = -1;
-                var t0 = maxAbsDiff.GetAsArray();
-                var t1 = maxDiff.GetAsArray();
-                var t2 = xIndex.GetAsArray();
-                var t3 = yIndex.GetAsArray();
-                for (int j = 0; j < t0.Length; j++)
-                    if (maxAbsDiffT < t0[j])
-                    {
-                        maxDiffT = t1[j];
-                        maxAbsDiffT = t0[j];
-                        xIndexT = t2[j];
-                        yIndexT = t3[j];
-                    }
-                
-                reduceAndUpdateX(new Index(8), xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
-                accelerator.Synchronize();
-                updateCandidatesKernel(psfSize, xCandidates.View, psf2.View, maxPixel.View, maxIndices.View);
-                accelerator.Synchronize();
+                    var maxDiffT = 0.0f;
+                    var maxAbsDiffT = 0.0f;
+                    var xIndexT = -1;
+                    var yIndexT = -1;
+                    var t0 = maxAbsDiff.GetAsArray();
+                    var t1 = maxDiff.GetAsArray();
+                    var t2 = xIndex.GetAsArray();
+                    var t3 = yIndex.GetAsArray();
+                    for (int j = 0; j < t0.Length; j++)
+                        if (maxAbsDiffT < t0[j])
+                        {
+                            maxDiffT = t1[j];
+                            maxAbsDiffT = t0[j];
+                            xIndexT = t2[j];
+                            yIndexT = t3[j];
+                        }
 
-                Console.WriteLine("iteration " + i);
+                    reduceAndUpdateX(new Index(1), xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
+                    accelerator.Synchronize();
+                    updateCandidatesKernel(psfSize, xCandidates.View, psf2.View, maxPixel.View, maxIndices.View);
+                    accelerator.Synchronize();
+
+                    Console.WriteLine("iteration " + i);
+                }
 
                 var x = xImage.GetAsArray();
                 var candidate = xCandidates.GetAsArray();
                 FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
                 FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
-
             }
         }
 
-        /// <summary>
-        /// returns the position of the Most signigicant bit
-        /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
-        private static int BitScan(uint value)
+        public static int CountLeadingZeroBits(UInt64 input)
         {
-            return 0;
+            if (input == 0) return 64;
 
+            UInt64 n = 1;
+
+            if ((input >> 32) == 0) { n = n + 32; input = input << 32; }
+            if ((input >> 48) == 0) { n = n + 16; input = input << 16; }
+            if ((input >> 56) == 0) { n = n + 8; input = input << 8; }
+            if ((input >> 60) == 0) { n = n + 4; input = input << 4; }
+            if ((input >> 62) == 0) { n = n + 2; input = input << 2; }
+            n = n - (input >> 63);
+
+            return (int)n;
         }
 
         public static double[,] CopyToImage(float[] img, Index2 size)
