@@ -77,6 +77,16 @@ namespace Single_Reference.Deconvolution
             bool converged = false;
             while (!converged & iter < maxIteration)
             {
+                var shrinked = new double[b.GetLength(0), b.GetLength(1)];
+                for (int y = 0; y < b.GetLength(0); y++)
+                    for (int x = 0; x < b.GetLength(1); x++)
+                    {
+                        var old = xImage[y, x];
+                        var xTmp = old + b[y, x] / aMap[y, x];
+                        xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
+                        shrinked[y, x] = Math.Abs(xTmp - old);
+                    }
+
                 var yPixel = -1;
                 var xPixel = -1;
                 var xMax = 0.0;
@@ -128,14 +138,11 @@ namespace Single_Reference.Deconvolution
                         UpdateB(b, bUpdateCache, imageSection, yPixel, xPixel, xOld - xNew);
                     }
                     iter++;
-
-                    var candidates = new double[b.GetLength(0), b.GetLength(1)];
-                    for (int y = 0; y < b.GetLength(0); y++)
-                        for (int x = 0; x < b.GetLength(1); x++)
-                            candidates[y,x] = b[y, x] / aMap[y, x];
+                            
                     if(iter == 12)
                     {
-                        FitsIO.Write(candidates, "candidatesGreedy2.fits");
+                        FitsIO.Write(shrinked, "shrinkedReal.fits");
+                        FitsIO.Write(b, "candidatesGreedy2.fits");
                         FitsIO.Write(xImage, "xImageGreedy2.fits");
                     }
 

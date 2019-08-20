@@ -69,15 +69,16 @@ namespace Single_Reference.GPUDeconvolution
                 var xNew = xOld + linB[i] / linA[i];
                 xNew = GPUShrinkElasticNet(xNew, lambda, alpha);
                 var tmpDiff = xNew - xOld;
+                var recIndex = Index2.ReconstructIndex(i, xImage.Extent);
+                shrinked[recIndex] = XMath.Abs(tmpDiff);
 
                 if (xAbsDiff < XMath.Abs(tmpDiff))
                 {
                     xDiff = tmpDiff;
                     xAbsDiff = XMath.Abs(tmpDiff);
-                    var recIndex = Index2.ReconstructIndex(i, xImage.Extent);
                     xIndex = recIndex.X;
                     yIndex = recIndex.Y;
-                    shrinked[xIndex, yIndex] = XMath.Abs(tmpDiff);
+                    
                 }
             }
         }
@@ -91,7 +92,8 @@ namespace Single_Reference.GPUDeconvolution
             ArrayView<float> xDiffOut,
             ArrayView<float> xAbsDiffOut,
             ArrayView<int> xIndexOut,
-            ArrayView<int> yIndexOut)
+            ArrayView<int> yIndexOut,
+            ArrayView2D<float> debugOut)
         {
             var gridIdx = grouped.GridIdx;
             var threadID = grouped.GroupIdx;
@@ -171,12 +173,14 @@ namespace Single_Reference.GPUDeconvolution
                 sharedXAbsDiff[warpIdx] = xAbsDiff;
                 sharedXIndex[warpIdx] = xIndex;
                 sharedYIndex[warpIdx] = yIndex;
+
+                debugOut[gridIdx, warpIdx] = xAbsDiff;
             }
             Group.Barrier();
 
             //warp 0 reduce of shared memory
             var maxShared = Group.Dimension.X / Warp.WarpSize;
-            if (warpIdx == 0 & Warp.LaneIdx + 1 < maxShared)
+            if (warpIdx == 0 & Warp.LaneIdx < maxShared)
             {
                 xDiff = sharedXDiff[Warp.LaneIdx];
                 xAbsDiff = sharedXAbsDiff[Warp.LaneIdx];
@@ -327,7 +331,7 @@ namespace Single_Reference.GPUDeconvolution
             var nextPower2 = 1 << (63 - CountLeadingZeroBits((UInt64)maxGroups));    //calculate the next smallest power of 2 value for the group size. Used for reduceAndUpdate
 
             var shrinkDebug = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView2D<float>>(ShrinkDebugKernel);
-            var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);
+            var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView2D<float>>(ShrinkReduceKernel);
             var reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView<float> , ArrayView<int>>(ReduceAndUpdate);
             var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
 
@@ -337,8 +341,10 @@ namespace Single_Reference.GPUDeconvolution
             using (var xImage = accelerator.Allocate<float>(size))
             using (var xCandidates = accelerator.Allocate<float>(size))
             using (var aMap = accelerator.Allocate<float>(size))
-            using (var shrinked = accelerator.Allocate<float>(size))
             using (var psf2 = accelerator.Allocate<float>(psfSize))
+
+            using (var shrinked = accelerator.Allocate<float>(size))
+            using(var shrinkedTmpDebug = accelerator.Allocate<float>(new Index2(maxGroups, 32)))
 
             using (var maxDiff = accelerator.Allocate<float>(maxGroups))
             using (var maxAbsDiff = accelerator.Allocate<float>(maxGroups))
@@ -361,12 +367,28 @@ namespace Single_Reference.GPUDeconvolution
 
                 for (int i = 0; i < 12; i++)
                 {
+                    shrinked.MemSetToZero();
+                    accelerator.Synchronize();
                     shrinkDebug(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, shrinked.View);
                     accelerator.Synchronize();
-                    var outputShrinked = shrinked.GetAsArray();
-                    FitsIO.Write(CopyToImage(outputShrinked, size), "shrinked.fits");
+                    var outputShrinked = CopyToImage(shrinked.GetAsArray(), size);
+                    FitsIO.Write(outputShrinked, "shrinked.fits");
+                    var maxPixelS = 0.0;
+                    var maxXIndexS = -1;
+                    var maxYIndexS = -1;
+                    for(int y = 0; y < outputShrinked.GetLength(0); y++)
+                        for(int x = 0; x < outputShrinked.GetLength(1); x++)
+                        {
+                            if(maxPixelS < outputShrinked[y, x])
+                            {
+                                maxPixelS = outputShrinked[y, x];
+                                maxYIndexS = y;
+                                maxXIndexS = x;
+                                
+                            }
+                        }
 
-                    shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View);
+                    shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, shrinkedTmpDebug.View);
                     accelerator.Synchronize();
                     
                     var maxDiffT = 0.0f;
@@ -385,6 +407,15 @@ namespace Single_Reference.GPUDeconvolution
                             xIndexT = t2[j];
                             yIndexT = t3[j];
                         }
+
+                    var sharedMemoryDebug = shrinkedTmpDebug.GetAs2DArray();
+                    var maxSharedDebug = 0.0f;
+                    for(int y = 0; y < sharedMemoryDebug.GetLength(0); y++)
+                        for(int x = 0; x < sharedMemoryDebug.GetLength(1); x++)
+                            if(maxSharedDebug < sharedMemoryDebug[y, x])
+                            {
+                                maxSharedDebug = sharedMemoryDebug[y, x];
+                            }
                         
                     reduceAndUpdateX(new Index(nextPower2), maxReduceThreads.View, xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
@@ -396,9 +427,9 @@ namespace Single_Reference.GPUDeconvolution
                     Console.WriteLine("iteration " + i);
                 }
 
-                var x = xImage.GetAsArray();
+                var xOutput = xImage.GetAsArray();
                 var candidate = xCandidates.GetAsArray();
-                FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
+                FitsIO.Write(CopyToImage(xOutput, size), "xImageGPU.fits");
                 FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
             }
         }
