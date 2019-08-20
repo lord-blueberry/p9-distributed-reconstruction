@@ -25,6 +25,63 @@ namespace Single_Reference.GPUDeconvolution
         }
 
         #region kernels
+        private static void ShrinkDebugKernel(
+            GroupedIndex grouped,
+            ArrayView2D<float> xImage,
+            ArrayView2D<float> bMap,
+            ArrayView2D<float> aMap,
+            ArrayView<float> lambdaAlpha,
+            ArrayView2D<float> shrinked)
+        {
+            var gridIdx = grouped.GridIdx;
+            var threadID = grouped.GroupIdx;
+            var warpIdx = threadID / Warp.WarpSize;
+
+            var lambda = lambdaAlpha[0];
+            var alpha = lambdaAlpha[1];
+
+            var yCount = xImage.Extent.Y / (float)(Grid.DimensionX);
+            var yIdx = (int)(gridIdx * yCount);
+            var yIdxEnd = (int)((gridIdx + 1) * yCount);
+            yIdxEnd = gridIdx + 1 == Grid.DimensionX ? xImage.Extent.Y : yIdxEnd;
+
+            //create linear views per group
+            var linX = xImage.AsLinearView();
+            var linB = bMap.AsLinearView();
+            var linA = aMap.AsLinearView();
+            var fromPixel = new Index2(0, yIdx).ComputeLinearIndex(xImage.Extent);
+            var toPixel = new Index2(xImage.Extent.X, yIdxEnd - 1).ComputeLinearIndex(xImage.Extent);
+
+            //assign consecutive pixels to threads in a group.
+            var pixelCount = (toPixel - fromPixel) / (float)(Group.Dimension.X);
+            var pixelIdx = (int)(threadID * pixelCount) + fromPixel;
+            var pixelEnd = (int)((threadID + 1) * pixelCount) + fromPixel;
+            pixelEnd = threadID + 1 == Group.DimensionX ? toPixel : pixelEnd;
+
+            //shrink and save max of the assigned pixels
+            float xDiff = 0.0f;
+            float xAbsDiff = float.MinValue;
+            int xIndex = -1;
+            int yIndex = -1;
+            for (int i = pixelIdx; i < pixelEnd; i++)
+            {
+                var xOld = linX[i];
+                var xNew = xOld + linB[i] / linA[i];
+                xNew = GPUShrinkElasticNet(xNew, lambda, alpha);
+                var tmpDiff = xNew - xOld;
+
+                if (xAbsDiff < XMath.Abs(tmpDiff))
+                {
+                    xDiff = tmpDiff;
+                    xAbsDiff = XMath.Abs(tmpDiff);
+                    var recIndex = Index2.ReconstructIndex(i, xImage.Extent);
+                    xIndex = recIndex.X;
+                    yIndex = recIndex.Y;
+                    shrinked[xIndex, yIndex] = XMath.Abs(tmpDiff);
+                }
+            }
+        }
+
         private static void ShrinkReduceKernel(
             GroupedIndex grouped,
             ArrayView2D<float> xImage,
@@ -190,7 +247,7 @@ namespace Single_Reference.GPUDeconvolution
             var itemCount = xDiff.Extent.X / (float)(totalThreads[0]);
             var itemIdx = (int)(threadIndex * itemCount);
             var itemEnd = (int)((threadIndex + 1) * itemCount);
-            itemEnd = threadIndex + 1 == Group.DimensionX ? xDiff.Extent.X : itemEnd;
+            itemEnd = threadIndex + 1 == totalThreads[0] ? xDiff.Extent.X : itemEnd;
 
             var tempX = xDiff[itemIdx];
             var tempAbs = xAbsDiff[itemIdx];
@@ -220,6 +277,20 @@ namespace Single_Reference.GPUDeconvolution
                     tempYIndex = oYIndex;
                 }
                 Warp.Barrier();
+            }
+
+            if(Warp.WarpSize == 1 & threadIndex == 0)
+            {
+                for(int i = itemEnd; i < xDiff.Extent.X;i++)
+                {
+                    if (tempAbs < xAbsDiff[i])
+                    {
+                        tempX = xDiff[i];
+                        tempAbs = xAbsDiff[i];
+                        tempXIndex = xIndex[i];
+                        tempYIndex = yIndex[i];
+                    }
+                }
             }
 
             if (threadIndex == 0)
@@ -255,6 +326,7 @@ namespace Single_Reference.GPUDeconvolution
             //groupThreadIdx = new GroupedIndex(maxGroups, 4);
             var nextPower2 = 1 << (63 - CountLeadingZeroBits((UInt64)maxGroups));    //calculate the next smallest power of 2 value for the group size. Used for reduceAndUpdate
 
+            var shrinkDebug = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView2D<float>>(ShrinkDebugKernel);
             var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);
             var reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView<float> , ArrayView<int>>(ReduceAndUpdate);
             var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
@@ -265,6 +337,7 @@ namespace Single_Reference.GPUDeconvolution
             using (var xImage = accelerator.Allocate<float>(size))
             using (var xCandidates = accelerator.Allocate<float>(size))
             using (var aMap = accelerator.Allocate<float>(size))
+            using (var shrinked = accelerator.Allocate<float>(size))
             using (var psf2 = accelerator.Allocate<float>(psfSize))
 
             using (var maxDiff = accelerator.Allocate<float>(maxGroups))
@@ -288,6 +361,11 @@ namespace Single_Reference.GPUDeconvolution
 
                 for (int i = 0; i < 12; i++)
                 {
+                    shrinkDebug(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, shrinked.View);
+                    accelerator.Synchronize();
+                    var outputShrinked = shrinked.GetAsArray();
+                    FitsIO.Write(CopyToImage(outputShrinked, size), "shrinked.fits");
+
                     shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View);
                     accelerator.Synchronize();
                     

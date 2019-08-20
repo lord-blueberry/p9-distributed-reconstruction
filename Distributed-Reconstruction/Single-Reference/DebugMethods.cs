@@ -252,7 +252,7 @@ namespace Single_Reference
                 var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                 var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5  , 0.2, 2000);
+                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5  , 0.2, 200);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
