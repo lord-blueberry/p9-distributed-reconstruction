@@ -176,7 +176,9 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        private static void ReduceAndUpdate(Index threadIndex,
+        private static void ReduceAndUpdate(
+            Index threadIndex,
+            ArrayView<int> totalThreads,
             ArrayView2D<float> xImage,
             ArrayView<float> xDiff,
             ArrayView<float> xAbsDiff,
@@ -185,7 +187,7 @@ namespace Single_Reference.GPUDeconvolution
             ArrayView<float> maxDiffOut,
             ArrayView<int> indicesOut)
         {
-            var itemCount = xDiff.Extent.X / (float)(Group.Dimension.X);
+            var itemCount = xDiff.Extent.X / (float)(totalThreads[0]);
             var itemIdx = (int)(threadIndex * itemCount);
             var itemEnd = (int)((threadIndex + 1) * itemCount);
             itemEnd = threadIndex + 1 == Group.DimensionX ? xDiff.Extent.X : itemEnd;
@@ -254,7 +256,7 @@ namespace Single_Reference.GPUDeconvolution
             var nextPower2 = 1 << (63 - CountLeadingZeroBits((UInt64)maxGroups));    //calculate the next smallest power of 2 value for the group size. Used for reduceAndUpdate
 
             var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);
-            var reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView<float> , ArrayView<int>>(ReduceAndUpdate);
+            var reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView<float> , ArrayView<int>>(ReduceAndUpdate);
             var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
 
             var size = new Index2(xImageIn.GetLength(0), xImageIn.GetLength(1));
@@ -273,6 +275,7 @@ namespace Single_Reference.GPUDeconvolution
             using (var maxPixel = accelerator.Allocate<float>(1))
             using (var maxIndices = accelerator.Allocate<int>(2))
             using (var lambdaAlpha = accelerator.Allocate<float>(2))
+            using (var maxReduceThreads = accelerator.Allocate<int>(1))
             {
                 xImage.CopyFrom(xImageIn, new Index2(0, 0), new Index2(0, 0), new Index2(xImageIn.GetLength(0), xImageIn.GetLength(1)));
                 xCandidates.CopyFrom(bMapIn, new Index2(0, 0), new Index2(0, 0), new Index2(bMapIn.GetLength(0), bMapIn.GetLength(1)));
@@ -281,12 +284,13 @@ namespace Single_Reference.GPUDeconvolution
 
                 lambdaAlpha.CopyFrom(lambda, new Index(0));
                 lambdaAlpha.CopyFrom(alpha, new Index(1));
+                maxReduceThreads.CopyFrom(nextPower2, new Index(0));
 
-                for (int i = 0; i < 1; i++)
+                for (int i = 0; i < 12; i++)
                 {
                     shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View);
                     accelerator.Synchronize();
-
+                    
                     var maxDiffT = 0.0f;
                     var maxAbsDiffT = 0.0f;
                     var xIndexT = -1;
@@ -303,8 +307,8 @@ namespace Single_Reference.GPUDeconvolution
                             xIndexT = t2[j];
                             yIndexT = t3[j];
                         }
-
-                    reduceAndUpdateX(new Index(nextPower2), xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
+                        
+                    reduceAndUpdateX(new Index(nextPower2), maxReduceThreads.View, xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
                     var bla = maxPixel.GetAsArray();
                     var bla2 = maxIndices.GetAsArray();
