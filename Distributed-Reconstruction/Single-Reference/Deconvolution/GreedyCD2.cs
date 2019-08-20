@@ -139,7 +139,7 @@ namespace Single_Reference.Deconvolution
                     }
                     iter++;
                             
-                    if(iter == 12)
+                    if(iter == 1000)
                     {
                         FitsIO.Write(shrinked, "shrinkedReal.fits");
                         FitsIO.Write(b, "candidatesGreedy2.fits");

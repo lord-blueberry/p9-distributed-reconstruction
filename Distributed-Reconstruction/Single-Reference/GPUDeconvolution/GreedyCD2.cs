@@ -164,9 +164,9 @@ namespace Single_Reference.GPUDeconvolution
                     xIndex = oXIndex;
                     yIndex = oYIndex;
                 }
-                Warp.Barrier();
+                //Warp.Barrier();
             }
-            Warp.Barrier();
+            //Warp.Barrier();
             if (Warp.IsFirstLane)
             {
                 sharedXDiff[warpIdx] = xDiff;
@@ -174,7 +174,7 @@ namespace Single_Reference.GPUDeconvolution
                 sharedXIndex[warpIdx] = xIndex;
                 sharedYIndex[warpIdx] = yIndex;
 
-                debugOut[gridIdx, warpIdx] = xAbsDiff;
+                //debugOut[gridIdx, warpIdx] = xAbsDiff;
             }
             Group.Barrier();
 
@@ -187,7 +187,7 @@ namespace Single_Reference.GPUDeconvolution
                 xIndex = sharedXIndex[Warp.LaneIdx];
                 yIndex = sharedYIndex[Warp.LaneIdx];
 
-                Warp.Barrier();
+                //Warp.Barrier();
                 //warp reduce
                 for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
                 {
@@ -202,7 +202,7 @@ namespace Single_Reference.GPUDeconvolution
                         xIndex = oXIndex;
                         yIndex = oYIndex;
                     }
-                    Warp.Barrier();
+                    //Warp.Barrier();
                 }
 
                 if (Warp.IsFirstLane)
@@ -280,7 +280,7 @@ namespace Single_Reference.GPUDeconvolution
                     tempXIndex = oXIndex;
                     tempYIndex = oYIndex;
                 }
-                Warp.Barrier();
+                //Warp.Barrier();
             }
 
             if(Warp.WarpSize == 1 & threadIndex == 0)
@@ -365,8 +365,9 @@ namespace Single_Reference.GPUDeconvolution
                 lambdaAlpha.CopyFrom(alpha, new Index(1));
                 maxReduceThreads.CopyFrom(nextPower2, new Index(0));
 
-                for (int i = 0; i < 12; i++)
+                for (int i = 0; i < 1000; i++)
                 {
+                    /*
                     shrinked.MemSetToZero();
                     accelerator.Synchronize();
                     shrinkDebug(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, shrinked.View);
@@ -387,10 +388,10 @@ namespace Single_Reference.GPUDeconvolution
                                 
                             }
                         }
-
+                        */
                     shrinkReduce(groupThreadIdx, xImage.View, xCandidates.View, aMap.View, lambdaAlpha.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, shrinkedTmpDebug.View);
                     accelerator.Synchronize();
-                    
+                    /*
                     var maxDiffT = 0.0f;
                     var maxAbsDiffT = 0.0f;
                     var xIndexT = -1;
@@ -416,11 +417,11 @@ namespace Single_Reference.GPUDeconvolution
                             {
                                 maxSharedDebug = sharedMemoryDebug[y, x];
                             }
-                        
+                        */
                     reduceAndUpdateX(new Index(nextPower2), maxReduceThreads.View, xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
-                    var bla = maxPixel.GetAsArray();
-                    var bla2 = maxIndices.GetAsArray();
+                    /*var bla = maxPixel.GetAsArray();
+                    var bla2 = maxIndices.GetAsArray();*/
                     updateCandidatesKernel(psfSize, xCandidates.View, psf2.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
 
@@ -434,7 +435,7 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        public static int CountLeadingZeroBits(UInt64 input)
+        private static int CountLeadingZeroBits(UInt64 input)
         {
             if (input == 0) return 64;
 

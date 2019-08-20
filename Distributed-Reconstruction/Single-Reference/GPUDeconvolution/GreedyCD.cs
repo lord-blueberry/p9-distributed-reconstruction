@@ -129,7 +129,7 @@ namespace Single_Reference.GPUDeconvolution
                 lambdaAlpha.CopyFrom(lambda, new Index(0));
                 lambdaAlpha.CopyFrom(alpha, new Index(1));
 
-                for (int i = 0; i< 100; i++)
+                for (int i = 0; i< 1000; i++)
                 {
                     shrinkKernel(size, xImage.View, xCandidates.View, maxCandidate.View, lambdaAlpha.View);
                     accelerator.Synchronize();
