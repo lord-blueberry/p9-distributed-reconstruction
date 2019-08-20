@@ -14,438 +14,440 @@ using ILGPU.Runtime.Cuda;
 
 namespace Single_Reference.GPUDeconvolution
 {
-    public class GreedyCD
+    public class GreedyCD : IDisposable
     {
-        
         private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => XMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
-        #region kernels
-        private static void ShrinkKernel(Index2 index,
-            ArrayView2D<float> xImage,
-            ArrayView2D<float> xCandidates,
-            ArrayView<float> maxCandidate,
-            ArrayView<float> lambdaAlpha)
-        {
-            if(index.InBounds(xImage.Extent))
-            {
-                var xOld = xImage[index];
-                var xCandidate = xCandidates[index];
-                var lambda = lambdaAlpha[0];
-                var alpha = lambdaAlpha[1];
+        #region GPU allocated data buffers
+        private MemoryBuffer2D<float> xImageGPU;
+        private MemoryBuffer2D<float> bMapGPU;
+        private MemoryBuffer2D<float> aMapGPU;
+        private MemoryBuffer2D<float> psf2GPU;
 
-                var xNew = GPUShrinkElasticNet(xOld + xCandidate, lambda, alpha);
-                Atomic.Max(ref maxCandidate[0], XMath.Abs(xOld - xNew));
-            }
+        private MemoryBuffer<float> lambdaAlpha;
+        private MemoryBuffer<Pixel> maxPixels;
+        private MemoryBuffer<Pixel> maxPixel;
+        #endregion
+
+        #region Loaded GPU kernels
+        readonly Action<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>> shrinkReduce;
+        readonly Action<Index, ArrayView<int>, ArrayView2D<float>, ArrayView<Pixel>, ArrayView<Pixel>> reduceAndUpdateX;
+        readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>> updateBKernelV0;
+        readonly Action<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>> updateBKernelV1;
+        #endregion
+
+        readonly Context c;
+        readonly Accelerator accelerator;
+        readonly int maxGroups;
+        readonly GroupedIndex groupThreadIdx;
+
+        public GreedyCD()
+        {
+            c = new Context(ContextFlags.FastMath);
+            var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
+            if (gpuIds.Any())
+                accelerator = new CudaAccelerator(c, gpuIds.First().DeviceId);
+            else
+                accelerator = new CPUAccelerator(c, 4);
+
+            maxGroups = accelerator.MaxNumThreads / accelerator.MaxNumThreadsPerGroup;
+            groupThreadIdx = new GroupedIndex(maxGroups, accelerator.MaxNumThreadsPerGroup);
+
+            //load kernels
+            shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>>(ShrinkReduceKernel);
+            reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView2D<float>, ArrayView<Pixel>, ArrayView<Pixel>>(ReduceAndUpdate);
+            updateBKernelV0 = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateBKernelV0);
+            updateBKernelV1 = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateBKernelV1);
         }
 
-        private static void Shrink2(Index2 index,
-            ArrayView2D<float> xImage,
-            ArrayView2D<float> xCandidates,
-            ArrayView<float> maxCandidate,
-            ArrayView<int> maxIndices,
-            ArrayView<float> lambdaAlpha)
+        public bool DeconvolvePath()
         {
-            //not sure if necessary, but bounds check were always done in the ILGPU examples
-            if (index.InBounds(xImage.Extent))
-            {
-                //TODO: fix this line for ximage.size != xCandidates.size
-                var xOld = xImage[index];
-                var xCandidate = xCandidates[index];
-                var lambda = lambdaAlpha[0];
-                var alpha = lambdaAlpha[1];
 
-                var xNew = GPUShrinkElasticNet(xOld + xCandidate, lambda, alpha);
-                var xDiff = xOld - xNew;
 
-                if (maxCandidate[0] == XMath.Abs(xDiff))
-                {
-                    var oldValue = Atomic.CompareExchange(ref maxIndices[0], -1, index.Y);
-                    if (oldValue == -1)
-                    {
-                        maxIndices[1] = index.X;
-
-                        //retrieve sign of maximum candidat
-                        maxCandidate[0] = xDiff;
-
-                        //update result
-                        xImage[index] = xNew;
-                    }
-                }
-            }
+            FreeGPU();
+            return false;
         }
 
-        private static void UpdateCandidatesKernel(Index2 index,
-            ArrayView2D<float> xCandidates,
+        public bool Deconvolve()
+        {
+
+
+            FreeGPU();
+            return false;
+        }
+
+        /// <summary>
+        /// Make several deconvolution iterations without checking convergence
+        /// </summary>
+        /// <param name="batchIterations"></param>
+        /// <returns></returns>
+        private bool DeconvolutionBatchIterations(int batchIterations)
+        {
+            for(int i = 0; i < batchIterations; i++)
+            {
+                shrinkReduce(groupThreadIdx, xImageGPU.View, bMapGPU.View, aMapGPU.View, lambdaAlpha.View, maxPixels.View);
+                accelerator.Synchronize();
+                //reduceAndUpdateX
+                accelerator.Synchronize();
+                updateBKernelV0(psf2GPU.Extent, bMapGPU.View, psf2GPU.View, maxPixel.View);
+                accelerator.Synchronize();
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Allocates and initializes buffers on the GPU
+        /// </summary>
+        private void AllocateGPU(float[,] xImage, float[,] bMap, float[,] aMap, float[,] psf2, float lambda, float alpha)
+        {
+            var index0 = new Index2(0, 0);
+            var size = new Index2(xImage.GetLength(1), xImage.GetLength(0));
+            xImageGPU = accelerator.Allocate<float>(size);
+            xImageGPU.CopyFrom(xImage, index0, index0, size);
+
+            lambdaAlpha = accelerator.Allocate<float>(2);
+            lambdaAlpha.CopyFrom(lambda, new Index(0));
+            lambdaAlpha.CopyFrom(alpha, new Index(1));
+
+            maxPixels = accelerator.Allocate<Pixel>(maxGroups);
+            maxPixel = accelerator.Allocate<Pixel>(1);
+        }
+
+        /// <summary>
+        /// Frees the buffers on the GPU
+        /// </summary>
+        private void FreeGPU()
+        {
+            xImageGPU.Dispose();
+            bMapGPU.Dispose();
+            aMapGPU.Dispose();
+            psf2GPU.Dispose();
+
+            lambdaAlpha.Dispose();
+            maxPixels.Dispose();
+            maxPixel.Dispose();
+        }
+
+        #region GPU pixel struct
+        public struct Pixel : System.IEquatable<Pixel>
+        {
+            public float AbsDiff;
+            public int Y;
+            public int X;
+            public int Sign;
+
+            public bool Equals(Pixel other)
+            {
+                return AbsDiff == other.AbsDiff
+                    & Y == other.Y
+                    & X == other.X
+                    & Sign == other.Sign;
+            }
+        }
+        #endregion
+
+        #region GPU Kernels
+        private static void ShrinkReduceKernel(
+            GroupedIndex grouped,
+            ArrayView2D<float> xImage,
+            ArrayView2D<float> bMap,
             ArrayView2D<float> aMap,
+            ArrayView<float> lambdaAlpha,
+            ArrayView<Pixel> maxPixels)
+        {
+            var gridIdx = grouped.GridIdx;
+            var threadID = grouped.GroupIdx;
+            var warpIdx = threadID / Warp.WarpSize;
+
+            var lambda = lambdaAlpha[0];
+            var alpha = lambdaAlpha[1];
+
+            //shared memory for warp reduce
+            int warpCount = 32;
+            var sharedXDiff = SharedMemory.Allocate<float>(warpCount);
+            var sharedXAbsDiff = SharedMemory.Allocate<float>(warpCount);
+            var sharedXIndex = SharedMemory.Allocate<int>(warpCount);
+            var sharedYIndex = SharedMemory.Allocate<int>(warpCount);
+
+            //assign y indices to the different threadgroups. y seems to be the major index in ILGPU
+            var yCount = xImage.Extent.Y / (float)(Grid.DimensionX);
+            var yIdx = (int)(gridIdx * yCount);
+            var yIdxEnd = (int)((gridIdx + 1) * yCount);
+            yIdxEnd = gridIdx + 1 == Grid.DimensionX ? xImage.Extent.Y : yIdxEnd;
+            var fromPixel = new Index2(0, yIdx).ComputeLinearIndex(xImage.Extent);
+            var toPixel = new Index2(xImage.Extent.X, yIdxEnd - 1).ComputeLinearIndex(xImage.Extent);
+
+            //create linear views per group
+            var linX = xImage.AsLinearView();
+            var linB = bMap.AsLinearView();
+            var linA = aMap.AsLinearView();
+
+            //assign consecutive pixels to threads in a group.
+            var pixelCount = (toPixel - fromPixel) / (float)(Group.Dimension.X);
+            var pixelIdx = (int)(threadID * pixelCount) + fromPixel;
+            var pixelEnd = (int)((threadID + 1) * pixelCount) + fromPixel;
+            pixelEnd = threadID + 1 == Group.DimensionX ? toPixel : pixelEnd;
+
+            //shrink and save max of the assigned pixels
+            float xDiff = 0.0f;
+            float xAbsDiff = float.MinValue;
+            int xIndex = -1;
+            int yIndex = -1;
+            for (int i = pixelIdx; i < pixelEnd; i++)
+            {
+                var xOld = linX[i];
+                var xNew = xOld + linB[i] / linA[i];
+                xNew = GPUShrinkElasticNet(xNew, lambda, alpha);
+                var tmpDiff = xNew - xOld;
+
+                if (xAbsDiff < XMath.Abs(tmpDiff))
+                {
+                    xDiff = tmpDiff;
+                    xAbsDiff = XMath.Abs(tmpDiff);
+                    var recIndex = Index2.ReconstructIndex(i, xImage.Extent);
+                    xIndex = recIndex.X;
+                    yIndex = recIndex.Y;
+                }
+            }
+
+            Warp.Barrier();
+            for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
+            {
+                var oXAbsDiff = Warp.ShuffleDown(xAbsDiff, offset);
+                var oXDiff = Warp.ShuffleDown(xDiff, offset);
+                var oXIndex = Warp.ShuffleDown(xIndex, offset);
+                var oYIndex = Warp.ShuffleDown(yIndex, offset);
+                if (xAbsDiff < oXAbsDiff)
+                {
+                    xAbsDiff = oXAbsDiff;
+                    xDiff = oXDiff;
+                    xIndex = oXIndex;
+                    yIndex = oYIndex;
+                }
+            }
+            if (Warp.IsFirstLane)
+            {
+                sharedXDiff[warpIdx] = xDiff;
+                sharedXAbsDiff[warpIdx] = xAbsDiff;
+                sharedXIndex[warpIdx] = xIndex;
+                sharedYIndex[warpIdx] = yIndex;
+            }
+            Group.Barrier();
+
+            //warp 0 reduce of shared memory
+            var maxShared = Group.Dimension.X / Warp.WarpSize;
+            if (warpIdx == 0 & Warp.LaneIdx < maxShared)
+            {
+                xDiff = sharedXDiff[Warp.LaneIdx];
+                xAbsDiff = sharedXAbsDiff[Warp.LaneIdx];
+                xIndex = sharedXIndex[Warp.LaneIdx];
+                yIndex = sharedYIndex[Warp.LaneIdx];
+
+                //warp reduce
+                for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
+                {
+                    var oXAbsDiff = Warp.ShuffleDown(xAbsDiff, offset);
+                    var oXDiff = Warp.ShuffleDown(xDiff, offset);
+                    var oXIndex = Warp.ShuffleDown(xIndex, offset);
+                    var oYIndex = Warp.ShuffleDown(yIndex, offset);
+                    if (xAbsDiff < oXAbsDiff)
+                    {
+                        xAbsDiff = oXAbsDiff;
+                        xDiff = oXDiff;
+                        xIndex = oXIndex;
+                        yIndex = oYIndex;
+                    }
+                }
+
+                if (Warp.IsFirstLane)
+                {
+                    var pixel = new Pixel() {
+                        AbsDiff = xAbsDiff,
+                        X = xIndex,
+                        Y = yIndex,
+                        Sign = XMath.Sign(xDiff)
+                    };
+
+                    maxPixels[gridIdx] = pixel;
+                }
+            }
+
+            //if accelerator has no warp, reduce the shared memory the old fashioned way
+            if (Warp.WarpSize == 1)
+            {
+                if (threadID == 0)
+                {
+                    for (int i = 0; i < maxShared; i++)
+                    {
+                        if (xAbsDiff < sharedXAbsDiff[i])
+                        {
+                            xDiff = sharedXDiff[i];
+                            xAbsDiff = sharedXAbsDiff[i];
+                            xIndex = sharedXIndex[i];
+                            yIndex = sharedYIndex[i];
+                        }
+                    }
+                    var pixel = new Pixel()
+                    {
+                        AbsDiff = xAbsDiff,
+                        X = xIndex,
+                        Y = yIndex,
+                        Sign = XMath.Sign(xDiff)
+                    };
+
+                    maxPixels[gridIdx] = pixel;
+                }
+            }
+        }
+
+        private static void ReduceAndUpdate(
+            Index threadIndex,
+            ArrayView<int> totalThreads,
+            ArrayView2D<float> xImage,
+            ArrayView<Pixel> maxPixels,
+            ArrayView<Pixel> maxPixelOut)
+        {
+            var itemCount = maxPixels.Extent.X / (float)(totalThreads[0]);
+            var itemIdx = (int)(threadIndex * itemCount);
+            var itemEnd = (int)((threadIndex + 1) * itemCount);
+            itemEnd = threadIndex + 1 == totalThreads[0] ? maxPixels.Extent.X : itemEnd;
+
+            var tempSign = maxPixels[itemIdx].Sign;
+            var tempAbs = maxPixels[itemIdx].AbsDiff;
+            var tempXIndex = maxPixels[itemIdx].X;
+            var tempYIndex = maxPixels[itemIdx].Y;
+            for (int i = itemIdx + 1; i < itemEnd; i++)
+                if (tempAbs < maxPixels[i].AbsDiff)
+                {
+                    tempSign = maxPixels[i].Sign;
+                    tempAbs = maxPixels[i].AbsDiff;
+                    tempXIndex = maxPixels[i].X;
+                    tempYIndex = maxPixels[i].Y;
+                }
+
+            Warp.Barrier();
+            for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
+            {
+                var oXAbsDiff = Warp.ShuffleDown(tempAbs, offset);
+                var oXDiff = Warp.ShuffleDown(tempSign, offset);
+                var oXIndex = Warp.ShuffleDown(tempXIndex, offset);
+                var oYIndex = Warp.ShuffleDown(tempYIndex, offset);
+                if (tempAbs < oXAbsDiff)
+                {
+                    tempAbs = oXAbsDiff;
+                    tempSign = oXDiff;
+                    tempXIndex = oXIndex;
+                    tempYIndex = oYIndex;
+                }
+            }
+
+            //if there is no warp, do it single threaded
+            if (Warp.WarpSize == 1 & threadIndex == 0)
+            {
+                for (int i = itemEnd; i < maxPixels.Extent.X; i++)
+                {
+                    if (tempAbs < maxPixels[i].AbsDiff)
+                    {
+                        tempSign = maxPixels[i].Sign;
+                        tempAbs = maxPixels[i].AbsDiff;
+                        tempXIndex = maxPixels[i].X;
+                        tempYIndex = maxPixels[i].Y;
+                    }
+                }
+            }
+
+            if (threadIndex == 0)
+            {
+                xImage[tempXIndex, tempYIndex] += (tempSign * tempAbs);
+                var outPixel = new Pixel()
+                {
+                    AbsDiff = tempAbs,
+                    X = tempXIndex,
+                    Y = tempYIndex,
+                    Sign = tempSign
+                };
+                maxPixelOut[0] = outPixel;
+            }
+        }
+
+        private static void UpdateBKernelV1(
+            GroupedIndex grouped,
+            ArrayView2D<float> bMap,
             ArrayView2D<float> psf2,
-            ArrayView<float> maxDiff,
-            ArrayView<int> maxIndices)
+            ArrayView<Pixel> maxPixel)
         {
-            var indexCandidate = index.Add(new Index2(maxIndices[1], maxIndices[0])).Subtract(psf2.Extent / 2);
-            if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(xCandidates.Extent))
+            var gridIdx = grouped.GridIdx;
+            var threadID = grouped.GroupIdx;
+
+            //assign y indices to the different threadgroups. y seems to be the major index in ILGPU
+            var yCount = psf2.Extent.Y / (float)(Grid.DimensionX);
+            var yIdx = (int)(gridIdx * yCount);
+            var yIdxEnd = (int)((gridIdx + 1) * yCount);
+            yIdxEnd = gridIdx + 1 == Grid.DimensionX ? psf2.Extent.Y : yIdxEnd;
+            var fromPixel = new Index2(0, yIdx).ComputeLinearIndex(psf2.Extent);
+            var toPixel = new Index2(psf2.Extent.X, yIdxEnd - 1).ComputeLinearIndex(psf2.Extent);
+
+            var linPSF = psf2.AsLinearView();
+
+            //assign consecutive pixels to threads in a group.
+            var pixelCount = (toPixel - fromPixel) / (float)(Group.Dimension.X);
+            var pixelIdx = (int)(threadID * pixelCount) + fromPixel;
+            var pixelEnd = (int)((threadID + 1) * pixelCount) + fromPixel;
+            pixelEnd = threadID + 1 == Group.DimensionX ? toPixel : pixelEnd;
+
+            var offset = new Index2(maxPixel[0].X, maxPixel[0].Y).Subtract(psf2.Extent / 2);
+            for (int i = pixelIdx; i < pixelEnd; i++)
             {
-                var update = (psf2[index] * maxDiff[0]) / aMap[indexCandidate];
-                xCandidates[indexCandidate] += (psf2[index] * maxDiff[0]) / aMap[indexCandidate];
+                var p = linPSF[i];
+                var psfIndex = Index2.ReconstructIndex(i, psf2.Extent);
+                var indexBMap = psfIndex.Add(offset);
+                if (indexBMap.InBounds(bMap.Extent))
+                {
+                    bMap[indexBMap] -= (p * maxPixel[0].Sign * maxPixel[0].AbsDiff);
+                }
             }
         }
 
-        private static void ResetIndicesKernel(Index index,
-            ArrayView<int> maxIndices,
-            ArrayView<float> maxCandidate)
+        private static void UpdateBKernelV0(
+            Index2 index,
+            ArrayView2D<float> bMap,
+            ArrayView2D<float> psf2,
+            ArrayView<Pixel> maxPixel)
         {
-            maxIndices[index] = -1;
-            maxCandidate[0] = 0;
+            var indexCandidate = index.Add(new Index2(maxPixel[0].X, maxPixel[0].Y)).Subtract(psf2.Extent / 2);
+            if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(bMap.Extent))
+            {
+                bMap[indexCandidate] -= (psf2[index] * maxPixel[0].Sign * maxPixel[0].AbsDiff);
+            }
         }
         #endregion
 
-        private static void Iteration(Accelerator accelerator, float[,] xImageInput, float[,]candidateInput, float[,] aMapInput, float[,] psf2Input, float lambda, float alpha)
+        #region Disposable implementation
+        protected bool disposed = false;
+        public void Dispose()
         {
-            var shrinkKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>>(ShrinkKernel);
-            var maxIndexKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>, ArrayView<float>>(Shrink2);
-            var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
-            var resetKernel = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView<float>>(ResetIndicesKernel);
-
-            var size = new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1));
-            var psfSize = new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1));
-
-            using (var xImage = accelerator.Allocate <float>(size))
-            using (var xCandidates = accelerator.Allocate<float>(size))
-            using (var shrinked = accelerator.Allocate<float>(size))
-            using (var aMap = accelerator.Allocate<float>(size))
-            using (var psf2 = accelerator.Allocate<float>(psfSize))
-            using (var maxCandidate = accelerator.Allocate<float>(1))
-            using (var maxIndices = accelerator.Allocate<int>(2))
-            using (var lambdaAlpha = accelerator.Allocate<float>(2))
-            {
-                xImage.CopyFrom(xImageInput, new Index2(0, 0), new Index2(0, 0), new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1)));
-                xCandidates.CopyFrom(candidateInput, new Index2(0, 0), new Index2(0, 0), new Index2(candidateInput.GetLength(0), candidateInput.GetLength(1)));
-                aMap.CopyFrom(aMapInput, new Index2(0, 0), new Index2(0, 0), new Index2(aMapInput.GetLength(0), aMapInput.GetLength(1)));
-                psf2.CopyFrom(psf2Input, new Index2(0, 0), new Index2(0, 0), new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1)));
-
-                maxIndices.CopyFrom(-1, new Index(0));
-                maxIndices.CopyFrom(-1, new Index(1));
-                maxCandidate.CopyFrom(0, new Index(0));
-
-                lambdaAlpha.CopyFrom(lambda, new Index(0));
-                lambdaAlpha.CopyFrom(alpha, new Index(1));
-
-                for (int i = 0; i< 1000; i++)
-                {
-                    shrinkKernel(size, xImage.View, xCandidates.View, maxCandidate.View, lambdaAlpha.View);
-                    accelerator.Synchronize();
-
-                    maxIndexKernel(size, xImage.View, xCandidates.View, maxCandidate.View, maxIndices.View, lambdaAlpha.View);
-                    accelerator.Synchronize();
-                    var indices = maxIndices.GetAsArray();
-                    var maxDiff = maxCandidate.GetAsArray();
-
-                    updateCandidatesKernel(psfSize, xCandidates.View, aMap.View, psf2.View, maxCandidate.View, maxIndices.View);
-                    accelerator.Synchronize();
-
-                    resetKernel(new Index(2), maxIndices.View, maxCandidate.View);
-                    accelerator.Synchronize();
-                    Console.WriteLine("iteration " + i);
-                }
-
-                var x = xImage.GetAs2DArray();
-                var candidate = xCandidates.GetAs2DArray();
-                var p = psf2.GetAsArray();
-                FitsIO.Write(ToDouble(x), "xImageGPU.fits");
-                FitsIO.Write(ToDouble(candidate), "candidateGPU.fits");
-            }
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
-        public static double[,] CopyToImage(float[] img, Index2 size)
+        protected virtual void Dispose(bool disposing)
         {
-            var output = new double[size.Y, size.X];
-            var index = 0;
-            for(int y = 0; y < size.Y; y++)
+            if (disposed)
+                return;
+            if (disposing)
             {
-                for (int x = 0; x < size.X; x++)
-                    output[x, y] = img[index + x];
-                index += size.X;
+                accelerator.Dispose();
+                c.Dispose();
             }
 
-            return output;
+            disposed = true;
         }
 
-        public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha)
+        ~GreedyCD()
         {
-            using (var context = new Context())
-            {
-
-                var yPsfHalf = psf.GetLength(0) / 2;
-                var xPsfHalf = psf.GetLength(1) / 2;
-
-                var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
-                var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
-                for (int y = 0; y < b.GetLength(0); y++)
-                    for (int x = 0; x < b.GetLength(1); x++)
-                        b[y, x] = b[y, x] / aMap[y, x];
-
-                var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
-                if(gpuIds.Any())
-                {
-                    using (var accelerator = new CudaAccelerator(context, gpuIds.First().DeviceId))
-                    {
-                        Console.WriteLine($"Performing operations on {accelerator}");
-                        Iteration(accelerator, ToFloat(xImage), ToFloat(b), ToFloat(aMap), ToFloat(psf2), (float)lambda, (float)alpha);
-                    }
-                }
-                else
-                {
-                    using (var accelerator = new CPUAccelerator(context, 4))
-                    {
-                        Console.WriteLine($"Performing operations on {accelerator}");
-                        Iteration(accelerator, ToFloat(xImage), ToFloat(b), ToFloat(aMap), ToFloat(psf2), (float)lambda, (float)alpha);
-                    }
-                }
-            }
-
-            return true;
-        }
-    
-
-        private static float[,] ToFloat(double[,] img)
-        {
-            var output = new float[img.GetLength(0), img.GetLength(1)];
-            for (int i = 0; i < img.GetLength(0); i++)
-                for (int j = 0; j < img.GetLength(1); j++)
-                    output[i, j] = (float)img[i, j];
-            return output;
-        }
-
-        private static double[,] ToDouble(float[,] img)
-        {
-            var output = new double[img.GetLength(0), img.GetLength(1)];
-            for (int i = 0; i < img.GetLength(0); i++)
-                for (int j = 0; j < img.GetLength(1); j++)
-                    output[i, j] = img[i, j];
-            return output;
-        }
-
-
-
-
-
-        #region V0.3.0 code
-        /*
-        private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => GPUMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
-
-        #region kernels
-        private static void ShrinkKernel(Index2 index,
-                                         ArrayView2D<float> xImage,
-                                         ArrayView2D<float> xCandidates,
-                                         ArrayView2D<float> shrinked,
-                                         ArrayView<float> lambdaAlpha)
-        {
-            if (index.InBounds(shrinked.Extent))
-            {
-                var xOld = xImage[index];
-                var xCandidate = xCandidates[index];
-                var lambda = lambdaAlpha[0];
-                var alpha = lambdaAlpha[1];
-
-                var xNew = GPUShrinkElasticNet(xOld + xCandidate, lambda, alpha);
-                shrinked[index] = GPUMath.Abs(xOld - xNew);
-            }
-        }
-
-        private static void MaxIndexKernel(Index2 index,
-                                       ArrayView2D<float> xImage,
-                                       ArrayView2D<float> xCandidate,
-                                       ArrayView2D<float> shrinked,
-                                       ArrayView<float> maxAbsDiff,
-                                       ArrayView<int> maxIndices,
-                                       ArrayView<float> lambdaAlpha)
-        {
-            //not sure if necessary, but bounds check were always done in the ILGPU examples
-            if (index.InBounds(xImage.Extent))
-            {
-                //TODO: fix this line for ximage.size != xCandidates.size
-                var shrink = shrinked[index];
-                var max = maxAbsDiff[0];
-
-                if (shrink == max)
-                {
-                    var oldValue = Atomic.CompareExchange(maxIndices.GetVariableView(0), -1, index.Y);
-                    if (oldValue == -1)
-                    {
-                        maxIndices[1] = index.X;
-
-                        //retrieve sign of maximum candidate
-                        var lambda = lambdaAlpha[0];
-                        var alpha = lambdaAlpha[1];
-                        var xNew = GPUShrinkElasticNet(xImage[index] + xCandidate[index], lambda, alpha);
-                        maxAbsDiff[0] = xImage[index] - xNew;
-
-                        //update result
-                        xImage[index] = xNew;
-                    }
-                }
-            }
-        }
-
-        private static void UpdateCandidatesKernel(Index2 index,
-                                                   ArrayView2D<float> xCandidates,
-                                                   ArrayView2D<float> aMap,
-                                                   ArrayView2D<float> psf2,
-                                                   ArrayView<float> maxDiff,
-                                                   ArrayView<int> maxIndices)
-        {
-            var indexCandidate = index.Add(new Index2(maxIndices[1], maxIndices[0])).Subtract(psf2.Extent / 2);
-            if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(xCandidates.Extent))
-            {
-                xCandidates[indexCandidate] += (psf2[index] * maxDiff[0]) / aMap[indexCandidate];
-            }
-        }
-
-        private static void ResetIndicesKernel(Index index,
-                                               ArrayView<int> maxIndices)
-        {
-            maxIndices[index] = -1;
+            Dispose(false);
         }
         #endregion
-
-        private static void Iteration(Accelerator accelerator, double[,] xImageInput, double[,] candidateInput, double[,] aMapInput, double[,] psf2Input, float lambda, float aplpha)
-        {
-            var shrinkKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>>(ShrinkKernel);
-            var maxIndexKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>, ArrayView<float>>(MaxIndexKernel);
-            var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
-            var resetKernel = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>>(ResetIndicesKernel);
-
-            var size = new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1));
-            var psfSize = new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1));
-
-            using (var xImage = accelerator.Allocate<float>(size))
-            using (var xCandidates = accelerator.Allocate<float>(size))
-            using (var shrinked = accelerator.Allocate<float>(size))
-            using (var aMap = accelerator.Allocate<float>(size))
-            using (var psf2 = accelerator.Allocate<float>(psfSize))
-            using (var maxCandidate = accelerator.Allocate<float>(1))
-            using (var maxIndices = accelerator.Allocate<int>(2))
-            using (var lambdaAlpha = accelerator.Allocate<float>(2))
-            {
-                CopyToBuffer(xImage, xImageInput);
-                CopyToBuffer(xCandidates, candidateInput);
-                CopyToBuffer(aMap, aMapInput);
-                CopyToBuffer(psf2, psf2Input);
-
-                maxIndices[0] = -1;
-                maxIndices[1] = -1;
-
-                lambdaAlpha[0] = lambda;
-                lambdaAlpha[1] = aplpha;
-
-                for(int i = 0; i < 100; i++)
-                {
-                    shrinkKernel(size, xImage.View, xCandidates.View, shrinked.View, lambdaAlpha.View);
-                    accelerator.Synchronize();
-
-                    if (accelerator.AcceleratorType == AcceleratorType.CPU)
-                        accelerator.Reduce(shrinked.View.AsLinearView(), maxCandidate.View, new ShuffleDownFloat(), new AtomicMaxFloat());
-                    else
-                        accelerator.Reduce(shrinked.View.AsLinearView(), maxCandidate.View, new ShuffleDownFloat(), new MaxFloat());
-                    accelerator.Synchronize();
-
-                    maxIndexKernel(size, xImage.View, xCandidates.View, shrinked.View, maxCandidate.View, maxIndices.View, lambdaAlpha.View);
-                    accelerator.Synchronize();
-                    //var indices = maxIndices.GetAsArray();
-                    //var maxDiff = maxCandidate.GetAsArray();
-
-                    updateCandidatesKernel(psfSize, xCandidates.View, aMap.View, psf2.View, maxCandidate.View, maxIndices.View);
-                    accelerator.Synchronize();
-
-                    resetKernel(new Index(2), maxIndices.View);
-                    accelerator.Synchronize();
-                    Console.WriteLine("iteration " + i);
-                }
-
-                var x = xImage.GetAsArray();
-                var candidate = xCandidates.GetAsArray();
-                var p = psf2.GetAsArray();
-                FitsIO.Write(CopyToImage(x, size), "xImageGPU.fits");
-                FitsIO.Write(CopyToImage(candidate, size), "candidateGPU.fits");
-
-            }
-        }
-
-        private static void CopyToBuffer(MemoryBuffer2D<float> buffer, double[,] image)
-        {
-            for (int i = 0; i < image.GetLength(0); i++)
-                for (int j = 0; j < image.GetLength(1); j++)
-                    buffer[new Index2(j, i)] = (float)image[i, j];
-        }
-
-        private static double[,] CopyToImage(float[] img, Index2 size)
-        {
-            var output = new double[size.Y, size.X];
-            var index = 0;
-            for (int y = 0; y < size.Y; y++)
-            {
-                for (int x = 0; x < size.X; x++)
-                    output[y, x] = img[index + x];
-                index += size.X;
-            }
-
-            return output;
-        }
-
-        public static bool Deconvolve(double[,] xImage, double[,] b, double[,] psf, double lambda, double alpha)
-        {
-            using (var context = new Context())
-            {
-                var yPsfHalf = psf.GetLength(0) / 2;
-                var xPsfHalf = psf.GetLength(1) / 2;
-
-                var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
-                var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
-
-                for (int y = 0; y < b.GetLength(0); y++)
-                    for (int x = 0; x < b.GetLength(1); x++)
-                        b[y, x] = b[y, x] / aMap[y, x];
-
-                var gpuId = Accelerator.Accelerators.Where(id => id.AcceleratorType == AcceleratorType.Cuda);
-                if (gpuId != null)
-                {
-                    using (var accelerator = new CudaAccelerator(context))
-                    {
-                        Iteration(accelerator, xImage, b, aMap, psf2, (float)lambda, (float)alpha);
-                    }
-                }
-                else
-                {
-                    using (var accelerator = new CPUAccelerator(context, 4, 4))
-                    {
-                        Iteration(accelerator, xImage, b, aMap, psf2, (float)lambda, (float)alpha);
-                    }
-                }
-            }
-
-            return true;
-        }
-
-        public static void Test()
-        {
-            using (var context = new Context())
-            {
-                // Create custom CPU context with a warp size > 1
-
-                using (var accelerator = new CPUAccelerator(context, 4, 4))
-                {
-                    Console.WriteLine($"Performing operations on {accelerator}");
-
-                    //Iteration(accelerator);
-                    //Reduce(accelerator);
-                    //AtomicReduce(accelerator);
-                }
-            }
-        }
-    */
-        #endregion
-
-
-
-
     }
 }
