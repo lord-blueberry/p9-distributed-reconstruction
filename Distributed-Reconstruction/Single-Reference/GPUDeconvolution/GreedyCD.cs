@@ -18,7 +18,7 @@ namespace Single_Reference.GPUDeconvolution
     {
         private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => XMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
-        #region GPU allocated structures
+        #region GPU allocated data buffers
         private MemoryBuffer2D<float> xImageGPU;
         private MemoryBuffer2D<float> bMapGPU;
         private MemoryBuffer2D<float> aMapGPU;
@@ -26,6 +26,7 @@ namespace Single_Reference.GPUDeconvolution
 
         private MemoryBuffer<float> lambdaAlpha;
         private MemoryBuffer<Pixel> maxPixels;
+        private MemoryBuffer<Pixel> maxPixel;
         #endregion
 
         #region Loaded GPU kernels
@@ -86,16 +87,36 @@ namespace Single_Reference.GPUDeconvolution
             {
                 shrinkReduce(groupThreadIdx, xImageGPU.View, bMapGPU.View, aMapGPU.View, lambdaAlpha.View, maxPixels.View);
                 accelerator.Synchronize();
+                //reduceAndUpdateX
+                accelerator.Synchronize();
+                updateBKernelV0(psf2GPU.Extent, bMapGPU.View, psf2GPU.View, maxPixel.View);
+                accelerator.Synchronize();
             }
 
             return false;
         }
 
-        private void AllocateGPU()
+        /// <summary>
+        /// Allocates and initializes buffers on the GPU
+        /// </summary>
+        private void AllocateGPU(float[,] xImage, float[,] bMap, float[,] aMap, float[,] psf2, float lambda, float alpha)
         {
+            var index0 = new Index2(0, 0);
+            var size = new Index2(xImage.GetLength(1), xImage.GetLength(0));
+            xImageGPU = accelerator.Allocate<float>(size);
+            xImageGPU.CopyFrom(xImage, index0, index0, size);
 
+            lambdaAlpha = accelerator.Allocate<float>(2);
+            lambdaAlpha.CopyFrom(lambda, new Index(0));
+            lambdaAlpha.CopyFrom(alpha, new Index(1));
+
+            maxPixels = accelerator.Allocate<Pixel>(maxGroups);
+            maxPixel = accelerator.Allocate<Pixel>(1);
         }
 
+        /// <summary>
+        /// Frees the buffers on the GPU
+        /// </summary>
         private void FreeGPU()
         {
             xImageGPU.Dispose();
@@ -105,6 +126,7 @@ namespace Single_Reference.GPUDeconvolution
 
             lambdaAlpha.Dispose();
             maxPixels.Dispose();
+            maxPixel.Dispose();
         }
 
         #region GPU pixel struct

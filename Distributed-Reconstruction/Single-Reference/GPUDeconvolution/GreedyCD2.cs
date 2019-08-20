@@ -63,7 +63,6 @@ namespace Single_Reference.GPUDeconvolution
         #endregion
 
         #region kernels
-
         private static void ShrinkReduceKernel(
             GroupedIndex grouped,
             ArrayView2D<float> xImage,
@@ -339,7 +338,6 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
         #endregion
-
 
         private static void Iteration(Accelerator accelerator, float[,] xImageIn, float[,] bMapIn, float[,] aMapIn, float[,] psf2In, float lambda, float alpha)
         {
