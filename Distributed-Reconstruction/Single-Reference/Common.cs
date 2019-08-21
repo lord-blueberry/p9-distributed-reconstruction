@@ -155,11 +155,11 @@ namespace Single_Reference
         {
             public static double[,] CalculateBMap(double[,] residuals, Complex[,] psfCorrelated, int yPadding, int xPadding)
             {
-                var resPadded = Residuals.Pad(residuals, yPadding, xPadding);
+                var resPadded = Pad(residuals, yPadding, xPadding);
                 var ResPAdded = FFT.Forward(resPadded, 1.0);
                 var B = Fourier2D.Multiply(ResPAdded, psfCorrelated);
                 var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
-                var bMap = Residuals.RemovePadding(bPadded, yPadding, xPadding);
+                var bMap = RemovePadding(bPadded, yPadding, xPadding);
                 return bMap;
             }
 
@@ -183,30 +183,6 @@ namespace Single_Reference
                 for (int y = 0; y < imgNoPadding.GetLength(0); y++)
                     for (int x = 0; x < imgNoPadding.GetLength(1); x++)
                         imgNoPadding[y, x] = image[y + yPsfHalf, x + xPsfHalf];
-
-                return imgNoPadding;
-            }
-
-            public static double[,] Pad(double[,] image, double[,] psf)
-            {
-                var yPsfHalf = psf.GetLength(0) / 2;
-                var xPsfHalf = psf.GetLength(1) / 2;
-                var resPadded = new double[image.GetLength(0) + psf.GetLength(0), image.GetLength(1) + psf.GetLength(1)];
-                for (int y = 0; y < image.GetLength(0); y++)
-                    for (int x = 0; x < image.GetLength(1); x++)
-                        resPadded[y + yPsfHalf, x + xPsfHalf] = image[y, x];
-
-                return resPadded;
-            }
-
-            public static double[,] RemovePadding(double[,] img, double[,] psf)
-            {
-                var yPsfHalf = psf.GetLength(0) / 2;
-                var xPsfHalf = psf.GetLength(1) / 2;
-                var imgNoPadding = new double[img.GetLength(0) - psf.GetLength(0), img.GetLength(1) - psf.GetLength(1)];
-                for (int y = 0; y < imgNoPadding.GetLength(0); y++)
-                    for (int x = 0; x < imgNoPadding.GetLength(1); x++)
-                        imgNoPadding[y, x] = img[y + yPsfHalf, x + xPsfHalf];
 
                 return imgNoPadding;
             }
