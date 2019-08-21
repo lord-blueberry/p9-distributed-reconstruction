@@ -262,7 +262,7 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        public static double CalculateB(double[,] resPadded, double[,] xImage, double[,] psf, int yPixel, int xPixel)
+        private static double CalculateB(double[,] resPadded, double[,] xImage, double[,] psf, int yPixel, int xPixel)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -282,7 +282,7 @@ namespace Single_Reference.Deconvolution
             return b;
         }
 
-        public static void Randomize<T>(List<T> arr)
+        private static void Randomize<T>(List<T> arr)
         {
             Random rand = new Random();
             

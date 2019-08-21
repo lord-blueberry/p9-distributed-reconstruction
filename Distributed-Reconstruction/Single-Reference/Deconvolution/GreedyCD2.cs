@@ -51,7 +51,7 @@ namespace Single_Reference.Deconvolution
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
             var aMap = Common.PSF.CalcAMap(xImage, psf);
-            var imageSection = new DebugCyclic.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
+            var imageSection = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
 
             //invert the PSF, since we actually do want to correlate the psf with the residuals. (The FFT already inverts the psf, so we need to invert it again to not invert it. Trust me.)
             var psfTmp = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
@@ -182,15 +182,15 @@ namespace Single_Reference.Deconvolution
             return PSFPadded;
         }
 
-        private static void UpdateB(double[,] b, double[,] bUpdate, DebugCyclic.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
+        private static void UpdateB(double[,] b, double[,] bUpdate, Common.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
             var xBHalf = bUpdate.GetLength(1) / 2;
 
             var yBMin = Math.Max(yPixel - yBHalf, imageSection.Y);
             var xBMin = Math.Max(xPixel - xBHalf, imageSection.X);
-            var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imageSection.YLength);
-            var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imageSection.XLength);
+            var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imageSection.YEnd);
+            var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imageSection.XEnd);
             for (int i = yBMin; i < yBMax; i++)
                 for (int j = xBMin; j < xBMax; j++)
                 {

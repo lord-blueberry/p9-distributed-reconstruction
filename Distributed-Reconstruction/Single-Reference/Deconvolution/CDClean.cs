@@ -152,7 +152,7 @@ namespace Single_Reference.Deconvolution
             }
         }
 
-        public static double CalculateB(double[,] residual, double[,] psf, int y, int x, int yResOffset, int xResOffset)
+        private static double CalculateB(double[,] residual, double[,] psf, int y, int x, int yResOffset, int xResOffset)
         {
             int yOffset = y - psf.GetLength(0) / 2;
             int xOffset = x - psf.GetLength(1) / 2;
@@ -206,7 +206,7 @@ namespace Single_Reference.Deconvolution
             return b2;
         }
 
-        public static void ModifyResidual(double[,] residual, double[,] psf, int y, int x, double xDiff)
+        private static void ModifyResidual(double[,] residual, double[,] psf, int y, int x, double xDiff)
         {
             int yOffset = y - psf.GetLength(0) / 2;
             int xOffset = x - psf.GetLength(1) / 2;
@@ -247,7 +247,7 @@ namespace Single_Reference.Deconvolution
             
         }
 
-        public static double CalcPSFSquared(double[,] psf)
+        private static double CalcPSFSquared(double[,] psf)
         {
             double squared = 0;
             for (int y = 0; y < psf.GetLength(0); y++)

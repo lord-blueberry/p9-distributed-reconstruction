@@ -101,16 +101,6 @@ namespace Single_Reference.Deconvolution
             }
         }
 
-        public static double CalcPSFSquared(double[,] psf)
-        {
-            double squared = 0;
-            for (int y = 0; y < psf.GetLength(0); y++)
-                for (int x = 0; x < psf.GetLength(0); x++)
-                    squared += psf[y, x] * psf[y, x];
-
-            return squared;
-        }
-
         private static double ShrinkAbsolute(double value, double lambda)
         {
             value = Math.Max(value, 0.0) - lambda;
