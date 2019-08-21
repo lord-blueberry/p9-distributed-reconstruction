@@ -27,6 +27,9 @@ namespace Single_Reference.GPUDeconvolution
             ArrayView<float> lambdaAlpha,
             ArrayView<Pixel> output)
         {
+            if(index.X == 0 & index.Y == 0)
+                output[0].AbsDiff = 0;
+            
             if (index.InBounds(xImage.Extent))
             {
                 var xOld = xImage[index];
@@ -49,32 +52,6 @@ namespace Single_Reference.GPUDeconvolution
                     Sign = sign
                 };
                 Atomic.MakeAtomic(ref output[0], pix, new MaxPixelOperation(), new MaxPixelCompareExchange());
-                /*
-                for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
-                {
-                    var oXAbsDiff = Warp.ShuffleDown(xAbsDiff, offset);
-                    var oXIndex = Warp.ShuffleDown(xIndex, offset);
-                    var oYIndex = Warp.ShuffleDown(yIndex, offset);
-                    var oSign = Warp.ShuffleDown(sign, offset);
-                    if (xAbsDiff < oXAbsDiff)
-                    {
-                        xAbsDiff = oXAbsDiff;
-                        xIndex = oXIndex;
-                        yIndex = oYIndex;
-                        sign = oSign;
-                    }
-                }
-                if(Warp.IsFirstLane)
-                {
-                    var pix = new Pixel()
-                    {
-                        AbsDiff = xAbsDiff,
-                        X = xIndex,
-                        Y = yIndex,
-                        Sign = sign
-                    };
-                    Atomic.MakeAtomic(ref output[0], pix, new MaxPixelOperation(), new MaxPixelCompareExchange());
-                }*/
             }
         }
 
@@ -131,7 +108,6 @@ namespace Single_Reference.GPUDeconvolution
             var indexCandidate = index.Add(new Index2(pixel[0].X, pixel[0].Y)).Subtract(psf2.Extent / 2);
             if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(xCandidates.Extent))
             {
-                //var update = (psf2[index] * maxDiff[0]) / aMap[indexCandidate];
                 xCandidates[indexCandidate] -= (psf2[index] * pixel[0].Sign * pixel[0].AbsDiff) / aMap[indexCandidate];
             }
         }
