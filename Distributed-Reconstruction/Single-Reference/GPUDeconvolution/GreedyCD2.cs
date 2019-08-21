@@ -48,14 +48,18 @@ namespace Single_Reference.GPUDeconvolution
         {
             public MaxPixel CompareExchange(ref MaxPixel target, MaxPixel compare, MaxPixel value)
             {
-
-                if (target.AbsDiff == compare.AbsDiff)
+                if (compare.AbsDiff != value.AbsDiff)
                 {
-                    target.AbsDiff = value.AbsDiff;
-                    target.X = value.X;
-                    target.Y = value.Y;
-                    target.Sign = value.Sign;
-                    return compare;
+                    var exchanged = Atomic.CompareExchange(ref target.AbsDiff, compare.AbsDiff, value.AbsDiff);
+                    if(exchanged == compare.AbsDiff)
+                    {
+                        target.X = value.X;
+                        target.Y = value.Y;
+                        target.Sign = value.Sign;
+                        return compare;
+                    }
+
+                    
                 }
                 return target;
             }

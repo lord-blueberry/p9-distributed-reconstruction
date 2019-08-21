@@ -202,11 +202,11 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 256;
+            int gridSize = 1024;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 1024;
-            double cellSize = 1.0 / 3600.0 * PI / 180.0;
+            double cellSize = 0.25 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
             var watchTotal = new Stopwatch();
@@ -291,11 +291,11 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 256;
+            int gridSize = 1024;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 1024;
-            double cellSize = 1.0 / 3600.0 * PI / 180.0;
+            double cellSize = 0.25 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
             var watchTotal = new Stopwatch();
@@ -343,7 +343,7 @@ namespace Single_Reference
                 var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
 
                 var converged = GPUDeconvolution.GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
-                //var converged = GPUDeconvolution.GreedyCD.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
+                //var converged = GPUDeconvolution.StupidGreedy.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
