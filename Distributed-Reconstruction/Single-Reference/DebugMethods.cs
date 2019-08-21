@@ -68,6 +68,7 @@ namespace Single_Reference
             var psfCut = CutImg(psf, 2);
             FitsIO.Write(psfCut, "psfCut.fits");
             var maxSidelobe = Common.PSF.CalculateMaxSidelobe(psf);
+            var psfCorrelated = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
@@ -82,12 +83,7 @@ namespace Single_Reference
                 watchDeconv.Start();
                 var sideLobe = maxSidelobe * GetMax(dirtyImage);
                 Console.WriteLine("sideLobeLevel: " + sideLobe);
-                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
-                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
-                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
-                var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
-                var b = Common.Residuals.RemovePadding(bPadded, psfCut);
+                var b = Common.Residuals.CalculateBMap(dirtyImage, psfCorrelated, psfCut.GetLength(0), psfCut.GetLength(1));
                 var lambda = 0.8;
                 var alpha = 0.05;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -160,11 +156,7 @@ namespace Single_Reference
                 var sideLobe = maxSidelobe * GetMax(dirtyImage);
                 Console.WriteLine("sideLobeLevel: " + sideLobe);
                 var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
-                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
-                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
-                var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
-                var b = Common.Residuals.RemovePadding(bPadded, psfCut);
+                var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 var lambda = 100.0;
                 var alpha = 0.95;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -247,11 +239,7 @@ namespace Single_Reference
                 watchDeconv.Start();
 
                 var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
-                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
-                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
-                var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
-                var b = Common.Residuals.RemovePadding(bPadded, psfCut);
+                var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5  , 0.2, 1000);
 
                 if (converged)
@@ -336,11 +324,7 @@ namespace Single_Reference
                 watchDeconv.Start();
 
                 var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
-                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
-                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
-                var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
-                var b = Common.Residuals.RemovePadding(bPadded, psfCut);
+                var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
 
                 //var converged = GPUDeconvolution.GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
                 var converged = GPUDeconvolution.StupidGreedy.Deconvolve(xImage, b, psfCut, 0.5, 0.20);

@@ -131,6 +131,12 @@ namespace Single_Reference
                     }
             }
 
+            /// <summary>
+            /// Find maximum pixel value that is outside the cut
+            /// </summary>
+            /// <param name="fullPsf"></param>
+            /// <param name="cutFactor"></param>
+            /// <returns></returns>
             public static double CalculateMaxSidelobe(double[,] fullPsf, int cutFactor = 2)
             {
                 var yOffset = fullPsf.GetLength(0) / 2 - (fullPsf.GetLength(0) / cutFactor) / 2;
@@ -147,6 +153,40 @@ namespace Single_Reference
 
         public static class Residuals
         {
+            public static double[,] CalculateBMap(double[,] residuals, Complex[,] psfCorrelated, int yPadding, int xPadding)
+            {
+                var resPadded = Residuals.Pad(residuals, yPadding, xPadding);
+                var ResPAdded = FFT.Forward(resPadded, 1.0);
+                var B = Fourier2D.Multiply(ResPAdded, psfCorrelated);
+                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
+                var bMap = Residuals.RemovePadding(bPadded, yPadding, xPadding);
+                return bMap;
+            }
+
+            private static double[,] Pad(double[,] image, int yPadding, int xPadding)
+            {
+                var yPsfHalf = yPadding / 2;
+                var xPsfHalf = xPadding / 2;
+                var resPadded = new double[image.GetLength(0) + yPadding, image.GetLength(1) + xPadding];
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        resPadded[y + yPsfHalf, x + xPsfHalf] = image[y, x];
+
+                return resPadded;
+            }
+
+            private static double[,] RemovePadding(double[,] image, int yPadding, int xPadding)
+            {
+                var yPsfHalf = yPadding / 2;
+                var xPsfHalf = xPadding / 2;
+                var imgNoPadding = new double[image.GetLength(0) - yPadding, image.GetLength(1) - xPadding];
+                for (int y = 0; y < imgNoPadding.GetLength(0); y++)
+                    for (int x = 0; x < imgNoPadding.GetLength(1); x++)
+                        imgNoPadding[y, x] = image[y + yPsfHalf, x + xPsfHalf];
+
+                return imgNoPadding;
+            }
+
             public static double[,] Pad(double[,] image, double[,] psf)
             {
                 var yPsfHalf = psf.GetLength(0) / 2;

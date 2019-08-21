@@ -517,11 +517,7 @@ namespace Distributed_Reference
                 maxSideLobeLevel = maxSidelobe * DebugMethods.GetMax(dirtyImage);
                 //remove spheroidal
 
-                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
-                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
-                var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
-                image = Common.Residuals.RemovePadding(bPadded, psfCut);
+                image = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 watchIdg.Stop();
             }
             comm.Broadcast(ref maxSideLobeLevel, 0);
