@@ -10,7 +10,7 @@ namespace Single_Reference.Deconvolution
     {
         public static bool DeconvolvePath(double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10,  int maxIteration = 100, double epsilon = 1e-4)
         {
-            var integral = Common.PSF.CalcScan(psf);
+            var integral = Common.PSF.CalcPSFScan(psf);
             var converged = false;
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
@@ -143,32 +143,6 @@ namespace Single_Reference.Deconvolution
             watch.Stop();
             Console.WriteLine(watch.Elapsed);
             return converged;
-        }
-
-        public static double[,] PadResiduals(double[,] res, double[,] psf)
-        {
-            var yPsfHalf = psf.GetLength(0) / 2;
-            var xPsfHalf = psf.GetLength(1) / 2;
-            var resPadded = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
-            for (int y = 0; y < res.GetLength(0); y++)
-                for (int x = 0; x < res.GetLength(1); x++)
-                    resPadded[y + yPsfHalf, x + xPsfHalf] = res[y, x];
-
-            return resPadded;
-        }
-
-        public static Complex[,] PadAndInvertPsf(double[,] psf, int yLength, int xLength)
-        {
-            var psfPadded = new double[yLength + psf.GetLength(0), xLength + psf.GetLength(1)];
-            var yPsfHalf = yLength / 2;
-            var xPsfHalf = xLength / 2;
-            for (int y = 0; y < psf.GetLength(0); y++)
-                for (int x = 0; x < psf.GetLength(1); x++)
-                    psfPadded[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
-            FFT.Shift(psfPadded);
-            var PSFPadded = FFT.Forward(psfPadded, 1.0);
-
-            return PSFPadded;
         }
 
         private static void UpdateB(double[,] b, double[,] bUpdate, Common.Rectangle imageSection, int yPixel, int xPixel, double xDiff)

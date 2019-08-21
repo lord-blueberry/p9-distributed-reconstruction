@@ -12,7 +12,7 @@ namespace Single_Reference
 
         public static class PSF
         {
-            public static double[,] CalcScan(double[,] psf)
+            public static double[,] CalcPSFScan(double[,] psf)
             {
                 var scan = new double[psf.GetLength(0), psf.GetLength(1)];
                 for (int i = 0; i < psf.GetLength(0); i++)
@@ -60,7 +60,7 @@ namespace Single_Reference
 
             public static double[,] CalcAMap(double[,] image, double[,] psf)
             {
-                var scan = CalcScan(psf);
+                var scan = CalcPSFScan(psf);
                 var aMap = new double[image.GetLength(0), image.GetLength(1)];
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
@@ -68,8 +68,22 @@ namespace Single_Reference
                 return aMap;
             }
 
+            public static Complex[,] CalculateFourierCorrelation(double[,] psf, int yPadding, int xPadding)
+            {
+                var psfPadded = new double[yPadding + psf.GetLength(0), xPadding + psf.GetLength(1)];
+                var yPsfHalf = yPadding / 2;
+                var xPsfHalf = xPadding / 2;
+                for (int y = 0; y < psf.GetLength(0); y++)
+                    for (int x = 0; x < psf.GetLength(1); x++)
+                        psfPadded[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
+                FFT.Shift(psfPadded);
+                var PSFPadded = FFT.Forward(psfPadded, 1.0);
+
+                return PSFPadded;
+            }
+
             /// <summary>
-            /// 
+            /// Calculate PSF*PSF
             /// </summary>
             /// <param name="image">is used to check if parts of the psf are masked by the image dimensions</param>
             /// <param name="psf"></param>
@@ -80,7 +94,7 @@ namespace Single_Reference
                 var xPsfHalf = psf.GetLength(1) / 2;
 
                 //invert the PSF, since we actually do want to correlate the psf with the residuals. (The FFT already inverts the psf, so we need to invert it again to not invert it. Trust me.)
-                var psfTmp = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
+                var psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
                 for (int y = 0; y < psf.GetLength(0); y++)
                     for (int x = 0; x < psf.GetLength(1); x++)
                         psfTmp[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
@@ -116,11 +130,24 @@ namespace Single_Reference
                         }
                     }
             }
+
+            public static double CalculateMaxSidelobe(double[,] fullPsf, int cutFactor = 2)
+            {
+                var yOffset = fullPsf.GetLength(0) / 2 - (fullPsf.GetLength(0) / cutFactor) / 2;
+                var xOffset = fullPsf.GetLength(1) / 2 - (fullPsf.GetLength(1) / cutFactor) / 2;
+
+                double output = 0.0;
+                for (int y = 0; y < fullPsf.GetLength(0); y++)
+                    for (int x = 0; x < fullPsf.GetLength(1); x++)
+                        if (!(y >= yOffset & y < (yOffset + fullPsf.GetLength(0) / cutFactor)) | !(x >= xOffset & x < (xOffset + fullPsf.GetLength(1) / cutFactor)))
+                            output = Math.Max(output, fullPsf[y, x]);
+                return output;
+            }
         }
 
         public static class Residuals
         {
-            public static double[,] PadImage(double[,] image, double[,] psf)
+            public static double[,] Pad(double[,] image, double[,] psf)
             {
                 var yPsfHalf = psf.GetLength(0) / 2;
                 var xPsfHalf = psf.GetLength(1) / 2;

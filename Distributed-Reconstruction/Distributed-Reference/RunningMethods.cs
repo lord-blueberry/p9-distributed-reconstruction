@@ -93,17 +93,17 @@ namespace Distributed_Reference
                 var halfComm = comm.Size / 2;
                 var yResOffset = comm.Rank / 2 * (gridSize / halfComm);
                 var xResOffset = comm.Rank % 2 * (gridSize / halfComm);
-                var imgSection = new Communication.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
-                var totalImage = new Communication.Rectangle(0, 0, c.GridSize, c.GridSize);
+                var imgSection = new Common.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
+                var totalImage = new Common.Rectangle(0, 0, c.GridSize, c.GridSize);
 
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
                 var psfCut = CutImg(psf);
-                var maxSidelobe = DebugMethods.GetMaxSidelobeLevel(psf);
+                var maxSidelobe = Common.PSF.CalculateMaxSidelobe(psf);
                 psf = null;
                 Complex[,] PsfCorrelation = null;
                 if (comm.Rank == 0)
-                    PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
+                    PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
 
                 var residualVis = visibilities;
                 var xLocal = new double[c.GridSize / halfComm, c.GridSize / halfComm];
@@ -246,17 +246,17 @@ namespace Distributed_Reference
                 var halfComm = comm.Size / 2;
                 var yResOffset = comm.Rank / 2 * (gridSize / halfComm);
                 var xResOffset = comm.Rank % 2 * (gridSize / halfComm);
-                var imgSection = new Communication.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
-                var totalImage = new Communication.Rectangle(0, 0, c.GridSize, c.GridSize);
+                var imgSection = new Common.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
+                var totalImage = new Common.Rectangle(0, 0, c.GridSize, c.GridSize);
 
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
                 var psfCut = CutImg(psf);
                 Complex[,] PsfCorrelation = null;
                 if (comm.Rank == 0)
-                    PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
+                    PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
 
-                var integral = Common.PSF.CalcScan(psfCut);
+                var integral = Common.PSF.CalcPSFScan(psfCut);
                 var aMapLocal = new double[imgSection.YEnd, imgSection.XEnd];
                 for (int y = imgSection.Y; y < imgSection.YEnd; y++)
                     for (int x = imgSection.X; x < imgSection.XEnd; x++)
@@ -410,17 +410,17 @@ namespace Distributed_Reference
                 var halfComm = comm.Size / 2;
                 var yResOffset = comm.Rank / 2 * (gridSize / halfComm);
                 var xResOffset = comm.Rank % 2 * (gridSize / halfComm);
-                var imgSection = new Communication.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
-                var totalImage = new Communication.Rectangle(0, 0, c.GridSize, c.GridSize);
+                var imgSection = new Common.Rectangle(yResOffset, xResOffset, yResOffset + gridSize / halfComm, xResOffset + gridSize / halfComm);
+                var totalImage = new Common.Rectangle(0, 0, c.GridSize, c.GridSize);
 
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
                 var psfCut =  CutImg(psf);
                 Complex[,] PsfCorrelation = null;
                 if(comm.Rank == 0)
-                    PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
+                    PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
 
-                var integral = Common.PSF.CalcScan(psfCut);
+                var integral = Common.PSF.CalcPSFScan(psfCut);
                 var aMapLocal = new double[imgSection.YEnd, imgSection.XEnd];
                 for (int y = imgSection.Y; y < imgSection.YEnd; y++)
                     for (int x = imgSection.X; x < imgSection.XEnd; x++)
@@ -517,7 +517,7 @@ namespace Distributed_Reference
                 maxSideLobeLevel = maxSidelobe * DebugMethods.GetMax(dirtyImage);
                 //remove spheroidal
 
-                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
                 var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
@@ -571,7 +571,7 @@ namespace Distributed_Reference
             return stitched;
         }
 
-        public static double[,] GetImgSection(double[,] b, Communication.Rectangle imgSection)
+        public static double[,] GetImgSection(double[,] b, Common.Rectangle imgSection)
         {
             var yLen = imgSection.YEnd - imgSection.Y;
             var xLen = imgSection.XEnd - imgSection.X;

@@ -67,7 +67,7 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
             var psfCut = CutImg(psf, 2);
             FitsIO.Write(psfCut, "psfCut.fits");
-            var maxSidelobe = GetMaxSidelobeLevel(psf);
+            var maxSidelobe = Common.PSF.CalculateMaxSidelobe(psf);
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
@@ -82,8 +82,8 @@ namespace Single_Reference
                 watchDeconv.Start();
                 var sideLobe = maxSidelobe * GetMax(dirtyImage);
                 Console.WriteLine("sideLobeLevel: " + sideLobe);
-                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
-                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
                 var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
@@ -144,7 +144,7 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
             var psfCut = CutImg(psf, 2);
             FitsIO.Write(psfCut, "psfCut.fits");
-            var maxSidelobe = GetMaxSidelobeLevel(psf);
+            var maxSidelobe = Common.PSF.CalculateMaxSidelobe(psf);
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
@@ -159,8 +159,8 @@ namespace Single_Reference
                 watchDeconv.Start();
                 var sideLobe = maxSidelobe * GetMax(dirtyImage);
                 Console.WriteLine("sideLobeLevel: " + sideLobe);
-                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
-                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
                 var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
@@ -246,8 +246,8 @@ namespace Single_Reference
                 //DECONVOLVE
                 watchDeconv.Start();
 
-                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
-                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
                 var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
@@ -335,8 +335,8 @@ namespace Single_Reference
                 //DECONVOLVE
                 watchDeconv.Start();
 
-                var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
-                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
                 var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
@@ -451,19 +451,6 @@ namespace Single_Reference
             return output;
         }
 
-        public static double GetMaxSidelobeLevel(double[,] psf, int factor = 2)
-        {
-            var yOffset = psf.GetLength(0) / 2 - (psf.GetLength(0) / factor) / 2;
-            var xOffset = psf.GetLength(1) / 2 - (psf.GetLength(1) / factor) / 2;
-
-            double output = 0.0;
-            for (int y = 0; y < psf.GetLength(0); y++)
-                for (int x = 0; x < psf.GetLength(1); x++)
-                    if (!(y >= yOffset & y < (yOffset + psf.GetLength(0) / factor)) | !(x >= xOffset & x < (xOffset + psf.GetLength(1) / factor)))
-                        output = Math.Max(output, psf[y, x]);
-            return output;
-        }
-
         public static double GetMax(double[,] image)
         {
             double max = 0.0;
@@ -471,127 +458,6 @@ namespace Single_Reference
                 for (int x = 0; x < image.GetLength(1); x++)
                     max = Math.Max(max, image[y, x]);
             return max;
-        }
-
-        public static double[,] Convolve(double[,] image, double[,] kernel)
-        {
-            var output = new double[image.GetLength(0), image.GetLength(1)];
-            for (int y = 0; y < image.GetLength(0); y++)
-            {
-                for (int x = 0; x < image.GetLength(1); x++)
-                {
-                    double sum = 0;
-                    for (int yk = 0; yk < kernel.GetLength(0); yk++)
-                    {
-                        for (int xk = 0; xk < kernel.GetLength(1); xk++)
-                        {
-                            int ySrc = y + yk - ((kernel.GetLength(0) - 1) - kernel.GetLength(0) / 2);
-                            int xSrc = x + xk - ((kernel.GetLength(1) - 1) - kernel.GetLength(1) / 2);
-                            if (ySrc >= 0 & ySrc < image.GetLength(0) &
-                                xSrc >= 0 & xSrc < image.GetLength(1))
-                            {
-                                sum += image[ySrc, xSrc] * kernel[kernel.GetLength(0) - 1 - yk, kernel.GetLength(1) - 1 - xk];
-                            }
-                        }
-                    }
-                    output[y, x] = sum;
-                }
-            }
-            return output;
-        }
-
-        public static double[,] ConvolveCircular(double[,] image, double[,] kernel)
-        {
-            var k2 = new double[kernel.GetLength(0), kernel.GetLength(1)];
-
-            var output = new double[image.GetLength(0), image.GetLength(1)];
-            for (int y = 0; y < image.GetLength(0); y++)
-            {
-                for (int x = 0; x < image.GetLength(1); x++)
-                {
-                    double sum = 0;
-                    for (int yk = 0; yk < kernel.GetLength(0); yk++)
-                    {
-                        for (int xk = 0; xk < kernel.GetLength(1); xk++)
-                        {
-                            int ySrc = (y + yk) % image.GetLength(0);
-                            int xSrc = (x + xk) % image.GetLength(0);
-                            int yKernel = (kernel.GetLength(0) / 2 + yk) % (kernel.GetLength(0) - 1);
-                            int xKernel = (kernel.GetLength(1) / 2 + xk) % (kernel.GetLength(1) - 1);
-                            var k = kernel[yKernel, xKernel];
-                            sum += image[ySrc, xSrc] * kernel[yKernel, xKernel];
-                        }
-                    }
-                    output[y, x] = sum;
-                }
-            }
-            return output;
-        }
-
-        private static Complex[,,] Substract(Complex[,,] vis0, Complex[,,] vis1, bool[,,] flags)
-        {
-            var output = new Complex[vis0.GetLength(0), vis0.GetLength(1), vis0.GetLength(2)];
-            for (int i = 0; i < vis0.GetLength(0); i++)
-                for (int j = 0; j < vis0.GetLength(1); j++)
-                    for (int k = 0; k < vis0.GetLength(2); k++)
-                        if (!flags[i, j, k])
-                            output[i, j, k] = vis0[i, j, k] - vis1[i, j, k];
-                        else
-                            output[i, j, k] = 0;
-            return output;
-        }
-
-        private static Complex[,,] Add(Complex[,,] vis0, Complex[,,] vis1)
-        {
-            var output = new Complex[vis0.GetLength(0), vis0.GetLength(1), vis0.GetLength(2)];
-
-            for (int i = 0; i < vis0.GetLength(0); i++)
-                for (int j = 0; j < vis0.GetLength(1); j++)
-                    for (int k = 0; k < vis0.GetLength(2); k++)
-                        output[i, j, k] = vis0[i, j, k] + vis1[i, j, k];
-            return output;
-        }
-
-
-        private static void Add(Complex[,] c0, Complex[,] c1)
-        {
-            for (int i = 0; i < c0.GetLength(0); i++)
-            {
-                for (int j = 0; j < c0.GetLength(1); j++)
-                    c0[i, j] += c1[i, j];
-            }
-        }
-
-        private static Complex[,] IFT(Complex vis, double u, double v, double freq, int gridSize, double imageSize)
-        {
-            u = u * freq / MathFunctions.SPEED_OF_LIGHT;
-            v = v * freq / MathFunctions.SPEED_OF_LIGHT;
-
-            var output = new Complex[gridSize, gridSize];
-            var I = new Complex(0, 1);
-            var cell = imageSize / gridSize;
-            for (int y = 0; y < gridSize; y++)
-            {
-                for (int x = 0; x < gridSize; x++)
-                {
-                    int xi = x - gridSize / 2;
-                    int yi = y - gridSize / 2;
-                    var d = Complex.Exp(2 * PI * I * (u * (xi) * cell + v * (yi) * cell));
-                    var c = vis * d;
-                    output[y, x] = c;
-                }
-            }
-            return output;
-        }
-
-        private static int CountNonZero(double[,] image)
-        {
-            int count = 0;
-            for(int y = 0; y < image.GetLength(0); y++)
-                for (int x = 0; x < image.GetLength(1); x++)
-                    if (image[y, x] > 0.0)
-                        count++;
-            return count;
         }
         #endregion
 

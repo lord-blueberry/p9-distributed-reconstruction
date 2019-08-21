@@ -37,20 +37,18 @@ namespace Distributed_Reference
             var metadata = Partitioner.CreatePartition(c, local.UVW, local.Frequencies);
 
             var imgSection = CalculateLocalImageSection(comm.Rank, comm.Size, c.GridSize, c.GridSize);
-            var totalImage = new Communication.Rectangle(0, 0, c.GridSize, c.GridSize);
+            var totalImage = new Common.Rectangle(0, 0, c.GridSize, c.GridSize);
 
             //calculate psf and prepare for correlation in the Fourier space
             var psf = CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies);
             var psfCut = CutImg(psf);
             Complex[,] PsfCorrelation = null;
-            var maxSidelobe = DebugMethods.GetMaxSidelobeLevel(psf);
+            var maxSidelobe = Common.PSF.CalculateMaxSidelobe(psf);
             
             if (comm.Rank == 0)
             {
-                PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
+                PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
             }
-            
-
 
             var residualVis = local.Visibilities;
             var xLocal = new double[imgSection.YEnd - imgSection.Y, imgSection.XEnd - imgSection.X];
@@ -106,7 +104,7 @@ namespace Distributed_Reference
             return reconstructed;
         }
 
-        private static Communication.Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
+        private static Common.Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
         {
             var yPatchCount = (int)Math.Floor(Math.Sqrt(nodeCount));
             var xPatchCount = (nodeCount / yPatchCount);
@@ -120,10 +118,10 @@ namespace Distributed_Reference
             var yPatchEnd = yIdx + 1 < yPatchCount ? yPatchOffset + ySize / yPatchCount : ySize;
             var xPatchEnd = xIdx + 1 < xPatchCount ? xPatchOffset + xSize / xPatchCount : xSize;
 
-            return new Communication.Rectangle(yPatchOffset, xPatchOffset, yPatchEnd, xPatchEnd);
+            return new Common.Rectangle(yPatchOffset, xPatchOffset, yPatchEnd, xPatchEnd);
         }
 
-        private static double[,] GetImgSection(double[,] b, Communication.Rectangle imgSection)
+        private static double[,] GetImgSection(double[,] b, Common.Rectangle imgSection)
         {
             var yLen = imgSection.YEnd - imgSection.Y;
             var xLen = imgSection.XEnd - imgSection.X;
@@ -159,7 +157,7 @@ namespace Distributed_Reference
                 maxSideLobeLevel = maxSidelobe * DebugMethods.GetMax(dirtyImage);
                 //remove spheroidal
 
-                var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
+                var dirtyPadded = Common.Residuals.Pad(dirtyImage, psfCut);
                 var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
