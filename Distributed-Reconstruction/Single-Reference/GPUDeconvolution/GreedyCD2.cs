@@ -17,14 +17,14 @@ namespace Single_Reference.GPUDeconvolution
         private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => XMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
         #region atomic MaxPixel operation
-        public struct MaxPixel : System.IEquatable<MaxPixel>
+        public struct Pixel : System.IEquatable<Pixel>
         {
             public float AbsDiff;
             public int Y;
             public int X;
             public int Sign;
 
-            public bool Equals(MaxPixel other)
+            public bool Equals(Pixel other)
             {
                 return AbsDiff == other.AbsDiff
                     & Y == other.Y
@@ -33,9 +33,9 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        public struct MaxPixelOperation : IAtomicOperation<MaxPixel>
+        public struct MaxPixelOperation : IAtomicOperation<Pixel>
         {
-            public MaxPixel Operation(MaxPixel current, MaxPixel value)
+            public Pixel Operation(Pixel current, Pixel value)
             {
                 if (current.AbsDiff < value.AbsDiff)
                     return value;
@@ -44,9 +44,9 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        public struct MaxPixelCompareExchange : ICompareExchangeOperation<MaxPixel>
+        public struct MaxPixelCompareExchange : ICompareExchangeOperation<Pixel>
         {
-            public MaxPixel CompareExchange(ref MaxPixel target, MaxPixel compare, MaxPixel value)
+            public Pixel CompareExchange(ref Pixel target, Pixel compare, Pixel value)
             {
                 if (compare.AbsDiff != value.AbsDiff)
                 {
@@ -58,8 +58,6 @@ namespace Single_Reference.GPUDeconvolution
                         target.Sign = value.Sign;
                         return compare;
                     }
-
-                    
                 }
                 return target;
             }
@@ -346,9 +344,8 @@ namespace Single_Reference.GPUDeconvolution
         private static void Iteration(Accelerator accelerator, float[,] xImageIn, float[,] bMapIn, float[,] aMapIn, float[,] psf2In, float lambda, float alpha)
         {
             var maxGroups = accelerator.MaxNumThreads / accelerator.MaxNumThreadsPerGroup;
+            maxGroups = 8;
             var groupThreadIdx = new GroupedIndex(maxGroups, accelerator.MaxNumThreadsPerGroup);
-            maxGroups = 2;
-            groupThreadIdx = new GroupedIndex(maxGroups, 4);
             var nextPower2 = 1 << (63 - CountLeadingZeroBits((UInt64)maxGroups));    //calculate the next smallest power of 2 value for the group size. Used for reduceAndUpdate
 
             var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);

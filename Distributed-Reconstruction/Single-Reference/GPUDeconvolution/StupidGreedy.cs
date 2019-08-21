@@ -11,6 +11,7 @@ using ILGPU.Runtime.CPU;
 using ILGPU.ShuffleOperations;
 using System.Linq;
 using ILGPU.Runtime.Cuda;
+using static Single_Reference.GPUDeconvolution.GreedyCD2;
 
 namespace Single_Reference.GPUDeconvolution
 {
@@ -23,7 +24,8 @@ namespace Single_Reference.GPUDeconvolution
             ArrayView2D<float> xImage,
             ArrayView2D<float> xCandidates,
             ArrayView<float> maxCandidate,
-            ArrayView<float> lambdaAlpha)
+            ArrayView<float> lambdaAlpha,
+            ArrayView<Pixel> output)
         {
             if (index.InBounds(xImage.Extent))
             {
@@ -33,8 +35,55 @@ namespace Single_Reference.GPUDeconvolution
                 var alpha = lambdaAlpha[1];
 
                 var xNew = GPUShrinkElasticNet(xOld + xCandidate, lambda, alpha);
-                Atomic.Max(ref maxCandidate[0], XMath.Abs(xOld - xNew));
+                //Atomic.Max(ref maxCandidate[0], XMath.Abs(xOld - xNew));
+                var xAbsDiff = XMath.Abs(xNew - xOld);
+                var xIndex = index.X;
+                var yIndex = index.Y;
+                var sign = XMath.Sign(xNew - xOld);
+
+                var pix = new Pixel()
+                {
+                    AbsDiff = xAbsDiff,
+                    X = xIndex,
+                    Y = yIndex,
+                    Sign = sign
+                };
+                Atomic.MakeAtomic(ref output[0], pix, new MaxPixelOperation(), new MaxPixelCompareExchange());
+                /*
+                for (int offset = Warp.WarpSize / 2; offset > 0; offset /= 2)
+                {
+                    var oXAbsDiff = Warp.ShuffleDown(xAbsDiff, offset);
+                    var oXIndex = Warp.ShuffleDown(xIndex, offset);
+                    var oYIndex = Warp.ShuffleDown(yIndex, offset);
+                    var oSign = Warp.ShuffleDown(sign, offset);
+                    if (xAbsDiff < oXAbsDiff)
+                    {
+                        xAbsDiff = oXAbsDiff;
+                        xIndex = oXIndex;
+                        yIndex = oYIndex;
+                        sign = oSign;
+                    }
+                }
+                if(Warp.IsFirstLane)
+                {
+                    var pix = new Pixel()
+                    {
+                        AbsDiff = xAbsDiff,
+                        X = xIndex,
+                        Y = yIndex,
+                        Sign = sign
+                    };
+                    Atomic.MakeAtomic(ref output[0], pix, new MaxPixelOperation(), new MaxPixelCompareExchange());
+                }*/
             }
+        }
+
+        private static void UpdateX (
+            Index index,
+            ArrayView2D<float> xImage,
+            ArrayView<Pixel> pixel)
+        {
+            xImage[pixel[0].X, pixel[0].Y] += pixel[0].Sign * pixel[0].AbsDiff;
         }
 
         private static void Shrink2(Index2 index,
@@ -73,6 +122,20 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
+        private static void UpdateCandidatesKernel2(Index2 index,
+            ArrayView2D<float> xCandidates,
+            ArrayView2D<float> aMap,
+            ArrayView2D<float> psf2,
+            ArrayView<Pixel> pixel)
+        {
+            var indexCandidate = index.Add(new Index2(pixel[0].X, pixel[0].Y)).Subtract(psf2.Extent / 2);
+            if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(xCandidates.Extent))
+            {
+                //var update = (psf2[index] * maxDiff[0]) / aMap[indexCandidate];
+                xCandidates[indexCandidate] -= (psf2[index] * pixel[0].Sign * pixel[0].AbsDiff) / aMap[indexCandidate];
+            }
+        }
+
         private static void UpdateCandidatesKernel(Index2 index,
             ArrayView2D<float> xCandidates,
             ArrayView2D<float> aMap,
@@ -90,19 +153,26 @@ namespace Single_Reference.GPUDeconvolution
 
         private static void ResetIndicesKernel(Index index,
             ArrayView<int> maxIndices,
-            ArrayView<float> maxCandidate)
+            ArrayView<float> maxCandidate,
+            ArrayView<Pixel> maxPixel)
         {
             maxIndices[index] = -1;
             maxCandidate[0] = 0;
+            maxPixel[0].AbsDiff = 0;
+            maxPixel[0].X = -1;
+            maxPixel[0].Y = -1;
         }
         #endregion
 
         private static void Iteration(Accelerator accelerator, float[,] xImageInput, float[,] candidateInput, float[,] aMapInput, float[,] psf2Input, float lambda, float alpha)
         {
-            var shrinkKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>>(ShrinkKernel);
+            var shrinkKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<Pixel>>(ShrinkKernel);
             var maxIndexKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>, ArrayView<float>>(Shrink2);
             var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
-            var resetKernel = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView<float>>(ResetIndicesKernel);
+            var resetKernel = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView<float>, ArrayView<Pixel>>(ResetIndicesKernel);
+
+            var updateXKernel = accelerator.LoadStreamKernel<Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateX);
+            var updateCandidatesKernel2 = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateCandidatesKernel2);
 
             var size = new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1));
             var psfSize = new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1));
@@ -113,6 +183,7 @@ namespace Single_Reference.GPUDeconvolution
             using (var aMap = accelerator.Allocate<float>(size))
             using (var psf2 = accelerator.Allocate<float>(psfSize))
             using (var maxCandidate = accelerator.Allocate<float>(1))
+            using (var maxPixel = accelerator.Allocate<Pixel>(1))
             using (var maxIndices = accelerator.Allocate<int>(2))
             using (var lambdaAlpha = accelerator.Allocate<float>(2))
             {
@@ -133,18 +204,20 @@ namespace Single_Reference.GPUDeconvolution
                 watch.Start();
                 for (int i = 0; i < 1000; i++)
                 {
-                    shrinkKernel(size, xImage.View, xCandidates.View, maxCandidate.View, lambdaAlpha.View);
+                    shrinkKernel(size, xImage.View, xCandidates.View, maxCandidate.View, lambdaAlpha.View, maxPixel.View);
                     accelerator.Synchronize();
 
-                    maxIndexKernel(size, xImage.View, xCandidates.View, maxCandidate.View, maxIndices.View, lambdaAlpha.View);
-                    accelerator.Synchronize();
+                    //maxIndexKernel(size, xImage.View, xCandidates.View, maxCandidate.View, maxIndices.View, lambdaAlpha.View);
+                    //accelerator.Synchronize();
                     //var indices = maxIndices.GetAsArray();
                     //var maxDiff = maxCandidate.GetAsArray();
 
-                    updateCandidatesKernel(psfSize, xCandidates.View, aMap.View, psf2.View, maxCandidate.View, maxIndices.View);
+                    updateXKernel(new Index(1), xImage.View, maxPixel.View);
+                    updateCandidatesKernel2(psfSize, xCandidates.View, aMap.View, psf2.View, maxPixel.View);
+                    //updateCandidatesKernel(psfSize, xCandidates.View, aMap.View, psf2.View, maxCandidate.View, maxIndices.View);
                     accelerator.Synchronize();
 
-                    resetKernel(new Index(2), maxIndices.View, maxCandidate.View);
+                    resetKernel(new Index(2), maxIndices.View, maxCandidate.View, maxPixel.View);
                     accelerator.Synchronize();
                     //Console.WriteLine("iteration " + i);
                 }
