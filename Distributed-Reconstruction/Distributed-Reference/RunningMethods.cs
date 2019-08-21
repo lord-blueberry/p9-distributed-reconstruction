@@ -263,7 +263,7 @@ namespace Distributed_Reference
                     {
                         var yPixel = y - imgSection.Y;
                         var xPixel = x - imgSection.X;
-                        aMapLocal[yPixel, xPixel] = GreedyCD.QueryIntegral2(integral, y, x, totalImage.YEnd, totalImage.XEnd);
+                        aMapLocal[yPixel, xPixel] = Common.PSF.QueryScan(integral, y, x, totalImage.YEnd, totalImage.XEnd);
                     }
 
                 var residualVis = visibilities;
@@ -427,7 +427,7 @@ namespace Distributed_Reference
                     {
                         var yPixel = y - imgSection.Y;
                         var xPixel = x - imgSection.X;
-                        aMapLocal[yPixel, xPixel] = GreedyCD.QueryIntegral2(integral, y, x, totalImage.YEnd, totalImage.XEnd);
+                        aMapLocal[yPixel, xPixel] = Common.PSF.QueryScan(integral, y, x, totalImage.YEnd, totalImage.XEnd);
                     }
 
                 var residualVis = visibilities;

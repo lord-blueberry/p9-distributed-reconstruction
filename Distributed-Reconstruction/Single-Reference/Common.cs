@@ -39,7 +39,6 @@ namespace Single_Reference
                 var yUnderShootIdx = Math.Max(1, yUnderShoot) - 1;
                 var xUnderShootIdx = Math.Max(1, xUnderShoot) - 1;
 
-
                 //PSF completely in picture
                 if (yOverShoot <= 0 & xOverShoot <= 0 & yUnderShoot <= 0 & xUnderShoot <= 0)
                     return psfScan[psfScan.GetLength(0) - 1, psfScan.GetLength(1) - 1];

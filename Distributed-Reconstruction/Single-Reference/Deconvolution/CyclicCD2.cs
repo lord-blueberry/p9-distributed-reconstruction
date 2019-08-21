@@ -52,7 +52,7 @@ namespace Single_Reference.Deconvolution
                 {
                     for (int x = 0; x < xImage.GetLength(1); x++)
                     {
-                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, xImage.GetLength(0), xImage.GetLength(1));
+                        var currentA = Common.PSF.QueryScan(integral, y, x, xImage.GetLength(0), xImage.GetLength(1));
                         var old = xImage[y, x];
                         var xTmp = old + b[y + yPsfHalf, x + xPsfHalf] / currentA;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
@@ -88,7 +88,7 @@ namespace Single_Reference.Deconvolution
                         var xOld = xImage[y, x];
                         var currentB = b[y + yPsfHalf, x + xPsfHalf];
 
-                        var xTmp = xOld + currentB / GreedyCD.QueryIntegral2(integral, y, x, xImage.GetLength(0), xImage.GetLength(1)); ;
+                        var xTmp = xOld + currentB / Common.PSF.QueryScan(integral, y, x, xImage.GetLength(0), xImage.GetLength(1)); ;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
                         var xDiff = (xOld - xTmp) /50.0;
 
@@ -158,7 +158,7 @@ namespace Single_Reference.Deconvolution
                         var currentB = CalculateB(resPadded, xImage, psf, y, x);
 
                         //calculate minimum of parabola, eg -2b/a
-                        var xTmp = xOld + currentB / GreedyCD.QueryIntegral2(integral, y, x, xImage.GetLength(0), xImage.GetLength(1)); ;
+                        var xTmp = xOld + currentB / Common.PSF.QueryScan(integral, y, x, xImage.GetLength(0), xImage.GetLength(1)); ;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
                         var xDiff = xOld - xTmp;
 
@@ -229,7 +229,7 @@ namespace Single_Reference.Deconvolution
                 for (int y = 0; y < res.GetLength(0); y++)
                     for (int x = 0; x < res.GetLength(1); x++)
                     {
-                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, res.GetLength(0), res.GetLength(1));
+                        var currentA = Common.PSF.QueryScan(integral, y, x, res.GetLength(0), res.GetLength(1));
                         var old = xImage[y, x];
                         var xTmp = old + b[y + yPsfHalf, x + xPsfHalf] / currentA;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));

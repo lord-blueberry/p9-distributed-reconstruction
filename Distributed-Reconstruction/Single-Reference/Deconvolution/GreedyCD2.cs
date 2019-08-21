@@ -19,7 +19,7 @@ namespace Single_Reference.Deconvolution
                 for (int y = 0; y < b.GetLength(0); y++)
                     for (int x = 0; x < b.GetLength(1); x++)
                     {
-                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, b.GetLength(0), b.GetLength(1));
+                        var currentA = Common.PSF.QueryScan(integral, y, x, b.GetLength(0), b.GetLength(1));
                         var xDiff = b[y, x] / currentA;
 
                         if (Math.Abs(xDiff) > xMaxAbsDiff)

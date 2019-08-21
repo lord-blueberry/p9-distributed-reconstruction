@@ -96,7 +96,7 @@ namespace Single_Reference.Deconvolution
                 for (int y = 0; y < res.GetLength(0); y++)
                     for (int x = 0; x < res.GetLength(1); x++)
                     {
-                        var currentA = QueryIntegral2(integral, y, x, res.GetLength(0), res.GetLength(1));
+                        var currentA = Common.PSF.QueryScan(integral, y, x, res.GetLength(0), res.GetLength(1));
                         var old = xImage[y, x];
                         var xTmp = old + b[y + yPsfHalf, x + xPsfHalf] / currentA;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
@@ -185,7 +185,7 @@ namespace Single_Reference.Deconvolution
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
                 {
-                    var a = QueryIntegral2(aMap, i + yOffset, j + xOffset, window.GetLength(0), window.GetLength(1));
+                    var a = Common.PSF.QueryScan(aMap, i + yOffset, j + xOffset, window.GetLength(0), window.GetLength(1));
                     objective += lambda * 2 * a * ElasticNetRegularization(xImage[i, j], alpha);
                 }
                     
@@ -199,36 +199,6 @@ namespace Single_Reference.Deconvolution
                 for (int j = 0; j < xImage.GetLength(1); j++)
                     objective += resPadded[i + yPsfOffset, j + xPsfOffset] * resPadded[i + yPsfOffset, j + xPsfOffset];
             return objective;
-        }
-
-        public static double QueryIntegral2(double[,] integral, int yPixel, int xPixel, int yLength, int xLength)
-        {
-            var yOverShoot = (yPixel + (integral.GetLength(0) - integral.GetLength(0) / 2)) - yLength;
-            var xOverShoot = (xPixel + (integral.GetLength(1) - integral.GetLength(1) / 2)) - xLength;
-            yOverShoot = Math.Max(0, yOverShoot);
-            xOverShoot = Math.Max(0, xOverShoot);
-            var yUnderShoot = (-1) * (yPixel - integral.GetLength(0) / 2);
-            var xUnderShoot = (-1) * (xPixel - integral.GetLength(1) / 2);
-            var yUnderShootIdx = Math.Max(1, yUnderShoot) - 1;
-            var xUnderShootIdx = Math.Max(1, xUnderShoot) - 1;
-
-            //PSF completely in picture
-            if (yOverShoot <= 0 & xOverShoot <= 0 & yUnderShoot <= 0 & xUnderShoot <= 0)
-                return integral[integral.GetLength(0) - 1, integral.GetLength(1) - 1];
-
-            if (yUnderShoot > 0 & xUnderShoot > 0)
-                return integral[integral.GetLength(0) - 1, integral.GetLength(1) - 1]
-                       - integral[integral.GetLength(0) - 1, xUnderShootIdx]
-                       - integral[yUnderShootIdx, integral.GetLength(1) - 1]
-                       + integral[yUnderShootIdx, xUnderShootIdx];
-
-            var correction = 0.0;
-            if (yUnderShoot > 0)
-                correction += integral[yUnderShootIdx, integral.GetLength(1) - xOverShoot - 1];
-            if (xUnderShoot > 0)
-                correction += integral[integral.GetLength(0) - yOverShoot - 1, xUnderShootIdx];
-
-            return integral[integral.GetLength(0) - 1 - yOverShoot, integral.GetLength(1) - 1 - xOverShoot] - correction;
         }
         #endregion
 

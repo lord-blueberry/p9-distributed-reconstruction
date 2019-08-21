@@ -80,10 +80,10 @@ namespace Single_Reference.Deconvolution
                     {
                         var yLocal = y - rec.Y;
                         var xLocal = x - rec.X;
-                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, res.GetLength(0), res.GetLength(1));
+                        var currentA = Common.PSF.QueryScan(integral, y, x, res.GetLength(0), res.GetLength(1));
                         var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[y + yPsfHalf, x + xPsfHalf] / currentA;
-                        xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
+                        xTmp = Common.ShrinkElasticNet(xTmp, lambda, alpha);
                         var xDiff = old - xTmp;
 
                         if (Math.Abs(xDiff) > epsilon)
@@ -116,7 +116,7 @@ namespace Single_Reference.Deconvolution
                         var currentB = CalculateB(resPadded, res, psf, y, x);
 
                         //calculate minimum of parabola, eg -2b/a
-                        var xTmp = xOld + currentB / GreedyCD.QueryIntegral2(integral, y, x, res.GetLength(0), res.GetLength(1));
+                        var xTmp = xOld + currentB / Common.PSF.QueryScan(integral, y, x, res.GetLength(0), res.GetLength(1));
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
                         var xDiff = xOld - xTmp;
 
@@ -214,7 +214,7 @@ namespace Single_Reference.Deconvolution
                     {
                         var yLocal = y - rec.Y;
                         var xLocal = x - rec.X;
-                        var currentA = GreedyCD.QueryIntegral2(integral, y, x, res.GetLength(0), res.GetLength(1));
+                        var currentA = Common.PSF.QueryScan(integral, y, x, res.GetLength(0), res.GetLength(1));
                         var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[y + yPsfHalf, x + xPsfHalf] / currentA;
                         xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
