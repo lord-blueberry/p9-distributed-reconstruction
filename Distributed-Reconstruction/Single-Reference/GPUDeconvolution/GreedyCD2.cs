@@ -430,8 +430,8 @@ namespace Single_Reference.GPUDeconvolution
         {
             using (var context = new Context(ContextFlags.FastMath, ILGPU.IR.Transformations.OptimizationLevel.Release))
             {
-                var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
-                var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
+                var psf2 = Common.PSF.CalcPSFSquared(xImage, psf);
+                var aMap = Common.PSF.CalcAMap(xImage, psf);
                 var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
                 if (gpuIds.Any())
                 {

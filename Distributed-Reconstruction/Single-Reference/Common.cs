@@ -6,7 +6,7 @@ using System.Numerics;
 
 namespace Single_Reference
 {
-    public static class CommonMethods
+    public static class Common
     {
         public static double ShrinkElasticNet(double value, double lambda, double alpha) => Math.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
@@ -184,8 +184,23 @@ namespace Single_Reference
 
                 return residualVis;
             }
+        }
 
+        public class Rectangle
+        {
+            public int Y { get; private set; }
+            public int X { get; private set; }
 
+            public int YEnd { get; private set; }
+            public int XEnd { get; private set; }
+
+            public Rectangle(int y, int x, int yEnd, int xEnd)
+            {
+                Y = y;
+                X = x;
+                YEnd = yEnd;
+                XEnd = xEnd;
+            }
         }
     }
 }

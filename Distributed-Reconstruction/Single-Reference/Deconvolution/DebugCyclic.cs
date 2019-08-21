@@ -70,7 +70,7 @@ namespace Single_Reference.Deconvolution
                 if (oOld < objective)
                     Console.Write("error");
                 var RES = FFT.FFTDebug(resPadded, 1.0);
-                var B = IDG.Multiply(RES, PSFPadded);
+                var B = Common.Fourier2D.Multiply(RES, PSFPadded);
                 var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
                 var activeSet = new List<Tuple<int, int>>();
@@ -174,7 +174,7 @@ namespace Single_Reference.Deconvolution
                         GreedyCD.UpdateResiduals2(resPadded, res, psf, p.Y, p.X, p.Value, yPsfHalf, xPsfHalf);*/
 
                 RES = FFT.FFTDebug(resPadded, 1.0);
-                B = IDG.Multiply(RES, PSFPadded);
+                B = Common.Fourier2D.Multiply(RES, PSFPadded);
                 b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
                 iter++;
@@ -194,7 +194,7 @@ namespace Single_Reference.Deconvolution
             var xPsfHalf = psf.GetLength(1) / 2;
 
             var RES = FFT.FFTDebug(resPadded, 1.0);
-            var B = IDG.Multiply(RES, PSFPadded);
+            var B = Common.Fourier2D.Multiply(RES, PSFPadded);
             var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
             double objective = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, rec.Y, rec.X);
@@ -243,7 +243,7 @@ namespace Single_Reference.Deconvolution
                     Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yLocal2 + "\t" + xLocal2);
                     GreedyCD.UpdateResiduals2(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
                     RES = FFT.FFTDebug(resPadded, 1.0);
-                    B = IDG.Multiply(RES, PSFPadded);
+                    B = Common.Fourier2D.Multiply(RES, PSFPadded);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                     iter++;
                 }
@@ -277,7 +277,7 @@ namespace Single_Reference.Deconvolution
             var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
 
             var RES = FFT.FFTDebug(resPadded, 1.0);
-            var B = IDG.Multiply(RES, PSFPadded);
+            var B = Common.Fourier2D.Multiply(RES, PSFPadded);
             var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
             double objective = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, rec.Y, rec.X);
@@ -323,11 +323,11 @@ namespace Single_Reference.Deconvolution
                     var xOld = xImage[yLocal2, xLocal2];
                     xImage[yLocal2, xLocal2] = xNew;
 
-                    FitsIO.Write(CommonMethods.Residuals.RemovePadding(b, psf), "b_greedyTrue.fits");
+                    FitsIO.Write(Common.Residuals.RemovePadding(b, psf), "b_greedyTrue.fits");
                     Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yLocal2 + "\t" + xLocal2);
                     GreedyCD.UpdateResiduals2(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
                     RES = FFT.FFTDebug(resPadded, 1.0);
-                    B = IDG.Multiply(RES, PSFPadded);
+                    B = Common.Fourier2D.Multiply(RES, PSFPadded);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                     iter++;
                 }

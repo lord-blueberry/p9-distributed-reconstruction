@@ -50,7 +50,7 @@ namespace Single_Reference.Deconvolution
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
-            var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
+            var aMap = Common.PSF.CalcAMap(xImage, psf);
             var imageSection = new DebugCyclic.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
 
             //invert the PSF, since we actually do want to correlate the psf with the residuals. (The FFT already inverts the psf, so we need to invert it again to not invert it. Trust me.)
@@ -62,9 +62,9 @@ namespace Single_Reference.Deconvolution
             var PsfCorr = FFT.FFTDebug(psfTmp, 1.0);
 
             psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
-            CommonMethods.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
+            Common.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
             var tmp = FFT.FFTDebug(psfTmp, 1.0);
-            var tmp2 = IDG.Multiply(tmp, PsfCorr);
+            var tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
 
             //cached bUpdate. When the PSF is not masked
             var bUpdateCache = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));

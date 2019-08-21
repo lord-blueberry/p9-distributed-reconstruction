@@ -34,6 +34,7 @@ namespace Single_Reference.GPUDeconvolution
         readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>> updateCandidates;
         #endregion
 
+        public bool RunsOnGPU { get; }
         readonly Context c;
         readonly Accelerator accelerator;
 
@@ -42,10 +43,16 @@ namespace Single_Reference.GPUDeconvolution
             c = new Context(ContextFlags.FastMath);
             var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
             if (gpuIds.Any())
+            {
+                RunsOnGPU = true;
                 accelerator = new CudaAccelerator(c, gpuIds.First().DeviceId);
+            }  
             else
+            {
+                RunsOnGPU = false;
                 accelerator = new CPUAccelerator(c, 4);
-
+            }
+                
             shrink = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>>(ShrinkKernel);
             updateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateXKernel);
             updateCandidates = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateCandidatesKernel);
@@ -66,7 +73,7 @@ namespace Single_Reference.GPUDeconvolution
             AllocateGPU(xImage, bMap, aMap, psf2, lambda, alpha);
             for(int i = 0; i < iterations; i++)
             {
-                this.DeconvolutionBatchIterations(batchIterations);
+                DeconvolutionBatchIterations(batchIterations);
                 var lastPixel = maxPixelGPU.GetAsArray()[0];
                 if(lastPixel.AbsDiff < epsilon)
                 {

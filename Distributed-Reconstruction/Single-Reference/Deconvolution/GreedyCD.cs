@@ -195,7 +195,7 @@ namespace Single_Reference.Deconvolution
                 }
             var IMG = FFT.FFTDebug(img2, 1.0);
             var PSF = FFT.FFTDebug(psf2, 1.0);
-            var CONV = IDG.Multiply(IMG, PSF);
+            var CONV = Common.Fourier2D.Multiply(IMG, PSF);
             var conv = FFT.IFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
             FFT.Shift(conv);
 
@@ -248,7 +248,7 @@ namespace Single_Reference.Deconvolution
             FFT.Shift(psfPadded);
             var RES = FFT.FFTDebug(resPadded, 1.0);
             var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
-            var B = IDG.Multiply(RES, PSFPadded);
+            var B = Common.Fourier2D.Multiply(RES, PSFPadded);
             var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
             
 
@@ -301,7 +301,7 @@ namespace Single_Reference.Deconvolution
                     var debug = EstimateObjectiveImprovement2(resPadded, res, psf, yPixel, xPixel, xOld - xNew);
                     UpdateResiduals2(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
                     RES = FFT.FFTDebug(resPadded, 1.0);
-                    B = IDG.Multiply(RES, PSFPadded);
+                    B = Common.Fourier2D.Multiply(RES, PSFPadded);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                     iter++;
                 }

@@ -229,8 +229,8 @@ namespace Single_Reference.GPUDeconvolution
                 var yPsfHalf = psf.GetLength(0) / 2;
                 var xPsfHalf = psf.GetLength(1) / 2;
 
-                var psf2 = CommonMethods.PSF.CalcPSFSquared(xImage, psf);
-                var aMap = CommonMethods.PSF.CalcAMap(xImage, psf);
+                var psf2 = Common.PSF.CalcPSFSquared(xImage, psf);
+                var aMap = Common.PSF.CalcAMap(xImage, psf);
                 for (int y = 0; y < b.GetLength(0); y++)
                     for (int x = 0; x < b.GetLength(1); x++)
                         b[y, x] = b[y, x] / aMap[y, x];

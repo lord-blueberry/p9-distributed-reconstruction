@@ -12,14 +12,14 @@ namespace Distributed_Reference.DistributedDeconvolution
     {
         public static bool DeconvolvePath(Intracommunicator comm, Rectangle imgSection, Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10, int maxIteration = 100, double epsilon = 1e-4)
         {
-            var integral = CommonMethods.PSF.CalcScan(psf);
+            var integral = Common.PSF.CalcScan(psf);
             var aMap = new double[b.GetLength(0), b.GetLength(1)];
             for (int y = imgSection.Y; y < imgSection.YEnd; y++)
                 for (int x = imgSection.X; x < imgSection.XEnd; x++)
                 {
                     var yLocal = y - imgSection.Y;
                     var xLocal = x - imgSection.X;
-                    aMap[yLocal, xLocal] = CommonMethods.PSF.QueryScan(integral, y, x, totalSize.YEnd, totalSize.XEnd);
+                    aMap[yLocal, xLocal] = Common.PSF.QueryScan(integral, y, x, totalSize.YEnd, totalSize.XEnd);
                 }
             
             var converged = false;

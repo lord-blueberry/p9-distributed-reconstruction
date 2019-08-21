@@ -85,9 +85,9 @@ namespace Single_Reference
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
-                var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
+                var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
+                var b = Common.Residuals.RemovePadding(bPadded, psfCut);
                 var lambda = 0.8;
                 var alpha = 0.05;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -162,9 +162,9 @@ namespace Single_Reference
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
-                var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
+                var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
+                var b = Common.Residuals.RemovePadding(bPadded, psfCut);
                 var lambda = 100.0;
                 var alpha = 0.95;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -249,9 +249,9 @@ namespace Single_Reference
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
-                var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
+                var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
+                var b = Common.Residuals.RemovePadding(bPadded, psfCut);
                 var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5  , 0.2, 1000);
 
                 if (converged)
@@ -272,7 +272,7 @@ namespace Single_Reference
                 watchBackwards.Stop();
 
                 var hello = FFT.FFTDebug(xImage, 1.0);
-                hello = IDG.Multiply(hello, psfGrid);
+                hello = Common.Fourier2D.Multiply(hello, psfGrid);
                 var hImg = FFT.IFFTDebug(hello, 128 * 128);
                 //FFT.Shift(hImg);
                 FitsIO.Write(hImg, "modelDirty_FFT.fits");
@@ -338,9 +338,9 @@ namespace Single_Reference
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
                 var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
-                var B = IDG.Multiply(DirtyPadded, PsfCorrelation);
+                var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
                 var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
-                var b = CommonMethods.Residuals.RemovePadding(bPadded, psfCut);
+                var b = Common.Residuals.RemovePadding(bPadded, psfCut);
 
                 //var converged = GPUDeconvolution.GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
                 var converged = GPUDeconvolution.StupidGreedy.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
@@ -363,7 +363,7 @@ namespace Single_Reference
                 watchBackwards.Stop();
 
                 var hello = FFT.FFTDebug(xImage, 1.0);
-                hello = IDG.Multiply(hello, psfGrid);
+                hello = Common.Fourier2D.Multiply(hello, psfGrid);
                 var hImg = FFT.IFFTDebug(hello, 128 * 128);
                 //FFT.Shift(hImg);
                 FitsIO.Write(hImg, "modelDirty_FFT.fits");

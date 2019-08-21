@@ -44,7 +44,7 @@ namespace Single_Reference.Deconvolution
             while (!converged & iter < maxIteration)
             {
                 var RES = FFT.FFTDebug(resPadded, 1.0);
-                var B = IDG.Multiply(RES, PSFPaddedCorr);
+                var B = Common.Fourier2D.Multiply(RES, PSFPaddedCorr);
                 var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
                 var activeSet = new List<Tuple<int, int>>();
@@ -112,7 +112,7 @@ namespace Single_Reference.Deconvolution
                         if(i % 50 == 0)
                         {
                             var Xdiff = FFT.FFTDebug(xCummulatedDiff, 1.0);
-                            var RESdiff = IDG.Multiply(Xdiff, PSFPaddedConv);
+                            var RESdiff = Common.Fourier2D.Multiply(Xdiff, PSFPaddedConv);
                             var resDiff = FFT.IFFTDebug(RESdiff, RESdiff.GetLength(0) * RESdiff.GetLength(1));
                             
                             for (int y2 = 0; y2 < res.GetLength(0); y2++)
@@ -121,7 +121,7 @@ namespace Single_Reference.Deconvolution
 
                             xCummulatedDiff = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
                             RES = FFT.FFTDebug(resPadded, 1.0);
-                            B = IDG.Multiply(RES, PSFPaddedCorr);
+                            B = Common.Fourier2D.Multiply(RES, PSFPaddedCorr);
                             b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
                             var objective2 = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0,0);
@@ -131,7 +131,7 @@ namespace Single_Reference.Deconvolution
                         i++;
                     }
                     var Xdiff2 = FFT.FFTDebug(xCummulatedDiff, 1.0);
-                    var RESdiff2 = IDG.Multiply(Xdiff2, PSFPaddedConv);
+                    var RESdiff2 = Common.Fourier2D.Multiply(Xdiff2, PSFPaddedConv);
                     var resDiff2 = FFT.IFFTDebug(RESdiff2, RESdiff2.GetLength(0) * RESdiff2.GetLength(1));
 
                     for (int y2 = 0; y2 < res.GetLength(0); y2++)
@@ -140,7 +140,7 @@ namespace Single_Reference.Deconvolution
 
                     xCummulatedDiff = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
                     RES = FFT.FFTDebug(resPadded, 1.0);
-                    B = IDG.Multiply(RES, PSFPaddedCorr);
+                    B = Common.Fourier2D.Multiply(RES, PSFPaddedCorr);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
                     var objective3 = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0,0);
@@ -189,7 +189,7 @@ namespace Single_Reference.Deconvolution
                 }
 
                 RES = FFT.FFTDebug(resPadded, 1.0);
-                B = IDG.Multiply(RES, PSFPaddedCorr);
+                B = Common.Fourier2D.Multiply(RES, PSFPaddedCorr);
                 b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
 
                 iter++;
@@ -209,7 +209,7 @@ namespace Single_Reference.Deconvolution
             var xPsfHalf = psf.GetLength(1) / 2;
 
             var RES = FFT.FFTDebug(resPadded, 1.0);
-            var B = IDG.Multiply(RES, PSFPadded);
+            var B = Common.Fourier2D.Multiply(RES, PSFPadded);
             var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
             
             double objective = 0;
@@ -253,7 +253,7 @@ namespace Single_Reference.Deconvolution
                     Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel);
                     GreedyCD.UpdateResiduals2(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
                     RES = FFT.FFTDebug(resPadded, 1.0);
-                    B = IDG.Multiply(RES, PSFPadded);
+                    B = Common.Fourier2D.Multiply(RES, PSFPadded);
                     b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
                     iter++;
                 }
