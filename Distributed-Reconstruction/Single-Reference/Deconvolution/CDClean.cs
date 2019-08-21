@@ -226,27 +226,6 @@ namespace Single_Reference.Deconvolution
             }
         }
 
-        private static void ModifyResidualParallel(double[,] residual, double[,] psf, int y, int x, double xDiff)
-        {
-            int yOffset = y - psf.GetLength(0) / 2;
-            int xOffset = x - psf.GetLength(1) / 2;
-            Parallel.For(0, psf.GetLength(0), i =>
-            {
-                for (int j = 0; j < psf.GetLength(1); j++)
-                {
-                    var yDst = yOffset + i;
-                    var xDst = xOffset + j;
-                    if (yDst >= 0 & yDst < residual.GetLength(0) &
-                        xDst >= 0 & xDst < residual.GetLength(1))
-                    {
-                        var res = residual[yDst, xDst];
-                        residual[yDst, xDst] -= xDiff * psf[i, j];
-                    }
-                }
-            });
-            
-        }
-
         private static double CalcPSFSquared(double[,] psf)
         {
             double squared = 0;

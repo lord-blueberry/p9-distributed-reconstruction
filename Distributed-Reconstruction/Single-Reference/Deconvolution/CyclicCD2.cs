@@ -12,7 +12,7 @@ namespace Single_Reference.Deconvolution
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
-            var integral = GreedyCD.CalcPSf2Integral(psf);
+            var integral = Common.PSF.CalcScan(psf);
             var resPadded = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
             for (int y = 0; y < res.GetLength(0); y++)
                 for (int x = 0; x < res.GetLength(1); x++)
@@ -260,26 +260,6 @@ namespace Single_Reference.Deconvolution
             }
 
             return converged;
-        }
-
-        private static double CalculateB(double[,] resPadded, double[,] xImage, double[,] psf, int yPixel, int xPixel)
-        {
-            var yPsfHalf = psf.GetLength(0) / 2;
-            var xPsfHalf = psf.GetLength(1) / 2;
-            int yOffset = yPixel - yPsfHalf;
-            int xOffset = xPixel - xPsfHalf;
-
-            var b = 0.0;
-            for (int i = 0; i < psf.GetLength(0); i++)
-                for (int j = 0; j < psf.GetLength(1); j++)
-                {
-                    var ySrc = yOffset + i;
-                    var xSrc = xOffset + j;
-                    if (ySrc >= 0 & ySrc < xImage.GetLength(0) & xSrc >= 0 & xSrc < xImage.GetLength(1))
-                        b += resPadded[ySrc + yPsfHalf, xSrc + xPsfHalf] * psf[i, j];
-                }
-            
-            return b;
         }
 
         private static void Randomize<T>(List<T> arr)

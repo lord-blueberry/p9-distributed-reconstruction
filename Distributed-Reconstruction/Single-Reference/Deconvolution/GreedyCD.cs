@@ -7,37 +7,6 @@ namespace Single_Reference.Deconvolution
 {
     public class GreedyCD
     {
-        public static double QueryIntegral(double[,] integral, int yPixel, int xPixel)
-        {
-            var yPsfHalf = integral.GetLength(0) / 2;
-            var xPsfHalf = integral.GetLength(1) / 2;
-
-            //possible off by one error for odd psf dimensions
-            var yOverShoot = integral.GetLength(0) * 2 - (yPixel + yPsfHalf) - 1;
-            var xOverShoot = integral.GetLength(1) * 2 - (xPixel + xPsfHalf) - 1;
-
-            var yCorrection = yOverShoot % integral.GetLength(0);
-            var xCorrection = xOverShoot % integral.GetLength(1);
-
-            if (yCorrection == yOverShoot & xCorrection == xOverShoot)
-            {
-                return integral[yCorrection, xCorrection];
-            }
-            else if (yCorrection == yOverShoot | xCorrection == xOverShoot)
-            {
-                var y = Math.Min(yOverShoot, integral.GetLength(0) - 1);
-                var x = Math.Min(xOverShoot, integral.GetLength(1) - 1);
-                return integral[y, x] - integral[yCorrection, xCorrection];
-            }
-            else
-            {
-                return integral[integral.GetLength(0) - 1, integral.GetLength(1) - 1]
-                       - integral[integral.GetLength(0) - 1, xCorrection]
-                       - integral[yCorrection, integral.GetLength(1) - 1]
-                       + integral[yCorrection, xCorrection];
-            }
-        }
-
         public static double CalcDataObjective(double[,] res)
         {
             double objective = 0;
@@ -53,8 +22,6 @@ namespace Single_Reference.Deconvolution
             value = Math.Max(value, 0.0) - lambda;
             return Math.Max(value, 0.0);
         }
-
-    
 
         public static double[,] ConvolveFFTPadded(double[,] img, double[,] psf)
         {
@@ -84,28 +51,12 @@ namespace Single_Reference.Deconvolution
             return convOut;
         }
 
-        public static double[,] CalcPSf2Integral(double[,] psf)
-        {
-            var integral = new double[psf.GetLength(0), psf.GetLength(1)];
-            for (int i = 0; i < psf.GetLength(0); i++)
-                for (int j = 0; j < psf.GetLength(1); j++)
-                {
-                    var iBefore = i > 0 ? integral[i - 1, j] : 0.0;
-                    var jBefore = j > 0 ? integral[i, j - 1] : 0.0;
-                    var ijBefore = i > 0 & j > 0 ? integral[i - 1, j - 1] : 0.0;
-                    var current = psf[i, j] * psf[i, j];
-                    integral[i, j] = current + iBefore + jBefore - ijBefore;
-                }
-
-            return integral;
-        }
-
         #region deconvReplacement
         public static bool Deconvolve2(double[,] xImage, double[,] res, double[,] psf, double lambda, double alpha, int maxIteration = 100, double[,] dirtyCopy = null)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
-            var integral = GreedyCD.CalcPSf2Integral(psf);
+            var integral = Common.PSF.CalcScan(psf);
 
             var resPadded = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
             for (int y = 0; y < res.GetLength(0); y++)
@@ -241,15 +192,6 @@ namespace Single_Reference.Deconvolution
             return objective;
         }
 
-        public static double CalcL1Objective2(double[,] xImage, double[,] aMap, double lambda)
-        {
-            double objective = 0;
-            for (int i = 0; i < xImage.GetLength(0); i++)
-                for (int j = 0; j < xImage.GetLength(1); j++)
-                    objective += Math.Abs(xImage[i, j]) * lambda * 2 * QueryIntegral2(aMap, i, j, xImage.GetLength(0), xImage.GetLength(1));
-            return objective;
-        }
-
         public static double CalcDataObjective(double[,] resPadded, double[,] xImage, int yPsfOffset, int xPsfOffset)
         {
             double objective = 0;
@@ -269,7 +211,6 @@ namespace Single_Reference.Deconvolution
             var xUnderShoot = (-1) * (xPixel - integral.GetLength(1) / 2);
             var yUnderShootIdx = Math.Max(1, yUnderShoot) - 1;
             var xUnderShootIdx = Math.Max(1, xUnderShoot) - 1;
-
 
             //PSF completely in picture
             if (yOverShoot <= 0 & xOverShoot <= 0 & yUnderShoot <= 0 & xUnderShoot <= 0)
@@ -292,9 +233,5 @@ namespace Single_Reference.Deconvolution
         #endregion
 
         public static double ElasticNetRegularization(double value, double alpha) => 1.0 / 2.0 * (1 - alpha) * (value * value) + alpha * Math.Abs(value);
-
-
-
-
     }
 }

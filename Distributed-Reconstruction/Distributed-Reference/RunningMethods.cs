@@ -256,7 +256,7 @@ namespace Distributed_Reference
                 if (comm.Rank == 0)
                     PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
 
-                var integral = GreedyCD.CalcPSf2Integral(psfCut);
+                var integral = Common.PSF.CalcScan(psfCut);
                 var aMapLocal = new double[imgSection.YEnd, imgSection.XEnd];
                 for (int y = imgSection.Y; y < imgSection.YEnd; y++)
                     for (int x = imgSection.X; x < imgSection.XEnd; x++)
@@ -420,7 +420,7 @@ namespace Distributed_Reference
                 if(comm.Rank == 0)
                     PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
 
-                var integral = GreedyCD.CalcPSf2Integral(psfCut);
+                var integral = Common.PSF.CalcScan(psfCut);
                 var aMapLocal = new double[imgSection.YEnd, imgSection.XEnd];
                 for (int y = imgSection.Y; y < imgSection.YEnd; y++)
                     for (int x = imgSection.X; x < imgSection.XEnd; x++)

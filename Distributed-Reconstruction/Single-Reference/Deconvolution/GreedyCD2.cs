@@ -10,7 +10,7 @@ namespace Single_Reference.Deconvolution
     {
         public static bool DeconvolvePath(double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10,  int maxIteration = 100, double epsilon = 1e-4)
         {
-            var integral = GreedyCD.CalcPSf2Integral(psf);
+            var integral = Common.PSF.CalcScan(psf);
             var converged = false;
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
@@ -79,17 +79,6 @@ namespace Single_Reference.Deconvolution
             watch.Start();
             while (!converged & iter < maxIteration)
             {
-                /*
-                var shrinked = new double[b.GetLength(0), b.GetLength(1)];
-                for (int y = 0; y < b.GetLength(0); y++)
-                    for (int x = 0; x < b.GetLength(1); x++)
-                    {
-                        var old = xImage[y, x];
-                        var xTmp = old + b[y, x] / aMap[y, x];
-                        xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
-                        shrinked[y, x] = Math.Abs(xTmp - old);
-                    }*/
-
                 var yPixel = -1;
                 var xPixel = -1;
                 var xMax = 0.0;
@@ -102,7 +91,7 @@ namespace Single_Reference.Deconvolution
                         var currentA = aMap[y, x];
                         var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[y, x] / currentA;
-                        xTmp = GreedyCD.ShrinkPositive(xTmp, lambda * alpha) / (1 + lambda * (1 - alpha));
+                        xTmp = Common.ShrinkElasticNet(xTmp, lambda, alpha);
 
                         var xDiff = old - xTmp;
 

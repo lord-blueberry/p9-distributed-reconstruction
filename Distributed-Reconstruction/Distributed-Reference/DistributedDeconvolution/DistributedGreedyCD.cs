@@ -9,9 +9,7 @@ using Single_Reference;
 namespace Distributed_Reference.DistributedDeconvolution
 {
     class DistributedGreedyCD
-    {
-        private static double ShrinkElasticNet(double value, double lambda, double alpha) => Math.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
-
+    { 
         public static bool DeconvolvePath(Intracommunicator comm, Rectangle imgSection, Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10, int maxIteration = 100, double epsilon = 1e-4)
         {
             var integral = Common.PSF.CalcScan(psf);
@@ -99,7 +97,7 @@ namespace Distributed_Reference.DistributedDeconvolution
                         var currentA = aMap[yLocal, xLocal];
                         var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[yLocal, xLocal] / currentA;
-                        xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                        xTmp = Common.ShrinkElasticNet(xTmp, lambda, alpha);
 
                         var xDiff = old - xTmp;
                         if (Math.Abs(xDiff) > xMax)
