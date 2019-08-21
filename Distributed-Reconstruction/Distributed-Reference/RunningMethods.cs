@@ -139,7 +139,7 @@ namespace Distributed_Reference
                         var x = StitchX(comm, c, totalX);
                         FitsIO.Write(x, "xImage_" + cycle + ".fits");
                         FFT.Shift(x);
-                        modelGrid = FFT.GridFFT(x);
+                        modelGrid = FFT.Forward(x);
                     }
                     comm.Broadcast(ref modelGrid, 0);
 
@@ -301,7 +301,7 @@ namespace Distributed_Reference
                         var x = StitchX(comm, c, totalX);
                         FitsIO.Write(x, "xImage_" + cycle + ".fits");
                         FFT.Shift(x);
-                        modelGrid = FFT.GridFFT(x);
+                        modelGrid = FFT.Forward(x);
                     }
                     comm.Broadcast(ref modelGrid, 0);
 
@@ -466,7 +466,7 @@ namespace Distributed_Reference
                         var x = StitchX(comm, c, totalX);
                         FitsIO.Write(x, "xImage_" + cycle + ".fits");
                         FFT.Shift(x);
-                        modelGrid = FFT.GridFFT(x);
+                        modelGrid = FFT.Forward(x);
                     }
                     comm.Broadcast(ref modelGrid, 0);
 
@@ -486,7 +486,7 @@ namespace Distributed_Reference
             var psf_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
-                psf = FFT.GridIFFT(psf_total, c.VisibilitiesCount);
+                psf = FFT.Backward(psf_total, c.VisibilitiesCount);
                 FFT.Shift(psf);    
                 Single_Reference.FitsIO.Write(psf, "psf.fits");
                 Console.WriteLine("psf Written");
@@ -511,16 +511,16 @@ namespace Distributed_Reference
             var grid_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
-                var dirtyImage = FFT.GridIFFT(grid_total, c.VisibilitiesCount);
+                var dirtyImage = FFT.Backward(grid_total, c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
 
                 maxSideLobeLevel = maxSidelobe * DebugMethods.GetMax(dirtyImage);
                 //remove spheroidal
 
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
-                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
+                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
                 image = Common.Residuals.RemovePadding(bPadded, psfCut);
                 watchIdg.Stop();
             }
@@ -539,7 +539,7 @@ namespace Distributed_Reference
             var grid_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
-                var dirtyImage = FFT.GridIFFT(grid_total, c.VisibilitiesCount);
+                var dirtyImage = FFT.Backward(grid_total, c.VisibilitiesCount);
                 FFT.Shift(image);
                 watchIdg.Stop();
 

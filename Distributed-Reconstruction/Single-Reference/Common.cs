@@ -86,14 +86,14 @@ namespace Single_Reference
                     for (int x = 0; x < psf.GetLength(1); x++)
                         psfTmp[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
                 FFT.Shift(psfTmp);
-                var PsfCorr = FFT.FFTDebug(psfTmp, 1.0);
+                var PsfCorr = FFT.Forward(psfTmp, 1.0);
 
                 psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
                 SetPSFInWindow(psfTmp, image, psf, image.GetLength(0) / 2, image.GetLength(1) / 2);
-                var tmp = FFT.FFTDebug(psfTmp, 1.0);
+                var tmp = FFT.Forward(psfTmp, 1.0);
                 var tmp2 = Fourier2D.Multiply(tmp, PsfCorr);
 
-                var psf2 = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
+                var psf2 = FFT.Backward(tmp2, (double)(tmp2.GetLength(0) * tmp2.GetLength(1)));
 
                 return psf2;
             }
@@ -156,16 +156,6 @@ namespace Single_Reference
                         outputVis[i, j] = vis0[i, j] * vis1[i, j];
 
                 return outputVis;
-            }
-
-            public static void FFT()
-            {
-
-            }
-
-            public static void IFFT()
-            {
-
             }
         }
 

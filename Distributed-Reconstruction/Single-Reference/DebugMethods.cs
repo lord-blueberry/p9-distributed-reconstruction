@@ -84,9 +84,9 @@ namespace Single_Reference
                 Console.WriteLine("sideLobeLevel: " + sideLobe);
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
-                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
+                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
                 var b = Common.Residuals.RemovePadding(bPadded, psfCut);
                 var lambda = 0.8;
                 var alpha = 0.05;
@@ -161,9 +161,9 @@ namespace Single_Reference
                 Console.WriteLine("sideLobeLevel: " + sideLobe);
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
-                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
+                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
                 var b = Common.Residuals.RemovePadding(bPadded, psfCut);
                 var lambda = 100.0;
                 var alpha = 0.95;
@@ -218,7 +218,7 @@ namespace Single_Reference
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            var psf = FFT.Backward(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
             
             var psfCut = CutImg(psf);
@@ -238,7 +238,7 @@ namespace Single_Reference
                 //FORWARD
                 watchForward.Start();
                 var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
-                var dirtyImage = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
+                var dirtyImage = FFT.Backward(dirtyGrid, c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
                 FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
                 watchForward.Stop();
@@ -248,9 +248,9 @@ namespace Single_Reference
 
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
-                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
+                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
                 var b = Common.Residuals.RemovePadding(bPadded, psfCut);
                 var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5  , 0.2, 1000);
 
@@ -265,15 +265,15 @@ namespace Single_Reference
                 //BACKWARDS
                 watchBackwards.Start();
                 FFT.Shift(xImage);
-                var xGrid = FFT.GridFFT(xImage);
+                var xGrid = FFT.Forward(xImage);
                 FFT.Shift(xImage);
                 var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
 
-                var hello = FFT.FFTDebug(xImage, 1.0);
+                var hello = FFT.Forward(xImage, 1.0);
                 hello = Common.Fourier2D.Multiply(hello, psfGrid);
-                var hImg = FFT.IFFTDebug(hello, 128 * 128);
+                var hImg = FFT.Backward(hello, (double)(128 * 128));
                 //FFT.Shift(hImg);
                 FitsIO.Write(hImg, "modelDirty_FFT.fits");
 
@@ -307,7 +307,7 @@ namespace Single_Reference
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            var psf = FFT.Backward(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
 
             var psfCut = CutImg(psf);
@@ -327,7 +327,7 @@ namespace Single_Reference
                 //FORWARD
                 watchForward.Start();
                 var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
-                var dirtyImage = FFT.GridIFFT(dirtyGrid, c.VisibilitiesCount);
+                var dirtyImage = FFT.Backward(dirtyGrid, c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
                 FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
                 watchForward.Stop();
@@ -337,9 +337,9 @@ namespace Single_Reference
 
                 var PsfCorrelation = GreedyCD2.PadAndInvertPsf(psfCut, c.GridSize, c.GridSize);
                 var dirtyPadded = GreedyCD2.PadResiduals(dirtyImage, psfCut);
-                var DirtyPadded = FFT.FFTDebug(dirtyPadded, 1.0);
+                var DirtyPadded = FFT.Forward(dirtyPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(DirtyPadded, PsfCorrelation);
-                var bPadded = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
                 var b = Common.Residuals.RemovePadding(bPadded, psfCut);
 
                 //var converged = GPUDeconvolution.GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
@@ -356,15 +356,15 @@ namespace Single_Reference
                 //BACKWARDS
                 watchBackwards.Start();
                 FFT.Shift(xImage);
-                var xGrid = FFT.GridFFT(xImage);
+                var xGrid = FFT.Forward(xImage);
                 FFT.Shift(xImage);
                 var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
 
-                var hello = FFT.FFTDebug(xImage, 1.0);
+                var hello = FFT.Forward(xImage, 1.0);
                 hello = Common.Fourier2D.Multiply(hello, psfGrid);
-                var hImg = FFT.IFFTDebug(hello, 128 * 128);
+                var hImg = FFT.Backward(hello, (double)(128 * 128));
                 //FFT.Shift(hImg);
                 FitsIO.Write(hImg, "modelDirty_FFT.fits");
 
@@ -421,7 +421,7 @@ namespace Single_Reference
             FFT.Shift(psf);
 
             var psf2Grid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf2 = FFT.GridIFFT(psf2Grid, c.VisibilitiesCount);
+            var psf2 = FFT.Backward(psf2Grid, c.VisibilitiesCount);
             FFT.Shift(psf2);
             FitsIO.Write(psf2, "psf2222.fits");
             FitsIO.Write(psf, "psf");

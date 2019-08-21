@@ -193,10 +193,10 @@ namespace Single_Reference.Deconvolution
                     img2[i + yHalf, j + xHalf] = img[i, j];
                     psf2[i + yHalf, j + xHalf] = psf[i, j];
                 }
-            var IMG = FFT.FFTDebug(img2, 1.0);
-            var PSF = FFT.FFTDebug(psf2, 1.0);
+            var IMG = FFT.Forward(img2, 1.0);
+            var PSF = FFT.Forward(psf2, 1.0);
             var CONV = Common.Fourier2D.Multiply(IMG, PSF);
-            var conv = FFT.IFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
+            var conv = FFT.Backward(CONV, (double)(img2.GetLength(0) * img2.GetLength(1)));
             FFT.Shift(conv);
 
             var convOut = new double[img.GetLength(0), img.GetLength(1)];
@@ -246,10 +246,10 @@ namespace Single_Reference.Deconvolution
                     psfPadded[y + psfYOffset +1, x + psfXOffset+1] = psf[psf.GetLength(0) - y -1, psf.GetLength(1) - x -1];
 
             FFT.Shift(psfPadded);
-            var RES = FFT.FFTDebug(resPadded, 1.0);
-            var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
+            var RES = FFT.Forward(resPadded, 1.0);
+            var PSFPadded = FFT.Forward(psfPadded, 1.0);
             var B = Common.Fourier2D.Multiply(RES, PSFPadded);
-            var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+            var b = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
             
 
             double objective = 0;
@@ -300,9 +300,9 @@ namespace Single_Reference.Deconvolution
 
                     var debug = EstimateObjectiveImprovement2(resPadded, res, psf, yPixel, xPixel, xOld - xNew);
                     UpdateResiduals2(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
-                    RES = FFT.FFTDebug(resPadded, 1.0);
+                    RES = FFT.Forward(resPadded, 1.0);
                     B = Common.Fourier2D.Multiply(RES, PSFPadded);
-                    b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                    b = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
                     iter++;
                 }
             }

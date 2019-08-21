@@ -12,7 +12,7 @@ namespace Single_Reference.IDGSequential
         public static Complex[,] Grid(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
-            var ftgridded = FFT.SubgridFFT(c, gridded);
+            var ftgridded = SubgridFFT.Forward(c, gridded);
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
 
@@ -39,7 +39,7 @@ namespace Single_Reference.IDGSequential
         {
             FFT.Shift(grid);
             var ftGridded = Adder.SplitHack(c, metadata, grid);
-            var gridded = FFT.SubgridIFFT(c, ftGridded);
+            var gridded = SubgridFFT.Backward(c, ftGridded);
             var visibilities = Gridder.BackwardsHack(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
 
             return visibilities;
@@ -48,10 +48,10 @@ namespace Single_Reference.IDGSequential
         public static double[,] ToImage(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
-            var ftgridded = FFT.SubgridFFT(c, gridded);
+            var ftgridded = SubgridFFT.Forward(c, gridded);
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
-            var img = FFT.GridIFFT(grid, c.VisibilitiesCount);
+            var img = FFT.Backward(grid, c.VisibilitiesCount);
             FFT.Shift(img);
 
             //remove spheroidal from grid
@@ -79,10 +79,10 @@ namespace Single_Reference.IDGSequential
                         
             
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
-            var ftgridded = FFT.SubgridFFT(c, gridded);
+            var ftgridded = SubgridFFT.Forward(c, gridded);
             var grid = Adder.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
-            var psf = FFT.GridIFFT(grid, c.VisibilitiesCount);
+            var psf = FFT.Backward(grid, c.VisibilitiesCount);
             FFT.Shift(psf);
 
             //remove spheroidal from grid
@@ -101,12 +101,12 @@ namespace Single_Reference.IDGSequential
                     image[i, j] = image[i, j] / c.GridSpheroidal[i, j];
 
             FFT.Shift(image);
-            var grid = FFT.GridFFT(image);
+            var grid = FFT.Forward(image);
             FFT.Shift(image);
 
             FFT.Shift(grid);
             var ftGridded = Adder.SplitHack(c, metadata, grid);
-            var gridded = FFT.SubgridIFFT(c, ftGridded);
+            var gridded = SubgridFFT.Backward(c, ftGridded);
             var visibilities = Gridder.BackwardsHack(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
 
             return visibilities;
@@ -139,7 +139,7 @@ namespace Single_Reference.IDGSequential
         public static Complex[,,] GridW(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
-            var ftgridded = FFT.SubgridFFT(c, gridded);
+            var ftgridded = SubgridFFT.Forward(c, gridded);
             var grid = AdderWStack.AddHack(c, metadata, ftgridded);
             FFT.Shift(grid);
 
@@ -150,7 +150,7 @@ namespace Single_Reference.IDGSequential
         {
             FFT.Shift(grid);
             var ftGridded = AdderWStack.SplitHack(c, metadata, grid);
-            var gridded = FFT.SubgridIFFT(c, ftGridded);
+            var gridded = SubgridFFT.Backward(c, ftGridded);
             var visibilities = Gridder.BackwardsHack(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
 
             return visibilities;

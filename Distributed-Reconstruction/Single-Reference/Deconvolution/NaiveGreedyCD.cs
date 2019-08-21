@@ -30,7 +30,7 @@ namespace Single_Reference.Deconvolution
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf = FFT.GridIFFT(psfGrid, c.VisibilitiesCount);
+            var psf = FFT.Backward(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
             var maxPsf = psf[gridSize / 2, gridSize / 2];
             for (int i = 0; i < psf.GetLength(0); i++)
@@ -235,10 +235,10 @@ namespace Single_Reference.Deconvolution
                     img2[i + yHalf, j + xHalf] = img[i, j];
                     psf2[i + yHalf, j + xHalf] = psf[i, j];
                 }
-            var IMG = FFT.FFTDebug(img2, 1.0);
-            var PSF = FFT.FFTDebug(psf2, 1.0);
+            var IMG = FFT.Forward(img2, 1.0);
+            var PSF = FFT.Forward(psf2, 1.0);
             var CONV = Common.Fourier2D.Multiply(IMG, PSF);
-            var conv = FFT.IFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
+            var conv = FFT.Backward(CONV, (double)(img2.GetLength(0) * img2.GetLength(1)));
             FFT.Shift(conv);
 
             var convOut = new double[img.GetLength(0), img.GetLength(1)];
@@ -263,10 +263,10 @@ namespace Single_Reference.Deconvolution
                     img2[i + yHalf, j + xHalf] = img[i, j];
                     psf2[i + yHalf+1, j + xHalf +1] = psf[psf.GetLength(0) - i - 1, psf.GetLength(1) - j -1];
                 }
-            var IMG = FFT.FFTDebug(img2, 1.0);
-            var PSF = FFT.FFTDebug(psf2, 1.0);
+            var IMG = FFT.Forward(img2, 1.0);
+            var PSF = FFT.Forward(psf2, 1.0);
             var CONV = Common.Fourier2D.Multiply(IMG, PSF);
-            var conv = FFT.IFFTDebug(CONV, img2.GetLength(0) * img2.GetLength(1));
+            var conv = FFT.Backward(CONV, (double)(img2.GetLength(0) * img2.GetLength(1)));
             FFT.Shift(conv);
 
             var convOut = new double[img.GetLength(0), img.GetLength(1)];
@@ -281,10 +281,10 @@ namespace Single_Reference.Deconvolution
 
         public static double[,] ConvolveFFT(double[,] img, double[,] psf)
         {
-            var IMG = FFT.FFTDebug(img, 1.0);
-            var PSF = FFT.FFTDebug(psf, 1.0);
+            var IMG = FFT.Forward(img, 1.0);
+            var PSF = FFT.Forward(psf, 1.0);
             var CONV = Common.Fourier2D.Multiply(IMG, PSF);
-            var conv = FFT.IFFTDebug(CONV, img.GetLength(0) * img.GetLength(1));
+            var conv = FFT.Backward(CONV, (double)(img.GetLength(0) * img.GetLength(1)));
             FFT.Shift(conv);
             return conv;
         }

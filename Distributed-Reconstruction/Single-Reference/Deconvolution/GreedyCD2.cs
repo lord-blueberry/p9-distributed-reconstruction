@@ -59,15 +59,15 @@ namespace Single_Reference.Deconvolution
                 for (int x = 0; x < psf.GetLength(1); x++)
                     psfTmp[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
             FFT.Shift(psfTmp);
-            var PsfCorr = FFT.FFTDebug(psfTmp, 1.0);
+            var PsfCorr = FFT.Forward(psfTmp, 1.0);
 
             psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
             Common.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
-            var tmp = FFT.FFTDebug(psfTmp, 1.0);
+            var tmp = FFT.Forward(psfTmp, 1.0);
             var tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
 
             //cached bUpdate. When the PSF is not masked
-            var bUpdateCache = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
+            var bUpdateCache = FFT.Backward(tmp2, (double)(tmp2.GetLength(0) * tmp2.GetLength(1)));
 
             //masked psf
             var maskedPsf = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
@@ -135,7 +135,7 @@ namespace Single_Reference.Deconvolution
 
                         /*CommonMethods.PSF.SetPSFInWindow(maskedPsf, xImage, psf, yPixel, xPixel);
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
-                        tmp2 = IDG.Multiply(tmp, PsfCorr);
+                        tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
                         bUpdateMasked = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
                         UpdateB(b, bUpdateMasked, imageSection, yPixel, xPixel, xOld - xNew);*/
                         UpdateB(b, bUpdateCache, imageSection, yPixel, xPixel, xOld - xNew);
@@ -177,7 +177,7 @@ namespace Single_Reference.Deconvolution
                 for (int x = 0; x < psf.GetLength(1); x++)
                     psfPadded[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
             FFT.Shift(psfPadded);
-            var PSFPadded = FFT.FFTDebug(psfPadded, 1.0);
+            var PSFPadded = FFT.Forward(psfPadded, 1.0);
 
             return PSFPadded;
         }

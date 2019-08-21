@@ -68,15 +68,15 @@ namespace Distributed_Reference.DistributedDeconvolution
                 for (int x = 0; x < psf.GetLength(1); x++)
                     psfTmp[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
             FFT.Shift(psfTmp);
-            var PsfCorr = FFT.FFTDebug(psfTmp, 1.0);
+            var PsfCorr = FFT.Forward(psfTmp, 1.0);
 
             psfTmp = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
             SetPsf(psfTmp, totalSize, psf, totalSize.YEnd / 2, totalSize.XEnd / 2);
-            var tmp = FFT.FFTDebug(psfTmp, 1.0);
-            var tmp2 = IDG.Multiply(tmp, PsfCorr);
+            var tmp = FFT.Forward(psfTmp, 1.0);
+            var tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
 
             //cached bUpdate. When the PSF is not masked
-            var bUpdateCache = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
+            var bUpdateCache = FFT.Backward(tmp2, (double)(tmp2.GetLength(0) * tmp2.GetLength(1)));
 
             //masked psf update. When the psf is masked by the image borders
             var maskedPsf = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
@@ -143,7 +143,7 @@ namespace Distributed_Reference.DistributedDeconvolution
                         /*
                         SetPsf(maskedPsf, totalSize, psf, maxCandidate.YPixel, maxCandidate.XPixel);
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
-                        tmp2 = IDG.Multiply(tmp, PsfCorr);
+                        tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
                         bUpdateMasked = FFT.IFFTDebug(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
                         UpdateB(b, bUpdateMasked, imgSection, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff);*/
                         UpdateB(b, bUpdateCache, imgSection, maxCandidate.YPixel, maxCandidate.XPixel, maxCandidate.XDiff);

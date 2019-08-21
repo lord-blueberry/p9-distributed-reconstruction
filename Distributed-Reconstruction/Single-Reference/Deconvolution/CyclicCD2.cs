@@ -26,14 +26,14 @@ namespace Single_Reference.Deconvolution
                 for (int x = 0; x < psf.GetLength(1); x++)
                     psfPadded[y + psfYOffset + 1, x + psfXOffset + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
             FFT.Shift(psfPadded);
-            var PSFPaddedCorr = FFT.FFTDebug(psfPadded, 1.0);
+            var PSFPaddedCorr = FFT.Forward(psfPadded, 1.0);
 
             var psfPaddedConv = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
             for (int y = 0; y < psf.GetLength(0); y++)
                 for (int x = 0; x < psf.GetLength(1); x++)
                     psfPaddedConv[y + psfYOffset + 1, x + psfXOffset + 1] = psf[y, x];
             FFT.Shift(psfPaddedConv);
-            var PSFPaddedConv = FFT.FFTDebug(psfPaddedConv, 1.0);
+            var PSFPaddedConv = FFT.Forward(psfPaddedConv, 1.0);
 
             DeconvolveGreedy(xImage, resPadded, res, psf, PSFPaddedCorr, integral, lambda, alpha, 100);
 
@@ -43,9 +43,9 @@ namespace Single_Reference.Deconvolution
             double epsilon = 1e-6;
             while (!converged & iter < maxIteration)
             {
-                var RES = FFT.FFTDebug(resPadded, 1.0);
+                var RES = FFT.Forward(resPadded, 1.0);
                 var B = Common.Fourier2D.Multiply(RES, PSFPaddedCorr);
-                var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                var b = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
 
                 var activeSet = new List<Tuple<int, int>>();
                 for (int y = 0; y < xImage.GetLength(0); y++)
@@ -111,18 +111,18 @@ namespace Single_Reference.Deconvolution
 
                         if(i % 50 == 0)
                         {
-                            var Xdiff = FFT.FFTDebug(xCummulatedDiff, 1.0);
+                            var Xdiff = FFT.Forward(xCummulatedDiff, 1.0);
                             var RESdiff = Common.Fourier2D.Multiply(Xdiff, PSFPaddedConv);
-                            var resDiff = FFT.IFFTDebug(RESdiff, RESdiff.GetLength(0) * RESdiff.GetLength(1));
+                            var resDiff = FFT.Backward(RESdiff, (double)(RESdiff.GetLength(0) * RESdiff.GetLength(1)));
                             
                             for (int y2 = 0; y2 < res.GetLength(0); y2++)
                                 for (int x2 = 0; x2 < res.GetLength(1); x2++)
                                     resPadded[y2 + yPsfHalf, x2 + xPsfHalf] += resDiff[y2 + yPsfHalf, x2 + xPsfHalf];
 
                             xCummulatedDiff = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
-                            RES = FFT.FFTDebug(resPadded, 1.0);
+                            RES = FFT.Forward(resPadded, 1.0);
                             B = Common.Fourier2D.Multiply(RES, PSFPaddedCorr);
-                            b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                            b = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
 
                             var objective2 = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0,0);
                             objective2 += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
@@ -130,18 +130,18 @@ namespace Single_Reference.Deconvolution
                         }
                         i++;
                     }
-                    var Xdiff2 = FFT.FFTDebug(xCummulatedDiff, 1.0);
+                    var Xdiff2 = FFT.Forward(xCummulatedDiff, 1.0);
                     var RESdiff2 = Common.Fourier2D.Multiply(Xdiff2, PSFPaddedConv);
-                    var resDiff2 = FFT.IFFTDebug(RESdiff2, RESdiff2.GetLength(0) * RESdiff2.GetLength(1));
+                    var resDiff2 = FFT.Backward(RESdiff2, (double)(RESdiff2.GetLength(0) * RESdiff2.GetLength(1)));
 
                     for (int y2 = 0; y2 < res.GetLength(0); y2++)
                         for (int x2 = 0; x2 < res.GetLength(1); x2++)
                             resPadded[y2 + yPsfHalf, x2 + xPsfHalf] += resDiff2[y2 + yPsfHalf, x2 + xPsfHalf];
 
                     xCummulatedDiff = new double[res.GetLength(0) + psf.GetLength(0), res.GetLength(1) + psf.GetLength(1)];
-                    RES = FFT.FFTDebug(resPadded, 1.0);
+                    RES = FFT.Forward(resPadded, 1.0);
                     B = Common.Fourier2D.Multiply(RES, PSFPaddedCorr);
-                    b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                    b = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
 
                     var objective3 = GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0,0);
                     objective3 += GreedyCD.CalcDataObjective(resPadded, res, yPsfHalf, yPsfHalf);
@@ -188,9 +188,9 @@ namespace Single_Reference.Deconvolution
                         activeSet.Remove(pixel);
                 }
 
-                RES = FFT.FFTDebug(resPadded, 1.0);
+                RES = FFT.Forward(resPadded, 1.0);
                 B = Common.Fourier2D.Multiply(RES, PSFPaddedCorr);
-                b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                b = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
 
                 iter++;
             }
@@ -208,9 +208,9 @@ namespace Single_Reference.Deconvolution
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
 
-            var RES = FFT.FFTDebug(resPadded, 1.0);
+            var RES = FFT.Forward(resPadded, 1.0);
             var B = Common.Fourier2D.Multiply(RES, PSFPadded);
-            var b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+            var b = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
             
             double objective = 0;
             objective += GreedyCD.CalcElasticNetObjective(xImage, res, integral, lambda, alpha, 0, 0);
@@ -252,9 +252,9 @@ namespace Single_Reference.Deconvolution
                     xImage[yPixel, xPixel] = xNew;
                     Console.WriteLine(iter + "\t" + Math.Abs(xOld - xNew) + "\t" + yPixel + "\t" + xPixel);
                     GreedyCD.UpdateResiduals2(resPadded, res, psf, yPixel, xPixel, xOld - xNew, yPsfHalf, xPsfHalf);
-                    RES = FFT.FFTDebug(resPadded, 1.0);
+                    RES = FFT.Forward(resPadded, 1.0);
                     B = Common.Fourier2D.Multiply(RES, PSFPadded);
-                    b = FFT.IFFTDebug(B, B.GetLength(0) * B.GetLength(1));
+                    b = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
                     iter++;
                 }
             }
