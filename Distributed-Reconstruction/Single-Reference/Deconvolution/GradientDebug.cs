@@ -43,7 +43,7 @@ namespace Single_Reference.Deconvolution
             Common.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
             var tmp = FFT.Forward(psfTmp, 1.0);
             var tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
-
+            var pixelAcces = new double[xImage.GetLength(0), xImage.GetLength(1)];
 
 
             while (!converged & iter < maxIteration)
@@ -64,6 +64,7 @@ namespace Single_Reference.Deconvolution
                     var old = xImage[yPixel, xPixel];
                     var xDiffShrink = Common.ShrinkElasticNet(old + xDiffPixel, lambda, alpha);
                     xDiff[yPixel, xPixel] = xDiffShrink;
+                    pixelAcces[yPixel, xPixel] += 1;
                 }
 
                 //update B-map
@@ -95,14 +96,13 @@ namespace Single_Reference.Deconvolution
                     }
 
                     Console.WriteLine("iter " + iter);
-
-
                 }
                 
                 iter++;
                 
             }
 
+            FitsIO.Write(pixelAcces, "pixelAccess.fits");
             return converged;
         }
 
