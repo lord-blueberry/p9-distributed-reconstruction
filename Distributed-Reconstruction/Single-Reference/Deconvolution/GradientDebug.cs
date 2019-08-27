@@ -20,16 +20,31 @@ namespace Single_Reference.Deconvolution
             var xDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var imageSection = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
 
-            var rand = new Random(123);
+            var rand = new Random(33);
             var iter = 0;
-            var theta = 2; //theta, also number of processors.
+            var theta = 1; //2; //theta, also number of processors.
             var degreeOfSep = CountNonZero(psf);
             var blockCount = xImage.Length;
             var beta = 1.0 + (degreeOfSep - 1) * (theta - 1) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling
+                                                                                                  /*
+                                                                                                   * Theta-nice sampling := sample theta pixels uniformly at random. I.e. the pixel 
+                                                                                                   */
 
-            /*
-             * Theta-nice sampling := sample theta pixels uniformly at random. I.e. the pixel 
-             */
+            var yPsfHalf = psf.GetLength(0) / 2;
+            var xPsfHalf = psf.GetLength(1) / 2;
+            var psfTmp = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
+            for (int y = 0; y < psf.GetLength(0); y++)
+                for (int x = 0; x < psf.GetLength(1); x++)
+                    psfTmp[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
+            FFT.Shift(psfTmp);
+            var PsfCorr = FFT.Forward(psfTmp, 1.0);
+
+            psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
+            Common.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
+            var tmp = FFT.Forward(psfTmp, 1.0);
+            var tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
+
+
 
             while (!converged & iter < maxIteration)
             {
@@ -37,31 +52,55 @@ namespace Single_Reference.Deconvolution
                 var samples = CreateSamples(xImage.Length, theta, rand);
                 for (int i = 0; i < samples.Length; i++)
                 {
-                    var y = samples[i] / xImage.GetLength(1);
-                    var x = samples[i] % xImage.GetLength(1);
+                    var yPixel = samples[i] / xImage.GetLength(1);
+                    var xPixel = samples[i] % xImage.GetLength(1);
 
                     //update with E.S.O
-                    var xDiffPixel = 2.0 * bMap[y, x] / (beta * aMap[y, x]);
+                    //var xDiffPixel = 2.0 * bMap[y, x] / (beta * aMap[y, x]);
 
-                    var old = xImage[y, x];
+                    //update without E.S.O
+                    var xDiffPixel = bMap[yPixel, xPixel] / (aMap[yPixel, xPixel]);
+
+                    var old = xImage[yPixel, xPixel];
                     var xDiffShrink = Common.ShrinkElasticNet(old + xDiffPixel, lambda, alpha);
-                    xDiff[y, x] = xDiffShrink;
+                    xDiff[yPixel, xPixel] = xDiffShrink;
                 }
 
                 //update B-map
                 //reset xDiff
                 for (int i = 0; i < samples.Length; i++)
                 {
-                    var y = samples[i] / xImage.GetLength(1);
-                    var x = samples[i] % xImage.GetLength(1);
+                    var yPixel = samples[i] / xImage.GetLength(1);
+                    var xPixel = samples[i] % xImage.GetLength(1);
 
-                    var bla = xDiff[y, x];
-                    UpdateB(bMap, psf2, imageSection, y, x, -xDiff[y, x]);
-                    xImage[y, x] += xDiff[y, x];
-                    xDiff[y, x] = 0;
+                    var bla = xDiff[yPixel, xPixel];
+                    if( bla != 0.0)
+                    {
+                        if (yPixel - yPsfHalf >= 0 & yPixel + yPsfHalf < xImage.GetLength(0) & xPixel - xPsfHalf >= 0 & xPixel + xPsfHalf < xImage.GetLength(0))
+                        {
+                            UpdateB(bMap, psf2, imageSection, yPixel, xPixel, -xDiff[yPixel, xPixel]);
+                        }
+                        else
+                        {
+                            Common.PSF.SetPSFInWindow(psfTmp, xImage, psf, yPixel, xPixel);
+                            tmp = FFT.Forward(psfTmp, 1.0);
+                            tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
+                            var bUpdateMasked = FFT.Backward(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
+                            UpdateB(bMap, bUpdateMasked, imageSection, yPixel, xPixel, -xDiff[yPixel, xPixel]);
+                        }
+
+                        xImage[yPixel, xPixel] += xDiff[yPixel, xPixel];
+                        xDiff[yPixel, xPixel] = 0;
+                        Console.WriteLine("iter " + iter + " y " + yPixel + " x " + xPixel + " val " + bla);
+                    }
+
+                    Console.WriteLine("iter " + iter);
+
+
                 }
                 
                 iter++;
+                
             }
 
             return converged;

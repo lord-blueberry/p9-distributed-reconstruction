@@ -309,7 +309,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 1; cycle++)
+            for (int cycle = 0; cycle < 2; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -324,7 +324,7 @@ namespace Single_Reference
 
                 var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                var converged = GradientDebug.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10);
+                var converged = GradientDebug.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10000);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -342,12 +342,6 @@ namespace Single_Reference
                 var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
-
-                var hello = FFT.Forward(xImage, 1.0);
-                hello = Common.Fourier2D.Multiply(hello, psfGrid);
-                var hImg = FFT.Backward(hello, (double)(128 * 128));
-                //FFT.Shift(hImg);
-                FitsIO.Write(hImg, "modelDirty_FFT.fits");
 
                 var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
                 FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
