@@ -240,7 +240,7 @@ namespace Single_Reference
 
                 var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5  , 0.2, 1000);
+                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10000);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -258,12 +258,6 @@ namespace Single_Reference
                 var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
-
-                var hello = FFT.Forward(xImage, 1.0);
-                hello = Common.Fourier2D.Multiply(hello, psfGrid);
-                var hImg = FFT.Backward(hello, (double)(128 * 128));
-                //FFT.Shift(hImg);
-                FitsIO.Write(hImg, "modelDirty_FFT.fits");
 
                 var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
                 FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
@@ -301,7 +295,7 @@ namespace Single_Reference
             var avgSidelobe = CalcAvgSidelobe(psf);
 
             var psfCut = CutImg(psf);
-            MaskPixels(psfCut, avgSidelobe);
+            //MaskPixels(psfCut, avgSidelobe);
             
 
             FitsIO.Write(psf, "psf.fits");
@@ -330,14 +324,14 @@ namespace Single_Reference
 
                 var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.2, 1000);
+                var converged = GradientDebug.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");
                 FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
-                FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
+                FitsIO.Write(b, "bMap_" + cycle + ".fits");
                 watchDeconv.Stop();
 
                 //BACKWARDS

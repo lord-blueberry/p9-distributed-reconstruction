@@ -25,7 +25,7 @@ namespace Single_Reference.Deconvolution
             var theta = 2; //theta, also number of processors.
             var degreeOfSep = CountNonZero(psf);
             var blockCount = xImage.Length;
-            var beta = 1.0 + (degreeOfSep - 1) * (theta - 1) / (Math.Max(1, blockCount - 1)); //arises from E.S.O of theta-nice sampling
+            var beta = 1.0 + (degreeOfSep - 1) * (theta - 1) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling
 
             /*
              * Theta-nice sampling := sample theta pixels uniformly at random. I.e. the pixel 
@@ -55,14 +55,14 @@ namespace Single_Reference.Deconvolution
                     var y = samples[i] / xImage.GetLength(1);
                     var x = samples[i] % xImage.GetLength(1);
 
+                    var bla = xDiff[y, x];
                     UpdateB(bMap, psf2, imageSection, y, x, -xDiff[y, x]);
+                    xImage[y, x] += xDiff[y, x];
                     xDiff[y, x] = 0;
                 }
                 
                 iter++;
             }
-
-
 
             return converged;
         }
@@ -102,7 +102,7 @@ namespace Single_Reference.Deconvolution
             var count = 0;
             for (int y = 0; y < psf.GetLength(0); y++)
                 for (int x = 0; x < psf.GetLength(1); x++)
-                    if (psf[y, x] == 0.0)
+                    if (psf[y, x] != 0.0)
                         count++;
             return count;
         }

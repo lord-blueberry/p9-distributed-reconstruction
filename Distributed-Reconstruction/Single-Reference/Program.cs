@@ -6,8 +6,9 @@ namespace Single_Reference
     {
         static void Main()
         {
-            DebugMethods.DebugSimulatedPCDM();
             //DebugMethods.DebugSimulatedGreedy2();
+            DebugMethods.DebugSimulatedPCDM();
+            
             //DebugMethods.DebugILGPU();
 
             //DebugMethods.DebugSimulatedMixed();
