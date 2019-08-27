@@ -67,7 +67,7 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
             var psfCut = CutImg(psf, 2);
             FitsIO.Write(psfCut, "psfCut.fits");
-            var maxSidelobe = Common.PSF.CalculateMaxSidelobe(psf);
+            var maxSidelobe = Common.PSF.CalcMaxSidelobe(psf);
             var psfCorrelated = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
 
             var xImage = new double[gridSize, gridSize];
@@ -140,7 +140,7 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
             var psfCut = CutImg(psf, 2);
             FitsIO.Write(psfCut, "psfCut.fits");
-            var maxSidelobe = Common.PSF.CalculateMaxSidelobe(psf);
+            var maxSidelobe = Common.PSF.CalcMaxSidelobe(psf);
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
@@ -194,11 +194,11 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 1024;
+            int gridSize = 256;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 1024;
-            double cellSize = 0.25 / 3600.0 * PI / 180.0;
+            double cellSize = 1.0 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
             var watchTotal = new Stopwatch();
@@ -241,6 +241,96 @@ namespace Single_Reference
                 var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5  , 0.2, 1000);
+
+                if (converged)
+                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
+                else
+                    Console.WriteLine("-------------------------------not converged----------------------");
+                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
+                FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
+                watchDeconv.Stop();
+
+                //BACKWARDS
+                watchBackwards.Start();
+                FFT.Shift(xImage);
+                var xGrid = FFT.Forward(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                watchBackwards.Stop();
+
+                var hello = FFT.Forward(xImage, 1.0);
+                hello = Common.Fourier2D.Multiply(hello, psfGrid);
+                var hImg = FFT.Backward(hello, (double)(128 * 128));
+                //FFT.Shift(hImg);
+                FitsIO.Write(hImg, "modelDirty_FFT.fits");
+
+                var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
+                FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
+            }
+        }
+
+        public static void DebugSimulatedPCDM()
+        {
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+            double norm = 2.0;
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            var visibilitiesCount = visibilities.Length;
+            int gridSize = 256;
+            int subgridsize = 8;
+            int kernelSize = 4;
+            int max_nr_timesteps = 1024;
+            double cellSize = 1.0 / 3600.0 * PI / 180.0;
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+
+            var watchTotal = new Stopwatch();
+            var watchForward = new Stopwatch();
+            var watchBackwards = new Stopwatch();
+            var watchDeconv = new Stopwatch();
+
+            watchTotal.Start();
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf = FFT.Backward(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+            var maxSidelobe = Common.PSF.CalcMaxSidelobe(psf);
+            var avgSidelobe = CalcAvgSidelobe(psf);
+
+            var psfCut = CutImg(psf);
+            MaskPixels(psfCut, avgSidelobe);
+            
+
+            FitsIO.Write(psf, "psf.fits");
+            FitsIO.Write(psfCut, "psfCut.fits");
+
+            var xImage = new double[gridSize, gridSize];
+            var residualVis = visibilities;
+            /*var truth = new double[gridSize, gridSize];
+            truth[30, 30] = 1.0;
+            truth[35, 36] = 1.5;
+            var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
+            visibilities = truthVis;
+            var residualVis = truthVis;*/
+            for (int cycle = 0; cycle < 1; cycle++)
+            {
+                //FORWARD
+                watchForward.Start();
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
+                var dirtyImage = FFT.Backward(dirtyGrid, c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
+                watchForward.Stop();
+
+                //DECONVOLVE
+                watchDeconv.Start();
+
+                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
+                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.2, 1000);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -442,6 +532,39 @@ namespace Single_Reference
                 for (int x = 0; x < image.GetLength(1); x++)
                     max = Math.Max(max, image[y, x]);
             return max;
+        }
+
+        public static double CalcAvgSidelobe(double[,] fullPsf, int cutFactor = 2)
+        {
+            var yOffset = fullPsf.GetLength(0) / 2 - (fullPsf.GetLength(0) / cutFactor) / 2;
+            var xOffset = fullPsf.GetLength(1) / 2 - (fullPsf.GetLength(1) / cutFactor) / 2;
+
+            double output = 0.0;
+            int count = 0;
+            for (int y = 0; y < fullPsf.GetLength(0); y++)
+                for (int x = 0; x < fullPsf.GetLength(1); x++)
+                    if (!(y >= yOffset & y < (yOffset + fullPsf.GetLength(0) / cutFactor)) | !(x >= xOffset & x < (xOffset + fullPsf.GetLength(1) / cutFactor)))
+                    {
+                        output += Math.Abs(fullPsf[y, x]);
+                        count++;
+                    }
+
+            return output / count;
+        }
+
+        public static int MaskPixels(double[,] image, double cutOff)
+        {
+            var zeroCount = 0;
+            for(int y = 0; y < image.GetLength(0);y++)
+                for(int x = 0; x < image.GetLength(1);x++)
+                    if(Math.Abs(image[y,x]) < cutOff)
+                    {
+                        image[y, x] = 0.0;
+                        zeroCount++;
+                    } 
+                
+
+            return zeroCount;
         }
         #endregion
 

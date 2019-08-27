@@ -137,7 +137,7 @@ namespace Single_Reference
             /// <param name="fullPsf"></param>
             /// <param name="cutFactor"></param>
             /// <returns></returns>
-            public static double CalculateMaxSidelobe(double[,] fullPsf, int cutFactor = 2)
+            public static double CalcMaxSidelobe(double[,] fullPsf, int cutFactor = 2)
             {
                 var yOffset = fullPsf.GetLength(0) / 2 - (fullPsf.GetLength(0) / cutFactor) / 2;
                 var xOffset = fullPsf.GetLength(1) / 2 - (fullPsf.GetLength(1) / cutFactor) / 2;

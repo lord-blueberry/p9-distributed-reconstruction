@@ -99,7 +99,7 @@ namespace Distributed_Reference
                 var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
                 var psf = CalculatePSF(comm, c, metadata, uvw, flags, frequencies);
                 var psfCut = CutImg(psf);
-                var maxSidelobe = Common.PSF.CalculateMaxSidelobe(psf);
+                var maxSidelobe = Common.PSF.CalcMaxSidelobe(psf);
                 psf = null;
                 Complex[,] PsfCorrelation = null;
                 if (comm.Rank == 0)

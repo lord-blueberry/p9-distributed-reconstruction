@@ -43,7 +43,7 @@ namespace Distributed_Reference
             var psf = CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies);
             var psfCut = CutImg(psf);
             Complex[,] PsfCorrelation = null;
-            var maxSidelobe = Common.PSF.CalculateMaxSidelobe(psf);
+            var maxSidelobe = Common.PSF.CalcMaxSidelobe(psf);
             
             if (comm.Rank == 0)
             {

@@ -6,8 +6,9 @@ namespace Single_Reference
     {
         static void Main()
         {
+            DebugMethods.DebugSimulatedPCDM();
             //DebugMethods.DebugSimulatedGreedy2();
-            DebugMethods.DebugILGPU();
+            //DebugMethods.DebugILGPU();
 
             //DebugMethods.DebugSimulatedMixed();
             //Deconvolution.NaiveGreedyCD.Run();

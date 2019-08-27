@@ -120,7 +120,6 @@ namespace Single_Reference.Deconvolution
                     }
                     else
                     {
-
                         /*CommonMethods.PSF.SetPSFInWindow(maskedPsf, xImage, psf, yPixel, xPixel);
                         tmp = FFT.FFTDebug(maskedPsf, 1.0);
                         tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
@@ -136,7 +135,6 @@ namespace Single_Reference.Deconvolution
                         //FitsIO.Write(b, "candidatesGreedy2.fits");
                         //FitsIO.Write(xImage, "xImageGreedy2.fits");
                     }
-
                 }
             }
             watch.Stop();
