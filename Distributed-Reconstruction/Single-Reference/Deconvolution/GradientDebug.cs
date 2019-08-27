@@ -16,40 +16,50 @@ namespace Single_Reference.Deconvolution
         {
             bool converged = false;
             var aMap = Common.PSF.CalcAMap(xImage, psf);
+            var psf2 = Common.PSF.CalcPSFSquared(xImage, psf);
             var xDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
+            var imageSection = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
+
             var rand = new Random(123);
             var iter = 0;
-            var probPerPixel = 1.0 / (double)xImage.Length;
-            var beta = (1.0 - probPerPixel) / probPerPixel;   //arises from E.S.O of theta-nice sampling
+            var theta = 2; //theta, also number of processors.
+            var degreeOfSep = CountNonZero(psf);
+            var blockCount = xImage.Length;
+            var beta = 1.0 + (degreeOfSep - 1) * (theta - 1) / (Math.Max(1, blockCount - 1)); //arises from E.S.O of theta-nice sampling
 
             /*
-             * Theta-nice sampling := sample theta pixels uniformly at random.
+             * Theta-nice sampling := sample theta pixels uniformly at random. I.e. the pixel 
              */
 
             while (!converged & iter < maxIteration)
             {
-                int currentPixels = 0;
-                for (int y = 0; y < xImage.GetLength(0); y++)
-                    for(int x = 0; x < xImage.GetLength(1); x++)
-                    {
-                        //uniformly sampled
-                        
-                        if (rand.NextDouble() < probPerPixel)
-                        {
-                            //update with E.S.O
-                            var xDiffPixel = 2.0*bMap[y, x] / (aMap[y, x] * vI);
-                            var old = xImage[y, x];
-                            var xDiffShrink = Common.ShrinkElasticNet(old + xDiffPixel, lambda, alpha);
-                            xDiff[y, x] = xDiffShrink;
-                        }
-                    }
+                // create sampling
+                var samples = CreateSamples(xImage.Length, theta, rand);
+                for (int i = 0; i < samples.Length; i++)
+                {
+                    var y = samples[i] / xImage.GetLength(1);
+                    var x = samples[i] % xImage.GetLength(1);
+
+                    //update with E.S.O
+                    var xDiffPixel = 2.0 * bMap[y, x] / (beta * aMap[y, x]);
+
+                    var old = xImage[y, x];
+                    var xDiffShrink = Common.ShrinkElasticNet(old + xDiffPixel, lambda, alpha);
+                    xDiff[y, x] = xDiffShrink;
+                }
 
                 //update B-map
+                //reset xDiff
+                for (int i = 0; i < samples.Length; i++)
+                {
+                    var y = samples[i] / xImage.GetLength(1);
+                    var x = samples[i] % xImage.GetLength(1);
 
-                for (int y = 0; y < xDiff.GetLength(0); y++)
-                    for (int x = 0; x < xDiff.GetLength(1); x++)
-                        xDiff[y, x] = 0;
-
+                    UpdateB(bMap, psf2, imageSection, y, x, -xDiff[y, x]);
+                    xDiff[y, x] = 0;
+                }
+                
+                iter++;
             }
 
 
@@ -75,6 +85,26 @@ namespace Single_Reference.Deconvolution
                     var xBUpdate = j + xBHalf - xPixel;
                     b[yLocal, xLocal] += bUpdate[yBUpdate, xBUpdate] * xDiff;
                 }
+        }
+
+        private static int[] CreateSamples(int length, int sampleCount, Random rand)
+        {
+            var samples = new HashSet<int>(sampleCount);
+            while(samples.Count < sampleCount)
+                samples.Add(rand.Next(0, length));
+            int[] output = new int[samples.Count];
+            samples.CopyTo(output);
+            return output;
+        }
+
+        private static int CountNonZero(double[,] psf)
+        {
+            var count = 0;
+            for (int y = 0; y < psf.GetLength(0); y++)
+                for (int x = 0; x < psf.GetLength(1); x++)
+                    if (psf[y, x] == 0.0)
+                        count++;
+            return count;
         }
 
         #region old stuff
