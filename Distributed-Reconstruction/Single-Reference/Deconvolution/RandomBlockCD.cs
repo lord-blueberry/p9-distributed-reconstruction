@@ -11,29 +11,49 @@ namespace Single_Reference.Deconvolution
     public class RandomBlockCD
     {
 
-
         public static bool Deconvolve(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
         {
             var yBlockSize = 16;
             var xBlockSize = 16;
-            //var bMap = 
-            //correlate residuals with psf
+            var psfCorrelated = Common.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0) - psf.GetLength(0), residuals.GetLength(1) - psf.GetLength(1));
+            var residualsFourier = FFT.Forward(residuals);
+            residualsFourier = Common.Fourier2D.Multiply(residualsFourier, psfCorrelated);
+            var bMap = FFT.Backward(residualsFourier, residualsFourier.Length);
+            FFT.Shift(bMap);
+
+            var psf2Fourier = Common.Fourier2D.Multiply(psfCorrelated, psfCorrelated);
 
             var xDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var blockInversion = CalcBlockInversion(psf, yBlockSize, xBlockSize);
             var random = new Random(123);
-
 
             var iter = 0;
             while(iter < maxIteration)
             {
                 var yB = yBlockSize * random.Next(xImage.GetLength(0) / yBlockSize);
                 var xB = xBlockSize * random.Next(xImage.GetLength(1) / xBlockSize);
+                var block = CopyFrom(bMap, yB, xB, yBlockSize, xBlockSize);
 
+                var optimized = block * blockInversion;
 
+                //shrink
+                for (int i = 0; i < optimized.Count; i++)
+                    optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);
+                AddInto(xDiff, optimized, yB, xB, yBlockSize, xBlockSize);
+                AddInto(xImage, optimized, yB, xB, yBlockSize, xBlockSize);
+
+                //update b-map
+                var XDIFF = FFT.Forward(xDiff);
+                XDIFF = Common.Fourier2D.Multiply(XDIFF, psf2Fourier);
+                Common.Fourier2D.SubtractInPlace(residualsFourier, XDIFF);
+                bMap = FFT.Backward(residualsFourier, residualsFourier.Length);
+                FFT.Shift(bMap);
+
+                //clear from xDiff
+                AddInto(xDiff, -optimized, yB, xB, yBlockSize, xBlockSize);
+
+                iter++;
             }
-
-            
 
             return false;
         }
@@ -48,17 +68,13 @@ namespace Single_Reference.Deconvolution
         private static double Correlate(double[,] psf, int yShift, int xShift)
         {
             var output = 0.0;
-
             for(int y = yShift; y < psf.GetLength(0); y++)
                 for(int x = xShift; x < psf.GetLength(1); x++)
-                {
                     output += psf[y - yShift, x - xShift] * psf[y, x];
-                }
+                
 
             return output;
         }
-
-
 
         private static Matrix<double> CalcBlockInversion(double[,] psf, int yBlockSize, int xBlockSize)
         {
@@ -82,12 +98,36 @@ namespace Single_Reference.Deconvolution
                     var xIndex = indices[x];
                     var cX = Math.Abs(yIndex.Item1 - xIndex.Item1);
                     var cY = Math.Abs(yIndex.Item2 - xIndex.Item2);
-                    var corr = correlations[cX, cY];
                     correlationMatrix[x, y] = correlations[cX, cY];
                 }
             }
 
             return correlationMatrix.Inverse();
+        }
+
+        private static Vector<double> CopyFrom(double[,] image, int yB, int xB, int yBlockSize, int xBlockSize)
+        {
+            var yOffset = yB * yBlockSize;
+            var xOffset = xB * xBlockSize;
+
+            int i = 0;
+            var vec = new DenseVector(yBlockSize * xBlockSize);
+            for (int y = 0; y < yBlockSize; y++)
+                for (int x = 0; x < xBlockSize; x++)
+                    vec[i++] = image[yOffset + y, xOffset + x];
+
+            return vec;
+        }
+
+        private static void AddInto(double[,] image, Vector<double> vec, int yB, int xB, int yBlockSize, int xBlockSize)
+        {
+            var yOffset = yB * yBlockSize;
+            var xOffset = xB * xBlockSize;
+
+            int i = 0;
+            for (int y = 0; y < yBlockSize; y++)
+                for (int x = 0; x < xBlockSize; x++)
+                    image[yOffset + y, xOffset + x] += vec[i++];
         }
 
         #region toDelete

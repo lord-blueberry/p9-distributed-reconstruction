@@ -200,6 +200,33 @@ namespace Single_Reference
 
                 return outputVis;
             }
+
+            public static Complex[,] Add(Complex[,] vis0, Complex[,] vis1)
+            {
+                var outputVis = new Complex[vis0.GetLength(0), vis0.GetLength(1)];
+                for (int i = 0; i < vis0.GetLength(0); i++)
+                    for (int j = 0; j < vis0.GetLength(1); j++)
+                        outputVis[i, j] = vis0[i, j] + vis1[i, j];
+
+                return outputVis;
+            }
+
+            public static Complex[,] Subtract(Complex[,] vis0, Complex[,] vis1)
+            {
+                var outputVis = new Complex[vis0.GetLength(0), vis0.GetLength(1)];
+                for (int i = 0; i < vis0.GetLength(0); i++)
+                    for (int j = 0; j < vis0.GetLength(1); j++)
+                        outputVis[i, j] = vis0[i, j] - vis1[i, j];
+
+                return outputVis;
+            }
+
+            public static void SubtractInPlace(Complex[,] vis0, Complex[,] vis1)
+            {
+                for (int i = 0; i < vis0.GetLength(0); i++)
+                    for (int j = 0; j < vis0.GetLength(1); j++)
+                        vis0[i, j] -=  vis1[i, j];
+            }
         }
 
         public static class Visibilities
