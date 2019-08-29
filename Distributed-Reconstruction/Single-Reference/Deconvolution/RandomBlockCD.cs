@@ -23,8 +23,23 @@ namespace Single_Reference.Deconvolution
             var a = new DenseVector(4);
             a[0] = CalcAMatrixEntry(psf, 0, 0);
             a[1] = CalcAMatrixEntry(psf, 0, 1);
-            a[2] = CalcAMatrixEntry(psf, 0, 2);
-            a[3] = CalcAMatrixEntry(psf, 0, 3);
+            a[2] = CalcAMatrixEntry(psf, 1, 0);
+            a[3] = CalcAMatrixEntry(psf, 1, 1);
+
+            var a01 = new DenseVector(3);
+            a01[0] = a[0];
+            a01[1] = a[3];
+            a01[2] = a[2];
+
+            var a10 = new DenseVector(2);
+            a10[0] = a[0];
+            a10[1] = a[1];
+            var LA = new List<DenseVector>(3);
+            LA.Add(a);
+            LA.Add(a01);
+            LA.Add(a10);
+
+            var A2 = CreateA2(LA);
 
             //a[5] = CalcAMatrixEntry(psf, 6, 6);
             //a[4] = CalcAMatrixEntry(psf, 1, 0);
@@ -34,9 +49,7 @@ namespace Single_Reference.Deconvolution
             a[7] = CalcAMatrixEntry(psf, 2, 1);
             a[8] = CalcAMatrixEntry(psf, 2, 2);*/
 
-            var A = CreateA(a);
-            var blaA = A.ToArray();
-            var inv = A.Inverse();
+            var inv = A2.Inverse();
             var arr = inv.ToArray();
 
             var xImage = new double[32, 32];
@@ -44,8 +57,8 @@ namespace Single_Reference.Deconvolution
 
             dirty[16, 16] = 1.0;
             dirty[16, 17] = 1.8;
-            dirty[16, 18] = 1.1;
-            dirty[16, 19] = 0.5;
+            dirty[17, 16] = 1.1;
+            dirty[17, 17] = 0.5;
             //dirty[16, 20] = 0.5;
             var IMG = FFT.Forward(dirty, 1.0);
             var PSF = FFT.Forward(psf, 1.0);
@@ -62,8 +75,8 @@ namespace Single_Reference.Deconvolution
             var bVec = new DenseVector(4);
             bVec[0] = bMap[16, 16];
             bVec[1] = bMap[16, 17];
-            bVec[2] = bMap[16, 18];
-            bVec[3] = bMap[16, 19];
+            bVec[2] = bMap[17, 16];
+            bVec[3] = bMap[17, 17];
 
             //bVec[5] = bMap[22, 22];
             /*
@@ -77,8 +90,8 @@ namespace Single_Reference.Deconvolution
             var res3 = (bVec * inv).ToArray();
             xImage[16, 16] = res3[0];
             xImage[16, 17] = res3[1];
-            xImage[16, 18] = res3[2];
-            xImage[16, 19] = res3[3];
+            xImage[17, 16] = res3[2];
+            xImage[17, 17] = res3[3];
             var XIMG = FFT.Forward(xImage, 1.0);
             var RESCONV = Common.Fourier2D.Multiply(XIMG, PSF);
             var results = FFT.Backward(RESCONV, (double)(BMAP.GetLength(0) * BMAP.GetLength(1)));
@@ -130,14 +143,23 @@ namespace Single_Reference.Deconvolution
             return A;
         }
 
-        private static void InfToZero(double[] mat)
+        private static DenseMatrix CreateA2(List<DenseVector> vecs)
         {
-            for (int j = 0; j < mat.Length; j++)
-                {
-                    if (!Double.IsFinite(mat[j]))
-                        mat[j] = 0;
-                }
+            var A = new DenseMatrix(vecs[0].Count, vecs[0].Count);
             
+            for(int i = 0; i < vecs.Count; i++)
+            {
+                var vec = vecs[i];
+                for(int j = 0; j < vec.Count; j++)
+                {
+                    A[i, i + j] = vec[j];
+                    A[i + j, i] = vec[j];
+                }
+            }
+            var last = vecs[0].Count - 1;
+            A[last, last] = vecs[0][0];
+
+            return A;
         }
     }
 }
