@@ -19,12 +19,13 @@ namespace Single_Reference.Deconvolution
                     psf[i, j] = 0.5;
             psf[16, 16] = 1.0;
 
+            var aaa = CalcBlockInversion(psf, 2, 2);
    
             var a = new DenseVector(4);
-            a[0] = CalcAMatrixEntry(psf, 0, 0);
-            a[1] = CalcAMatrixEntry(psf, 0, 1);
-            a[2] = CalcAMatrixEntry(psf, 1, 0);
-            a[3] = CalcAMatrixEntry(psf, 1, 1);
+            a[0] = Correlate(psf, 0, 0);
+            a[1] = Correlate(psf, 0, 1);
+            a[2] = Correlate(psf, 1, 0);
+            a[3] = Correlate(psf, 1, 1);
 
             var a01 = new DenseVector(3);
             a01[0] = a[0];
@@ -40,14 +41,6 @@ namespace Single_Reference.Deconvolution
             LA.Add(a10);
 
             var A2 = CreateA2(LA);
-
-            //a[5] = CalcAMatrixEntry(psf, 6, 6);
-            //a[4] = CalcAMatrixEntry(psf, 1, 0);
-            /*a[4] = CalcAMatrixEntry(psf, 0, 2);
-            a[5] = CalcAMatrixEntry(psf, 2, 0);
-            a[6] = CalcAMatrixEntry(psf, 1, 2);
-            a[7] = CalcAMatrixEntry(psf, 2, 1);
-            a[8] = CalcAMatrixEntry(psf, 2, 2);*/
 
             var inv = A2.Inverse();
             var arr = inv.ToArray();
@@ -67,6 +60,7 @@ namespace Single_Reference.Deconvolution
             FFT.Shift(residuals);
 
             var RES = FFT.Forward(residuals, 1.0);
+            //TODO: WRONG WRONG WRONG, its PSFCorrelated. But does not matter for toy PSF
             var BMAP = Common.Fourier2D.Multiply(RES, PSF);
             var bMap = FFT.Backward(BMAP, (double)(BMAP.GetLength(0) * BMAP.GetLength(1)));
             FFT.Shift(bMap);
@@ -105,9 +99,9 @@ namespace Single_Reference.Deconvolution
         {
             //var bMap = 
             var A = new DenseMatrix(2, 2);
-            A[0, 0] = CalcAMatrixEntry(psf, 0, 0);
+            A[0, 0] = Correlate(psf, 0, 0);
             A[1, 1] = A[0, 0];
-            A[1, 0] = CalcAMatrixEntry(psf, 0, 1);
+            A[1, 0] = Correlate(psf, 0, 1);
             A[0, 1] = A[1, 0];
 
             var inv = A.Inverse();
@@ -116,31 +110,24 @@ namespace Single_Reference.Deconvolution
             return false;
         }
 
-        private static double CalcAMatrixEntry(double[,] psf, int yOffset, int xOffset)
+        /// <summary>
+        /// Calculate correlation of the psf with itself, but shifted
+        /// </summary>
+        /// <param name="psf"></param>
+        /// <param name="yShift"></param>
+        /// <param name="xShift"></param>
+        /// <returns></returns>
+        private static double Correlate(double[,] psf, int yShift, int xShift)
         {
             var output = 0.0;
 
-            for(int y = yOffset; y < psf.GetLength(0); y++)
-                for(int x = xOffset; x < psf.GetLength(1); x++)
+            for(int y = yShift; y < psf.GetLength(0); y++)
+                for(int x = xShift; x < psf.GetLength(1); x++)
                 {
-                    output += psf[y - yOffset, x - xOffset] * psf[y, x];
+                    output += psf[y - yShift, x - xShift] * psf[y, x];
                 }
 
             return output;
-        }
-
-        private static DenseMatrix CreateA(DenseVector vec)
-        {
-            var A = new DenseMatrix(vec.Count, vec.Count);
-            for(int i = 0; i < vec.Count; i++)
-            {
-                for(int j = 0; j < vec.Count; j++)
-                {
-                    A[j, i] = vec[Math.Abs((j - i) % vec.Count)];
-                }
-            }
-
-            return A;
         }
 
         private static DenseMatrix CreateA2(List<DenseVector> vecs)
@@ -160,6 +147,36 @@ namespace Single_Reference.Deconvolution
             A[last, last] = vecs[0][0];
 
             return A;
+        }
+
+        private static Matrix<double> CalcBlockInversion(double[,] psf, int yBlockSize, int xBlockSize)
+        {
+            var size = yBlockSize * xBlockSize;
+
+            var correlations = new double[yBlockSize, xBlockSize];
+            var indices = new Tuple<int, int>[size];
+            for (int i = 0; i < yBlockSize; i++)
+                for (int j = 0; j < xBlockSize; j++)
+                {
+                    correlations[i, j]= Correlate(psf, i, j);
+                    indices[i * yBlockSize + j] = new Tuple<int, int>(i, j);
+                }
+
+            var correlationMatrix = new DenseMatrix(size, size);
+            for (int y = 0; y < size; y++)
+            {
+                var yIndex = indices[y];
+                for (int x = 0; x < size; x++)
+                {
+                    var xIndex = indices[x];
+                    var cX = Math.Abs(yIndex.Item1 - xIndex.Item1);
+                    var cY = Math.Abs(yIndex.Item2 - xIndex.Item2);
+                    var corr = correlations[cX, cY];
+                    correlationMatrix[x, y] = correlations[cX, cY];
+                }
+            }
+
+            return correlationMatrix.Inverse();
         }
     }
 }
