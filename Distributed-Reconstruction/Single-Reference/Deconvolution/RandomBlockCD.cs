@@ -25,6 +25,9 @@ namespace Single_Reference.Deconvolution
             a[1] = CalcAMatrixEntry(psf, 0, 1);
             a[2] = CalcAMatrixEntry(psf, 0, 2);
             a[3] = CalcAMatrixEntry(psf, 0, 3);
+
+            //a[5] = CalcAMatrixEntry(psf, 6, 6);
+            //a[4] = CalcAMatrixEntry(psf, 1, 0);
             /*a[4] = CalcAMatrixEntry(psf, 0, 2);
             a[5] = CalcAMatrixEntry(psf, 2, 0);
             a[6] = CalcAMatrixEntry(psf, 1, 2);
@@ -39,10 +42,11 @@ namespace Single_Reference.Deconvolution
             var xImage = new double[32, 32];
             var dirty = new double[32, 32];
 
-            //dirty[16, 16] = 1.0;
-            //dirty[16, 17] = 1.8;
-            //dirty[16, 18] = 1.1;
+            dirty[16, 16] = 1.0;
+            dirty[16, 17] = 1.8;
+            dirty[16, 18] = 1.1;
             dirty[16, 19] = 0.5;
+            //dirty[16, 20] = 0.5;
             var IMG = FFT.Forward(dirty, 1.0);
             var PSF = FFT.Forward(psf, 1.0);
             var CONV = Common.Fourier2D.Multiply(IMG, PSF);
@@ -59,7 +63,10 @@ namespace Single_Reference.Deconvolution
             bVec[0] = bMap[16, 16];
             bVec[1] = bMap[16, 17];
             bVec[2] = bMap[16, 18];
-            bVec[3] = bMap[16, 19];/*
+            bVec[3] = bMap[16, 19];
+
+            //bVec[5] = bMap[22, 22];
+            /*
             bVec[4] = bMap[16, 18];
             bVec[5] = bMap[18, 16];
             bVec[6] = bMap[17, 18];
@@ -78,8 +85,9 @@ namespace Single_Reference.Deconvolution
             FFT.Shift(results);
             FitsIO.Write(results, "dirtyConf.fits");
             FitsIO.Write(xImage, "dXXConf.fits");
+            Console.Write(inv);
 
-        }
+         }
         public static bool Deconvolve(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
         {
             //var bMap = 
