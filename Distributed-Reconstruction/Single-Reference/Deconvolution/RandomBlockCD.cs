@@ -13,13 +13,15 @@ namespace Single_Reference.Deconvolution
 
         public static bool Deconvolve(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
         {
+            FitsIO.Write(residuals, "res.fits");
             var yBlockSize = 16;
             var xBlockSize = 16;
             var psfCorrelated = Common.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0) - psf.GetLength(0), residuals.GetLength(1) - psf.GetLength(1));
             var residualsFourier = FFT.Forward(residuals);
             residualsFourier = Common.Fourier2D.Multiply(residualsFourier, psfCorrelated);
             var bMap = FFT.Backward(residualsFourier, residualsFourier.Length);
-            FFT.Shift(bMap);
+            //FFT.Shift(bMap);
+            FitsIO.Write(bMap, "bMap.fits");
 
             var psf2Fourier = Common.Fourier2D.Multiply(psfCorrelated, psfCorrelated);
 
@@ -30,28 +32,30 @@ namespace Single_Reference.Deconvolution
             var iter = 0;
             while(iter < maxIteration)
             {
-                var yB = yBlockSize * random.Next(xImage.GetLength(0) / yBlockSize);
-                var xB = xBlockSize * random.Next(xImage.GetLength(1) / xBlockSize);
+                var yB = random.Next(xImage.GetLength(0) / yBlockSize);
+                var xB = random.Next(xImage.GetLength(1) / xBlockSize);
                 var block = CopyFrom(bMap, yB, xB, yBlockSize, xBlockSize);
 
                 var optimized = block * blockInversion;
+                var xOld = CopyFrom(xImage, yB, xB, yBlockSize, xBlockSize);
+                optimized = xOld + optimized;
 
                 //shrink
                 for (int i = 0; i < optimized.Count; i++)
                     optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);
-                AddInto(xDiff, optimized, yB, xB, yBlockSize, xBlockSize);
-                AddInto(xImage, optimized, yB, xB, yBlockSize, xBlockSize);
+                var optDiff = optimized - xOld;
+                AddInto(xDiff, optDiff, yB, xB, yBlockSize, xBlockSize);
+                AddInto(xImage, optDiff, yB, xB, yBlockSize, xBlockSize);
 
                 //update b-map
                 var XDIFF = FFT.Forward(xDiff);
                 XDIFF = Common.Fourier2D.Multiply(XDIFF, psf2Fourier);
                 Common.Fourier2D.SubtractInPlace(residualsFourier, XDIFF);
                 bMap = FFT.Backward(residualsFourier, residualsFourier.Length);
-                FFT.Shift(bMap);
+                //FitsIO.Write(bMap, "bMap2.fits");
 
                 //clear from xDiff
-                AddInto(xDiff, -optimized, yB, xB, yBlockSize, xBlockSize);
-
+                AddInto(xDiff, -optDiff, yB, xB, yBlockSize, xBlockSize);
                 iter++;
             }
 
