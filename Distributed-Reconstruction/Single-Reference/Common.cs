@@ -75,7 +75,8 @@ namespace Single_Reference
                 var xPsfHalf = xPadding / 2;
                 for (int y = 0; y < psf.GetLength(0); y++)
                     for (int x = 0; x < psf.GetLength(1); x++)
-                        psfPadded[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
+                        if (y + +yPsfHalf + 1 < psfPadded.GetLength(0) & x + xPsfHalf + 1 < psfPadded.GetLength(1))
+                            psfPadded[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
                 FFT.Shift(psfPadded);
                 var PSFPadded = FFT.Forward(psfPadded, 1.0);
 
