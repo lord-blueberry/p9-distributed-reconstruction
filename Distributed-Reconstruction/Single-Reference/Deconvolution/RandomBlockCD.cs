@@ -34,6 +34,8 @@ namespace Single_Reference.Deconvolution
             {
                 var yB = random.Next(xImage.GetLength(0) / yBlockSize);
                 var xB = random.Next(xImage.GetLength(1) / xBlockSize);
+                yB = 6;
+                xB = 8;
                 var block = CopyFrom(bMap, yB, xB, yBlockSize, xBlockSize);
 
                 var optimized = block * blockInversion;
@@ -163,6 +165,8 @@ namespace Single_Reference.Deconvolution
             psf[16, 16] = 1.0;
             psf[17, 17] = 0.8;
 
+            var yBSize = 2;
+            var xBSize = 2;
             var aaa = CalcBlockInversion(psf, 2, 2);
 
             var a = new DenseVector(4);
@@ -194,8 +198,8 @@ namespace Single_Reference.Deconvolution
 
             dirty[16, 16] = 1.0;
             dirty[16, 17] = 1.8;
-            dirty[17, 16] = 1.1;
-            dirty[17, 17] = 0.5;
+            //dirty[17, 16] = 1.1;
+            //dirty[17, 17] = 0.5;
             //dirty[16, 20] = 0.5;
             var IMG = FFT.Forward(dirty, 1.0);
             var PSF = FFT.Forward(psf, 1.0);
@@ -209,27 +213,13 @@ namespace Single_Reference.Deconvolution
             var bMap = FFT.Backward(BMAP, (double)(BMAP.GetLength(0) * BMAP.GetLength(1)));
             FFT.Shift(bMap);
 
-            FitsIO.Write(residuals, "resConf.fits");
-            var bVec = new DenseVector(4);
-            bVec[0] = bMap[16, 16];
-            bVec[1] = bMap[16, 17];
-            bVec[2] = bMap[17, 16];
-            bVec[3] = bMap[17, 17];
+            FitsIO.Write(bMap, "resConf.fits");
 
-            //bVec[5] = bMap[22, 22];
-            /*
-            bVec[4] = bMap[16, 18];
-            bVec[5] = bMap[18, 16];
-            bVec[6] = bMap[17, 18];
-            bVec[7] = bMap[18, 17];
-            bVec[8] = bMap[18, 18];*/
+            var bVec = CopyFrom(bMap, 16 / yBSize, 16 /xBSize, yBSize, xBSize);
 
-
-            var res3 = (bVec * inv).ToArray();
-            xImage[16, 16] = res3[0];
-            xImage[16, 17] = res3[1];
-            xImage[17, 16] = res3[2];
-            xImage[17, 17] = res3[3];
+            var res3 = (bVec * inv);
+            var array = res3.ToArray();
+            AddInto(xImage, res3, 16 / yBSize, 16 / xBSize, yBSize, xBSize);
             var XIMG = FFT.Forward(xImage, 1.0);
             var RESCONV = Common.Fourier2D.Multiply(XIMG, PSF);
             var results = FFT.Backward(RESCONV, (double)(BMAP.GetLength(0) * BMAP.GetLength(1)));
