@@ -9,6 +9,7 @@ using System.Numerics;
 using System.Collections.Generic;
 using System.IO;
 using Distributed_Reference.DistributedDeconvolution;
+using static Single_Reference.Common;
 
 namespace Distributed_Reference
 {

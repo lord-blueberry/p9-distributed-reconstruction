@@ -34,7 +34,7 @@ namespace Distributed_Reference.DistributedDeconvolution
                     
                 var lambdaMax = 1 / alpha * xMaxDiff;
                 lambdaMax = comm.Allreduce(lambdaMax, (x, y) => x+y);
-                if (lambdaMax / lambdaMin > lambdaFactor)
+                if (lambdaMax / lambdaFactor > lambdaMin)
                 {
                     Console.WriteLine("-----------------------------GreedyCD2 with lambda " + lambdaMax / lambdaFactor + "------------------------");
                     converged = Deconvolve(comm, imgSection, totalSize, xImage, aMap, b, psf, lambdaMax / lambdaFactor, alpha, maxIteration, epsilon);

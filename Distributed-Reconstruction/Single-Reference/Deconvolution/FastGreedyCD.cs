@@ -36,19 +36,31 @@ namespace Single_Reference.Deconvolution
             aMap = PSF.CalcAMap(psf, totalSize, imageSection);
         }
 
-        public FastGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared, int nCores):
-            this(totalSize, imageSection, psf, psfCorrelation, psfSquared)
-        {
-
-        }
 
         public bool DeconvolvePath(float[,] reconstruction, float[,] residuals, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
+            bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
+            for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
+            {
+                var max = GetAbsMax(reconstruction, bMap, 0.0f, 1.0f);
 
+                var lambdaMax = 1 / alpha * max.PixelMaxDiff;
+                var lambdaCurrent = lambdaMax / lambdaFactor;
+                Console.WriteLine("-----------------------------FastGreedyCD with lambda " + lambdaCurrent + "------------------------");
+                if (lambdaCurrent > lambdaMin)
+                {
+                    Deconvolve(reconstruction, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
+                }
+                else
+                {
+                    converged = Deconvolve(reconstruction, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
+                    if (converged)
+                        break;
+                }
+            }
 
-
-            return false;
+            return converged;
         }
 
         public bool Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon)
@@ -60,49 +72,58 @@ namespace Single_Reference.Deconvolution
             bool converged = false;
             while (!converged & iter < maxIteration)
             {
-                var maxPixels = new MaxPixel[imageSection.YExtent()];
-                Parallel.For(imageSection.Y, imageSection.YEnd, (y) =>
-                {
-                    var yLocal = y - imageSection.Y;
-
-                    var currentMax = new MaxPixel(-1, -1, 0, 0);
-                    for (int x = imageSection.X; x < imageSection.XEnd; x++)
-                    {                 
-                        var xLocal = x - imageSection.X;
-                        var currentA = aMap[yLocal, xLocal];
-                        var old = xImage[yLocal, xLocal];
-                        var xTmp = old + bMap[y, x] / currentA;
-                        xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
-                        var xDiff = old - xTmp;
-
-                        if (currentMax.PixelMax < Math.Abs(xDiff))
-                        {
-                            currentMax.Y = y;
-                            currentMax.X = x;
-                            currentMax.PixelMax = Math.Abs(xDiff);
-                            currentMax.PixelNew = xTmp;
-                        }
-                    }
-                    maxPixels[yLocal] = currentMax;
-                });
-
-                var maxPixel = new MaxPixel(-1, -1, 0, 0);
-                for (int i = 0; i < maxPixels.Length; i++)
-                    if (maxPixel.PixelMax < maxPixels[i].PixelMax)
-                        maxPixel = maxPixels[i];
-
-                converged = maxPixel.PixelMax < epsilon;
+                var maxPixel = GetAbsMax(xImage, bMap, lambda, alpha);
+                converged = maxPixel.PixelMaxDiff < epsilon;
                 if (!converged)
                 {
                     var yLocal = maxPixel.Y - imageSection.Y;
                     var xLocal = maxPixel.X - imageSection.X;
-                    var xOld = xImage[yLocal, xLocal];
+                    var pixelOld = xImage[yLocal, xLocal];
                     xImage[yLocal, xLocal] = maxPixel.PixelNew;
-                    UpdateBSingle(bMap, psf2, imageSection, maxPixel.Y, maxPixel.X, xOld - maxPixel.PixelNew);
+                    UpdateBSingle(bMap, psf2, imageSection, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
+
+                    if(iter % 50 == 0)
+                        Console.WriteLine("iter\t" + iter + "\tcurrentUpdate\t" + Math.Abs(maxPixel.PixelNew - pixelOld));
                 }
             }
 
             return converged;
+        }
+
+        private MaxPixel GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
+        {
+            var maxPixels = new MaxPixel[imageSection.YExtent()];
+            Parallel.For(imageSection.Y, imageSection.YEnd, (y) =>
+            {
+                var yLocal = y - imageSection.Y;
+
+                var currentMax = new MaxPixel(-1, -1, 0, 0);
+                for (int x = imageSection.X; x < imageSection.XEnd; x++)
+                {
+                    var xLocal = x - imageSection.X;
+                    var currentA = aMap[yLocal, xLocal];
+                    var old = xImage[yLocal, xLocal];
+                    var xTmp = old + bMap[y, x] / currentA;
+                    xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                    var xDiff = old - xTmp;
+
+                    if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
+                    {
+                        currentMax.Y = y;
+                        currentMax.X = x;
+                        currentMax.PixelMaxDiff = Math.Abs(xDiff);
+                        currentMax.PixelNew = xTmp;
+                    }
+                }
+                maxPixels[yLocal] = currentMax;
+            });
+
+            var maxPixel = new MaxPixel(-1, -1, 0, 0);
+            for (int i = 0; i < maxPixels.Length; i++)
+                if (maxPixel.PixelMaxDiff < maxPixels[i].PixelMaxDiff)
+                    maxPixel = maxPixels[i];
+
+            return maxPixel;
         }
 
         private static void UpdateBSingle(float[,] b, float[,] bUpdate, Rectangle imageSection, int yPixel, int xPixel, float xDiff)
@@ -151,14 +172,14 @@ namespace Single_Reference.Deconvolution
         {
             public int Y;
             public int X;
-            public float PixelMax;
+            public float PixelMaxDiff;
             public float PixelNew;
 
             public MaxPixel(int y, int x, float xMax, int xNew)
             {
                 Y = y;
                 X = x;
-                PixelMax = xMax;
+                PixelMaxDiff = xMax;
                 PixelNew = xNew;
             }
         }

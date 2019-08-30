@@ -30,7 +30,7 @@ namespace Single_Reference.Deconvolution
                     }
 
                 var lambdaMax = 1 / alpha * xMaxDiff;
-                if (lambdaMax / lambdaMin > lambdaFactor)
+                if (lambdaMax / lambdaFactor > lambdaMin)
                 {
                     Console.WriteLine("-----------------------------GreedyCD2 with lambda " + lambdaMax / lambdaFactor + "------------------------");
                     converged = Deconvolve(xImage, b, psf, lambdaMax / lambdaFactor, alpha, maxIteration, epsilon);
@@ -103,7 +103,6 @@ namespace Single_Reference.Deconvolution
                         }
                     }
 
-                //exchange max
                 converged = Math.Abs(xMax) < epsilon;
                 if (!converged)
                 {
