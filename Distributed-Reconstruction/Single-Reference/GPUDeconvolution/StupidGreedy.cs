@@ -231,7 +231,7 @@ namespace Single_Reference.GPUDeconvolution
 
                 var psfCorr = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, xImage.GetLength(0), xImage.GetLength(1));
                 var psf2 = Common.PSF.CalcPSFSquared(psfCorr);
-                var aMap = Common.PSF.CalcAMap(xImage, psf);
+                var aMap = CommonDeprecated.PSF.CalcAMap(xImage, psf);
                 for (int y = 0; y < b.GetLength(0); y++)
                     for (int x = 0; x < b.GetLength(1); x++)
                         b[y, x] = b[y, x] / aMap[y, x];

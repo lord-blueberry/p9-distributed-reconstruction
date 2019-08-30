@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using static Single_Reference.Common;
 
 namespace Single_Reference.Deconvolution.ToyImplementations
 {
@@ -15,9 +16,9 @@ namespace Single_Reference.Deconvolution.ToyImplementations
         public static bool Deconvolve(double[,] xImage, double[,] bMap, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
         {
             bool converged = false;
-            var aMap = Common.PSF.CalcAMap(xImage, psf);
-            var padding = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
-            var psfCorrelated = Common.PSF.CalcPaddedFourierCorrelation(Common.ToFloatImage(psf), padding);
+            var aMap = CommonDeprecated.PSF.CalcAMap(xImage, psf);
+            var padding = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
+            var psfCorrelated = PSF.CalcPaddedFourierCorrelation(ToFloatImage(psf), padding);
             var psf2 = Common.PSF.CalcPSFSquared(psfCorrelated);
             var xDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var imageSection = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));

@@ -12,15 +12,8 @@ namespace Distributed_Reference.DistributedDeconvolution
     { 
         public static bool DeconvolvePath(Intracommunicator comm, Common.Rectangle imgSection, Common.Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10, int maxIteration = 100, double epsilon = 1e-4)
         {
-            var integral = Common.PSF.CalcPSFScan(psf);
-            var aMap = new double[b.GetLength(0), b.GetLength(1)];
-            for (int y = imgSection.Y; y < imgSection.YEnd; y++)
-                for (int x = imgSection.X; x < imgSection.XEnd; x++)
-                {
-                    var yLocal = y - imgSection.Y;
-                    var xLocal = x - imgSection.X;
-                    aMap[yLocal, xLocal] = Common.PSF.QueryScan(integral, y, x, totalSize.YEnd, totalSize.XEnd);
-                }
+            //TODO: Debug this
+            var aMap = Common.PSF.CalcAMap(Common.ToFloatImage(psf), totalSize, imgSection);
             
             var converged = false;
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
@@ -57,7 +50,7 @@ namespace Distributed_Reference.DistributedDeconvolution
             return converged;
         }
 
-        public static bool Deconvolve(Intracommunicator comm, Common.Rectangle imgSection, Common.Rectangle totalSize, double[,] xImage, double[,] aMap, double[,] b, double[,] psf, double lambda, double alpha, int maxIteration = 1000, double epsilon = 1e-4)
+        public static bool Deconvolve(Intracommunicator comm, Common.Rectangle imgSection, Common.Rectangle totalSize, double[,] xImage, float[,] aMap, double[,] b, double[,] psf, double lambda, double alpha, int maxIteration = 1000, double epsilon = 1e-4)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;

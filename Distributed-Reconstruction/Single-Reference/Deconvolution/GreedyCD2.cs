@@ -10,7 +10,7 @@ namespace Single_Reference.Deconvolution
     {
         public static bool DeconvolvePath(double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10,  int maxIteration = 100, double epsilon = 1e-4)
         {
-            var integral = Common.PSF.CalcPSFScan(psf);
+            var integral = CommonDeprecated.PSF.CalcPSFScan(psf);
             var converged = false;
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
@@ -19,7 +19,7 @@ namespace Single_Reference.Deconvolution
                 for (int y = 0; y < b.GetLength(0); y++)
                     for (int x = 0; x < b.GetLength(1); x++)
                     {
-                        var currentA = Common.PSF.QueryScan(integral, y, x, b.GetLength(0), b.GetLength(1));
+                        var currentA = CommonDeprecated.PSF.QueryScan(integral, y, x, b.GetLength(0), b.GetLength(1));
                         var xDiff = b[y, x] / currentA;
 
                         if (Math.Abs(xDiff) > xMaxAbsDiff)
@@ -50,7 +50,7 @@ namespace Single_Reference.Deconvolution
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
-            var aMap = Common.PSF.CalcAMap(xImage, psf);
+            var aMap = CommonDeprecated.PSF.CalcAMap(xImage, psf);
             var imageSection = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
 
             //invert the PSF, since we actually do want to correlate the psf with the residuals. (The FFT already inverts the psf, so we need to invert it again to not invert it. Trust me.)
