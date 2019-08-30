@@ -390,10 +390,6 @@ namespace Single_Reference
             var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;
 
-            var psf2 = PSF.CalcPSFSquaredDebug(psfCutDouble);
-            FitsIO.Write(psf2, "psf2double.fits");
-
-
             /*var truth = new double[gridSize, gridSize];
             truth[30, 30] = 1.0;
             truth[35, 36] = 1.5;

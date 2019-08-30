@@ -73,9 +73,6 @@ namespace Single_Reference.Deconvolution
             var maskedPsf = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
             double[,] bUpdateMasked;
 
-            FitsIO.Write(b, "bMapGreedy.fits");
-            FitsIO.Write(bUpdateCache, "psf2Greedy.fits");
-
             int iter = 0;
             bool converged = false;
             var watch = new System.Diagnostics.Stopwatch();

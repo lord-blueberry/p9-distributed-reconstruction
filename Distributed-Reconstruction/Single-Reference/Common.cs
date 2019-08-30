@@ -111,20 +111,11 @@ namespace Single_Reference
                 var fullWindow = new Rectangle(0, 0, psfPadded.GetLength(0), psfPadded.GetLength(1));
                 SetPsfInWindow(psfPadded, psf, fullWindow, psf.GetLength(0), psf.GetLength(1));
                 var PSF = FFT.Forward(psfPadded);
+
+                //convolve psf with its flipped version == correlation
                 var PSF2 = Fourier2D.Multiply(PSF, psfCorrelated);
                 var psf2 = FFT.Backward(PSF2, psfCorrelated.Length);
-                FFT.Shift(psf2);
                 return ToFloatImage(psf2);
-            }
-
-            public static double[,] CalcPSFSquaredDebug(double[,] psf)
-            {
-                var psfCorrelated = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, psf.GetLength(0), psf.GetLength(1));
-                //var psfCorrelated = CalcPaddedFourierCorrelation (psf, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
-                var PSF2 = Fourier2D.Multiply(psfCorrelated, psfCorrelated);
-                var psf2 = FFT.Backward(PSF2, psfCorrelated.Length);
-                FFT.Shift(psf2);
-                return psf2;
             }
 
             private static void SetPsfInWindow(float[,] psfOutput, float[,] psf, Rectangle window, int yPixel, int xPixel)
@@ -143,7 +134,7 @@ namespace Single_Reference
                         }
                         else
                         {
-                            psfOutput[i + yPsfHalf, j + yPsfHalf] = 0.0;
+                            psfOutput[i + yPsfHalf, j + yPsfHalf] = 0.0f;
                         }
                     }
             }

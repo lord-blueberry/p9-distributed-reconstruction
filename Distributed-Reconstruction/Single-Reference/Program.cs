@@ -8,7 +8,7 @@ namespace Single_Reference
         {
 
             //Deconvolution.ToyImplementations.RandomBlockCD2.RunToy();
-            //DebugMethods.DebugSimulatedGreedy2();
+            DebugMethods.DebugSimulatedGreedy2();
             //DebugMethods.DebugSimulatedPCDM();
             
             DebugMethods.DebugILGPU();
