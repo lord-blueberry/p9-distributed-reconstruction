@@ -112,6 +112,26 @@ namespace Single_Reference
             return output;
         }
 
+        public static Complex[,] Forward(float[,] image, double norm = 1.0)
+        {
+            Complex[,] output = new Complex[image.GetLength(0), image.GetLength(1)];
+            using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))
+            using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
+            {
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        imageSpace[y, x] = image[y, x];
+
+                DFT.FFT(imageSpace, fourierSpace);
+
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        output[y, x] = fourierSpace[y, x] / norm;
+            }
+
+            return output;
+        }
+
         public static double[,] Backward(Complex[,] image, double norm)
         {
             double[,] output = new double[image.GetLength(0), image.GetLength(1)];
@@ -127,6 +147,26 @@ namespace Single_Reference
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
                         output[y, x] = fourierSpace[y, x].Real / norm;
+            }
+
+            return output;
+        }
+
+        public static float[,] BackwardFloat(Complex[,] image, double norm)
+        {
+            var output = new float[image.GetLength(0), image.GetLength(1)];
+            using (var imageSpace = new AlignedArrayComplex(16, image.GetLength(0), image.GetLength(1)))
+            using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
+            {
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        imageSpace[y, x] = image[y, x];
+
+                DFT.IFFT(imageSpace, fourierSpace);
+
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        output[y, x] = (float)(fourierSpace[y, x].Real / norm);
             }
 
             return output;

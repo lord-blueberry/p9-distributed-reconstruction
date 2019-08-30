@@ -37,10 +37,12 @@ namespace Single_Reference.GPUDeconvolution
         public bool RunsOnGPU { get; }
         readonly Context c;
         readonly Accelerator accelerator;
-        readonly Common.Rectangle imageSection;
+        readonly Rectangle imageSection;
+        readonly Rectangle psfSize;
         readonly Complex[,] psfCorrelation;
         readonly float[,] psf2;
         readonly float[,] aMap;
+        readonly FFT fft;
         
         public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation):
             this(totalSize, imageSection, psf, psfCorrelation, PSF.CalcPSFSquared(psfCorrelation))
@@ -51,6 +53,7 @@ namespace Single_Reference.GPUDeconvolution
         public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared)
         {
             this.imageSection = imageSection;
+            psfSize = new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1));
             this.psfCorrelation = psfCorrelation;
             psf2 = psfSquared;
             aMap = PSF.CalcAMap(psf, totalSize, imageSection);
@@ -64,7 +67,7 @@ namespace Single_Reference.GPUDeconvolution
             }
             else
             {
-                Console.WriteLine("GPU vendor not supported. ILGPU switches to !!!!VERY!!!! slow CPU implementation");
+                Console.WriteLine("GPU vendor not supported. ILGPU switches to a !!!!VERY!!!! slow CPU implementation");
                 RunsOnGPU = false;
                 accelerator = new CPUAccelerator(c, 4);
             }
@@ -74,21 +77,23 @@ namespace Single_Reference.GPUDeconvolution
             updateCandidates = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateCandidatesKernel);
         }
 
-        public bool DeconvolvePath(float[,] reconstruction, float[,] residuals, Common.Rectangle residualsWindow, float[,] psf, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, double epsilon = 0.0001)
+        public bool DeconvolvePath(float[,] reconstruction, float[,] residuals, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
             bool converged = false;
-            //AllocateGPU(reconstruction, residuals, psf, psf2, lambda, alpha);
+            var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
+            AllocateGPU(reconstruction, bMap, lambdaMin, alpha);
 
             FreeGPU();
             return converged;
         }
 
-        public bool Deconvolve(float[,] xImage, float[,] bMap, float[,] aMap, float[,] psf2, float lambda, float alpha, float epsilon, int iterations, int batchIterations=500)
+        public bool Deconvolve(float[,] reconstruction, float[,] residuals, float lambda, float alpha, float epsilon, int iterations, int batchIterations=500)
         {
             
             bool converged = false;
-            /*AllocateGPU(xImage, bMap, aMap, psf2, lambda, alpha);
-            for(int i = 0; i < iterations; i++)
+            var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
+            AllocateGPU(reconstruction, bMap, lambda, alpha);
+            for (int i = 0; i < iterations; i++)
             {
                 DeconvolutionBatchIterations(batchIterations);
                 var lastPixel = maxPixelGPU.GetAsArray()[0];
@@ -98,7 +103,7 @@ namespace Single_Reference.GPUDeconvolution
                     break;
                 }
             }
-            FreeGPU();*/
+            FreeGPU();
             return converged;
         }
 
@@ -125,8 +130,6 @@ namespace Single_Reference.GPUDeconvolution
         /// </summary>
         /// <param name="xImage"></param>
         /// <param name="bMap">Gets modified by this method. output: bMap/aMap</param>
-        /// <param name="aMap"></param>
-        /// <param name="psf2"></param>
         /// <param name="lambda"></param>
         /// <param name="alpha"></param>
         private void AllocateGPU(float[,] xImage, float[,] bMap, float lambda, float alpha)

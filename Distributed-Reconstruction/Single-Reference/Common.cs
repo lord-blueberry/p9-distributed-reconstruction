@@ -8,12 +8,8 @@ namespace Single_Reference
 {
     public static class Common
     {
-        public static double ShrinkElasticNet(double value, double lambda, double alpha) => Math.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
-
-        public static class PSF2
-        {
-
-        }
+        public static double ShrinkElasticNet(double value, double lambda, double alpha) => Math.Max(value - lambda * alpha, 0.0) / (1 + lambda * (1 - alpha));
+        public static float ShrinkElasticNet(float value, float lambda, float alpha) => Math.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
         public static class PSF
         {
@@ -65,6 +61,7 @@ namespace Single_Reference
 
             public static float[,] CalcAMap(float[,] psf, Rectangle totalSize, Rectangle imageSection)
             {
+                //TODO: change this?
                 var scan = CalcPSFScan(psf);
                 var aMap = new float[imageSection.YExtent(), imageSection.XExtent()];
                 for (int y = imageSection.Y; y < imageSection.YEnd; y++)
@@ -157,14 +154,51 @@ namespace Single_Reference
 
         public static class Residuals
         {
-            public static double[,] CalculateBMap(double[,] residuals, Complex[,] psfCorrelated, int yPadding, int xPadding)
+            public static double[,] CalculateBMap(double[,] residuals, Complex[,] psfCorrelation, int yPadding, int xPadding)
             {
                 var resPadded = Pad(residuals, yPadding, xPadding);
                 var ResPAdded = FFT.Forward(resPadded, 1.0);
-                var B = Fourier2D.Multiply(ResPAdded, psfCorrelated);
+                var B = Fourier2D.Multiply(ResPAdded, psfCorrelation);
                 var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
                 var bMap = RemovePadding(bPadded, yPadding, xPadding);
                 return bMap;
+            }
+
+            public static float[,] CalcBMap(float[,] residuals, Complex[,] psfCorrelation, Rectangle psfSize)
+            {
+                var yPadding = psfSize.YEnd;
+                var xPadding = psfSize.XEnd;
+
+                var resPadded = Pad(residuals, yPadding, xPadding);
+                var ResPAdded = FFT.Forward(resPadded, 1.0);
+                var B = Fourier2D.Multiply(ResPAdded, psfCorrelation);
+                var bPadded = FFT.BackwardFloat(B, (double)(B.GetLength(0) * B.GetLength(1)));
+                var bMap = RemovePadding(bPadded, yPadding, xPadding);
+                return bMap;
+            }
+
+            private static float[,] Pad(float[,] image, int yPadding, int xPadding)
+            {
+                var yPsfHalf = yPadding / 2;
+                var xPsfHalf = xPadding / 2;
+                var resPadded = new float[image.GetLength(0) + yPadding, image.GetLength(1) + xPadding];
+                for (int y = 0; y < image.GetLength(0); y++)
+                    for (int x = 0; x < image.GetLength(1); x++)
+                        resPadded[y + yPsfHalf, x + xPsfHalf] = image[y, x];
+
+                return resPadded;
+            }
+
+            private static float[,] RemovePadding(float[,] image, int yPadding, int xPadding)
+            {
+                var yPsfHalf = yPadding / 2;
+                var xPsfHalf = xPadding / 2;
+                var imgNoPadding = new float[image.GetLength(0) - yPadding, image.GetLength(1) - xPadding];
+                for (int y = 0; y < imgNoPadding.GetLength(0); y++)
+                    for (int x = 0; x < imgNoPadding.GetLength(1); x++)
+                        imgNoPadding[y, x] = image[y + yPsfHalf, x + xPsfHalf];
+
+                return imgNoPadding;
             }
 
             private static double[,] Pad(double[,] image, int yPadding, int xPadding)
