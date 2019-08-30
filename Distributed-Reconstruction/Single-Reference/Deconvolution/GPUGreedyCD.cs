@@ -20,7 +20,7 @@ namespace Single_Reference.Deconvolution
 
         #region GPU allocated data buffers
         private MemoryBuffer2D<float> xImageGPU;
-        private MemoryBuffer2D<float> candidatesGPU;
+        private MemoryBuffer2D<float> bMapGPU;
         private MemoryBuffer2D<float> aMapGPU;
         private MemoryBuffer2D<float> psf2GPU;
 
@@ -29,7 +29,7 @@ namespace Single_Reference.Deconvolution
         #endregion
 
         #region Loaded GPU kernels
-        readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>> shrink;
+        readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>> shrink;
         readonly Action<Index, ArrayView2D<float>, ArrayView<Pixel>> updateX;
         readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>> updateCandidates;
         #endregion
@@ -79,7 +79,7 @@ namespace Single_Reference.Deconvolution
                 accelerator = new CPUAccelerator(c, 4);
             }
 
-            shrink = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>>(ShrinkKernel);
+            shrink = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>>(ShrinkKernel);
             updateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateXKernel);
             updateCandidates = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateCandidatesKernel);
         }
@@ -98,7 +98,7 @@ namespace Single_Reference.Deconvolution
             {
                 //set lambdap
                 lambdaAlpha.CopyFrom(0.0f, new Index(0));
-                shrink(xImageGPU.Extent, xImageGPU.View, candidatesGPU.View, lambdaAlpha.View, maxPixelGPU.View);
+                shrink(xImageGPU.Extent, xImageGPU.View, bMapGPU.View, aMapGPU.View, lambdaAlpha.View, maxPixelGPU.View);
                 accelerator.Synchronize();
                 var maxPixel = maxPixelGPU.GetAsArray()[0];
                 var lambdaMax = 1 / alpha * maxPixel.AbsDiff;
@@ -135,9 +135,10 @@ namespace Single_Reference.Deconvolution
         {
             bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
+            /*
             for (int i = 0; i < bMap.GetLength(0); i++)
                 for (int j = 0; j < bMap.GetLength(1); j++)
-                    bMap[i, j] = bMap[i, j] / aMap[i, j];
+                    bMap[i, j] = bMap[i, j] / aMap[i, j];*/
 
             AllocateGPU(reconstruction, bMap, lambda, alpha);
             for (int i = 0; i < iterations; i+=batchIterations)
@@ -164,11 +165,11 @@ namespace Single_Reference.Deconvolution
         {
             for(int i = 0; i < batchIterations; i++)
             {
-                shrink(xImageGPU.Extent, xImageGPU.View, candidatesGPU.View, lambdaAlpha.View, maxPixelGPU.View);
+                shrink(xImageGPU.Extent, xImageGPU.View, bMapGPU.View, aMapGPU.View, lambdaAlpha.View, maxPixelGPU.View);
                 accelerator.Synchronize();
 
                 updateX(new Index(1), xImageGPU.View, maxPixelGPU.View);
-                updateCandidates(psf2GPU.Extent, candidatesGPU.View, aMapGPU.View, psf2GPU.View, maxPixelGPU.View);
+                updateCandidates(psf2GPU.Extent, bMapGPU.View, aMapGPU.View, psf2GPU.View, maxPixelGPU.View);
                 accelerator.Synchronize();
             }
         }
@@ -191,8 +192,8 @@ namespace Single_Reference.Deconvolution
             xImageGPU.CopyFrom(xImage, zeroIndex, zeroIndex, size);
 
             var bMapSize = new Index2(bMap.GetLength(1), bMap.GetLength(0));
-            candidatesGPU = accelerator.Allocate<float>(bMapSize);
-            candidatesGPU.CopyFrom(bMap, zeroIndex, zeroIndex, bMapSize);
+            bMapGPU = accelerator.Allocate<float>(bMapSize);
+            bMapGPU.CopyFrom(bMap, zeroIndex, zeroIndex, bMapSize);
 
             aMapGPU = accelerator.Allocate<float>(size);
             aMapGPU.CopyFrom(aMap, zeroIndex, zeroIndex, size);
@@ -214,7 +215,7 @@ namespace Single_Reference.Deconvolution
         private void FreeGPU()
         {
             xImageGPU.Dispose();
-            candidatesGPU.Dispose();
+            bMapGPU.Dispose();
             aMapGPU.Dispose();
             psf2GPU.Dispose();
 
@@ -281,7 +282,8 @@ namespace Single_Reference.Deconvolution
         #region GPU Kernels
         private static void ShrinkKernel(Index2 index,
             ArrayView2D<float> xImage,
-            ArrayView2D<float> candidates,
+            ArrayView2D<float> bMap,
+            ArrayView2D<float> aMap,
             ArrayView<float> lambdaAlpha,
             ArrayView<Pixel> output)
         {
@@ -291,7 +293,7 @@ namespace Single_Reference.Deconvolution
             if (index.InBounds(xImage.Extent))
             {
                 var xOld = xImage[index];
-                var xCandidate = candidates[index];
+                var xCandidate = bMap[index] / aMap[index];
                 var lambda = lambdaAlpha[0];
                 var alpha = lambdaAlpha[1];
 
@@ -329,7 +331,7 @@ namespace Single_Reference.Deconvolution
             var indexCandidate = index.Add(new Index2(pixel[0].X, pixel[0].Y)).Subtract(psf2.Extent / 2);
             if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(candidates.Extent))
             {
-                candidates[indexCandidate] -= (psf2[index] * pixel[0].Sign * pixel[0].AbsDiff) / aMap[indexCandidate];
+                candidates[indexCandidate] -= (psf2[index] * pixel[0].Sign * pixel[0].AbsDiff);
             }
         }
         #endregion
