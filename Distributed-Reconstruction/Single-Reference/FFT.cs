@@ -10,8 +10,8 @@ namespace Single_Reference
 {
     public class FFT : IDisposable
     {
-        private FftwPlanRC fft;
-        private FftwPlanRC ifft;
+        private readonly FftwPlanRC fft;
+        private readonly FftwPlanRC ifft;
         public AlignedArrayDouble ImageBuffer {get; private set;}
         public AlignedArrayComplex FourierBuffer { get; private set; }
 

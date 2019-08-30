@@ -430,7 +430,9 @@ namespace Single_Reference.GPUDeconvolution
         {
             using (var context = new Context(ContextFlags.FastMath, ILGPU.IR.Transformations.OptimizationLevel.Release))
             {
-                var psf2 = Common.PSF.CalcPSFSquared(xImage, psf);
+                var padding = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
+                var psfCorrelated = Common.PSF.CalculatePaddedFourierCorrelation(Common.ToFloatImage(psf), padding);
+                var psf2 = Common.PSF.CalcPSFSquared(psfCorrelated);
                 var aMap = Common.PSF.CalcAMap(xImage, psf);
                 var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
                 if (gpuIds.Any())
@@ -438,7 +440,7 @@ namespace Single_Reference.GPUDeconvolution
                     using (var accelerator = new CudaAccelerator(context, gpuIds.First().DeviceId))
                     {
                         Console.WriteLine($"Performing operations on {accelerator}");
-                        Iteration(accelerator, ToFloat(xImage), ToFloat(b), ToFloat(aMap), ToFloat(psf2), (float)lambda, (float)alpha);
+                        Iteration(accelerator, ToFloat(xImage), ToFloat(b), ToFloat(aMap), psf2, (float)lambda, (float)alpha);
                     }
                 }
                 else
@@ -446,7 +448,7 @@ namespace Single_Reference.GPUDeconvolution
                     using (var accelerator = new CPUAccelerator(context, 4))
                     {
                         Console.WriteLine($"Performing operations on {accelerator}");
-                        Iteration(accelerator, ToFloat(xImage), ToFloat(b), ToFloat(aMap), ToFloat(psf2), (float)lambda, (float)alpha);
+                        Iteration(accelerator, ToFloat(xImage), ToFloat(b), ToFloat(aMap), psf2, (float)lambda, (float)alpha);
                     }
                 }
             }

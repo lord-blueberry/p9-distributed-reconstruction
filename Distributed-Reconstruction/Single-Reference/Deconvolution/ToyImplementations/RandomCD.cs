@@ -16,7 +16,9 @@ namespace Single_Reference.Deconvolution.ToyImplementations
         {
             bool converged = false;
             var aMap = Common.PSF.CalcAMap(xImage, psf);
-            var psf2 = Common.PSF.CalcPSFSquared(xImage, psf);
+            var padding = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
+            var psfCorrelated = Common.PSF.CalculatePaddedFourierCorrelation(Common.ToFloatImage(psf), padding);
+            var psf2 = Common.PSF.CalcPSFSquared(psfCorrelated);
             var xDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var imageSection = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
 
@@ -40,7 +42,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var PsfCorr = FFT.Forward(psfTmp, 1.0);
 
             psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
-            Common.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
+            CommonDeprecated.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
             var tmp = FFT.Forward(psfTmp, 1.0);
             var tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
             var pixelAcces = new double[xImage.GetLength(0), xImage.GetLength(1)];
@@ -83,11 +85,11 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                         }
                         else
                         {
-                            Common.PSF.SetPSFInWindow(psfTmp, xImage, psf, yPixel, xPixel);
+                            CommonDeprecated.PSF.SetPSFInWindow(psfTmp, xImage, psf, yPixel, xPixel);
                             tmp = FFT.Forward(psfTmp, 1.0);
                             tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
                             var bUpdateMasked = FFT.Backward(tmp2, tmp2.GetLength(0) * tmp2.GetLength(1));
-                            UpdateB(bMap, bUpdateMasked, imageSection, yPixel, xPixel, -xDiff[yPixel, xPixel]);
+                            UpdateB(bMap, Common.ToFloatImage(bUpdateMasked), imageSection, yPixel, xPixel, -xDiff[yPixel, xPixel]);
                         }
 
                         xImage[yPixel, xPixel] += xDiff[yPixel, xPixel];
@@ -106,7 +108,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return converged;
         }
 
-        private static void UpdateB(double[,] b, double[,] bUpdate, Common.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
+        private static void UpdateB(double[,] b, float[,] bUpdate, Common.Rectangle imageSection, int yPixel, int xPixel, double xDiff)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
             var xBHalf = bUpdate.GetLength(1) / 2;

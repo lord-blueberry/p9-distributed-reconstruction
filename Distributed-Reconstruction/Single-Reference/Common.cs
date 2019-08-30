@@ -10,6 +10,11 @@ namespace Single_Reference
     {
         public static double ShrinkElasticNet(double value, double lambda, double alpha) => Math.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
+        public static class PSF2
+        {
+
+        }
+
         public static class PSF
         {
             public static double[,] CalcPSFScan(double[,] psf)
@@ -68,8 +73,11 @@ namespace Single_Reference
                 return aMap;
             }
 
-            public static Complex[,] CalculateFourierCorrelation(double[,] psf, int yPadding, int xPadding)
+            public static Complex[,] CalculatePaddedFourierCorrelation(float[,] psf, Rectangle padding)
             {
+                var yPadding = padding.YEnd;
+                var xPadding = padding.XEnd;
+
                 var psfPadded = new double[yPadding + psf.GetLength(0), xPadding + psf.GetLength(1)];
                 var yPsfHalf = yPadding / 2;
                 var xPsfHalf = xPadding / 2;
@@ -83,36 +91,14 @@ namespace Single_Reference
                 return PSFPadded;
             }
 
-            /// <summary>
-            /// Calculate PSF*PSF
-            /// </summary>
-            /// <param name="image">is used to check if parts of the psf are masked by the image dimensions</param>
-            /// <param name="psf"></param>
-            /// <returns></returns>
-            public static double[,] CalcPSFSquared(double[,] image, double[,] psf)
+            public static float[,] CalcPSFSquared(Complex[,] psfCorrelated)
             {
-                var yPsfHalf = psf.GetLength(0) / 2;
-                var xPsfHalf = psf.GetLength(1) / 2;
-
-                //invert the PSF, since we actually do want to correlate the psf with the residuals. (The FFT already inverts the psf, so we need to invert it again to not invert it. Trust me.)
-                var psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
-                for (int y = 0; y < psf.GetLength(0); y++)
-                    for (int x = 0; x < psf.GetLength(1); x++)
-                        psfTmp[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
-                FFT.Shift(psfTmp);
-                var PsfCorr = FFT.Forward(psfTmp, 1.0);
-
-                psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
-                SetPSFInWindow(psfTmp, image, psf, image.GetLength(0) / 2, image.GetLength(1) / 2);
-                var tmp = FFT.Forward(psfTmp, 1.0);
-                var tmp2 = Fourier2D.Multiply(tmp, PsfCorr);
-
-                var psf2 = FFT.Backward(tmp2, (double)(tmp2.GetLength(0) * tmp2.GetLength(1)));
-
-                return psf2;
+                var PSF2 = Fourier2D.Multiply(psfCorrelated, psfCorrelated);
+                var psf2 = FFT.Backward(PSF2, psfCorrelated.Length);
+                return ToFloatImage(psf2);
             }
 
-            public static void SetPSFInWindow(double[,] psfPadded, double[,] window, double[,] psf, int yPixel, int xPixel)
+            public static void SetPsfInWindow(double[,] psfOutput, double[,] psf, Rectangle window, int yPixel, int xPixel)
             {
                 var yPsfHalf = psf.GetLength(0) / 2;
                 var xPsfHalf = psf.GetLength(1) / 2;
@@ -121,16 +107,17 @@ namespace Single_Reference
                     {
                         var y = (yPixel + i) - yPsfHalf;
                         var x = (xPixel + j) - xPsfHalf;
-                        if (y >= 0 & y < window.GetLength(0) & x >= 0 & x < window.GetLength(1))
+                        if (y >= 0 & y < window.YEnd & x >= 0 & x < window.XEnd)
                         {
-                            psfPadded[i + yPsfHalf, j + xPsfHalf] = psf[i, j];
+                            psfOutput[i + yPsfHalf, j + xPsfHalf] = psf[i, j];
                         }
                         else
                         {
-                            psfPadded[i + yPsfHalf, j + yPsfHalf] = 0.0;
+                            psfOutput[i + yPsfHalf, j + yPsfHalf] = 0.0;
                         }
                     }
             }
+
 
             /// <summary>
             /// Find maximum pixel value that is outside the cut
@@ -244,6 +231,16 @@ namespace Single_Reference
 
                 return residualVis;
             }
+        }
+
+        public static float[,] ToFloatImage(double[,] image)
+        {
+            var output = new float[image.GetLength(0), image.GetLength(1)];
+            for (int i = 0; i < image.GetLength(0); i++)
+                for (int j = 0; j < image.GetLength(1); j++)
+                    output[i, j] = (float)image[i,j];
+
+            return output;
         }
 
         public class Rectangle

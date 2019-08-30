@@ -6,6 +6,7 @@ using Single_Reference.Deconvolution;
 using Single_Reference.Deconvolution.ToyImplementations;
 using System.Numerics;
 using static System.Math;
+using static Single_Reference.Common;
 using System.Diagnostics;
 using System.IO;
 
@@ -68,8 +69,8 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
             var psfCut = CutImg(psf, 2);
             FitsIO.Write(psfCut, "psfCut.fits");
-            var maxSidelobe = Common.PSF.CalcMaxSidelobe(psf);
-            var psfCorrelated = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+            var maxSidelobe = PSF.CalcMaxSidelobe(psf);
+            var psfCorrelated = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
@@ -156,7 +157,7 @@ namespace Single_Reference
                 watchDeconv.Start();
                 var sideLobe = maxSidelobe * GetMax(dirtyImage);
                 Console.WriteLine("sideLobeLevel: " + sideLobe);
-                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 var lambda = 100.0;
                 var alpha = 0.95;
@@ -239,7 +240,7 @@ namespace Single_Reference
                 //DECONVOLVE
                 watchDeconv.Start();
 
-                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10000);
 
@@ -324,7 +325,7 @@ namespace Single_Reference
                 //DECONVOLVE
                 watchDeconv.Start();
 
-                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 //var converged = GradientDebug.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10000);
                 var converged = RandomBlockCD.Deconvolve(xImage, dirtyImage, psf, 0.0, 1.0, 1);
@@ -360,11 +361,11 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 1024;
+            int gridSize = 256;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 1024;
-            double cellSize = 0.25 / 3600.0 * PI / 180.0;
+            double cellSize = 1.0 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
             var watchTotal = new Stopwatch();
@@ -404,10 +405,13 @@ namespace Single_Reference
                 //DECONVOLVE
                 watchDeconv.Start();
 
-                var PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
 
                 //var converged = GPUDeconvolution.GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
+                var deconvolver = new GPUDeconvolution.GPUGreedyCD();
+                deconvolver.DeconvolvePath(null, null, null, null, 0.5f, 0.5f, 1, 10, 100);
+
                 var converged = GPUDeconvolution.StupidGreedy.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
 
                 if (converged)

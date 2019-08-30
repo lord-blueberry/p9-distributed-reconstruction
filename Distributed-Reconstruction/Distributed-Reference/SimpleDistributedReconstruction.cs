@@ -7,6 +7,7 @@ using MPI;
 using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
 using Single_Reference;
+using static Single_Reference.Common;
 
 using Distributed_Reference.DistributedDeconvolution;
 
@@ -43,11 +44,11 @@ namespace Distributed_Reference
             var psf = CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies);
             var psfCut = CutImg(psf);
             Complex[,] PsfCorrelation = null;
-            var maxSidelobe = Common.PSF.CalcMaxSidelobe(psf);
+            var maxSidelobe = PSF.CalcMaxSidelobe(psf);
             
             if (comm.Rank == 0)
             {
-                PsfCorrelation = Common.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                PsfCorrelation = PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
             }
 
             var residualVis = local.Visibilities;
@@ -104,7 +105,7 @@ namespace Distributed_Reference
             return reconstructed;
         }
 
-        private static Common.Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
+        private static Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
         {
             var yPatchCount = (int)Math.Floor(Math.Sqrt(nodeCount));
             var xPatchCount = (nodeCount / yPatchCount);
@@ -118,7 +119,7 @@ namespace Distributed_Reference
             var yPatchEnd = yIdx + 1 < yPatchCount ? yPatchOffset + ySize / yPatchCount : ySize;
             var xPatchEnd = xIdx + 1 < xPatchCount ? xPatchOffset + xSize / xPatchCount : xSize;
 
-            return new Common.Rectangle(yPatchOffset, xPatchOffset, yPatchEnd, xPatchEnd);
+            return new Rectangle(yPatchOffset, xPatchOffset, yPatchEnd, xPatchEnd);
         }
 
         private static double[,] GetImgSection(double[,] b, Common.Rectangle imgSection)
@@ -188,7 +189,7 @@ namespace Distributed_Reference
         }
 
 
-        private static double[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
+        public static double[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             double[,] psf = null;
             var localGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
@@ -197,8 +198,6 @@ namespace Distributed_Reference
             {
                 psf = FFT.Backward(psf_total, c.VisibilitiesCount);
                 FFT.Shift(psf);
-                Single_Reference.FitsIO.Write(psf, "psf.fits");
-                Console.WriteLine("psf Written");
             }
             comm.Broadcast(ref psf, 0);
 

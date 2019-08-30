@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Numerics;
 
 using ILGPU;
 using ILGPU.AtomicOperations;
-using ILGPU.Lightning;
-using ILGPU.ReductionOperations;
 using ILGPU.Runtime;
 using ILGPU.Runtime.CPU;
-using ILGPU.ShuffleOperations;
 using System.Linq;
 using ILGPU.Runtime.Cuda;
+
+using static Single_Reference.Common;
 
 namespace Single_Reference.GPUDeconvolution
 {
@@ -37,6 +37,22 @@ namespace Single_Reference.GPUDeconvolution
         public bool RunsOnGPU { get; }
         readonly Context c;
         readonly Accelerator accelerator;
+        readonly Common.Rectangle xImageSection;
+        readonly Complex[,] psfCorrelation;
+        readonly float[,] psf2;
+        readonly float[,] aMap;
+        
+        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation):
+            this(totalSize, imageSection, psf, psfCorrelation, PSF.CalcPSFSquared(psfCorrelation))
+        {
+            
+        }
+
+        public GPUGreedyCD(Rectangle totalSize, Rectangle windowSize, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared)
+        {
+
+        }
+
 
         public GPUGreedyCD()
         {
@@ -70,8 +86,9 @@ namespace Single_Reference.GPUDeconvolution
 
         public bool Deconvolve(float[,] xImage, float[,] bMap, float[,] aMap, float[,] psf2, float lambda, float alpha, float epsilon, int iterations, int batchIterations=500)
         {
+            
             bool converged = false;
-            AllocateGPU(xImage, bMap, aMap, psf2, lambda, alpha);
+            /*AllocateGPU(xImage, bMap, aMap, psf2, lambda, alpha);
             for(int i = 0; i < iterations; i++)
             {
                 DeconvolutionBatchIterations(batchIterations);
@@ -82,7 +99,7 @@ namespace Single_Reference.GPUDeconvolution
                     break;
                 }
             }
-            FreeGPU();
+            FreeGPU();*/
             return converged;
         }
 
@@ -113,25 +130,26 @@ namespace Single_Reference.GPUDeconvolution
         /// <param name="psf2"></param>
         /// <param name="lambda"></param>
         /// <param name="alpha"></param>
-        private void AllocateGPU(float[,] xImage, float[,] bMap, float[,] aMap, float[,] psf2, float lambda, float alpha)
+        private void AllocateGPU(float[,] xImage, float[,] bMap, float lambda, float alpha)
         {
+            //TODO:windowing
             for (int i = 0; i < bMap.GetLength(0); i++)
                 for (int j = 0; j < bMap.GetLength(1); j++)
                     bMap[i, j] = bMap[i, j] / aMap[i, j];
 
-            var index0 = new Index2(0, 0);
+            var zeroIndex = new Index2(0, 0);
             var size = new Index2(xImage.GetLength(1), xImage.GetLength(0));
             xImageGPU = accelerator.Allocate<float>(size);
-            xImageGPU.CopyFrom(xImage, index0, index0, size);
+            xImageGPU.CopyFrom(xImage, zeroIndex, zeroIndex, size);
 
             candidatesGPU = accelerator.Allocate<float>(size);
-            candidatesGPU.CopyFrom(bMap, index0, index0, size);
+            candidatesGPU.CopyFrom(bMap, zeroIndex, zeroIndex, size);
 
             aMapGPU = accelerator.Allocate<float>(size);
-            aMapGPU.CopyFrom(aMap, index0, index0, size);
+            aMapGPU.CopyFrom(aMap, zeroIndex, zeroIndex, size);
 
             var sizePSF = new Index2(psf2.GetLength(1), psf2.GetLength(0));
-            psf2GPU.CopyFrom(psf2, index0, index0, sizePSF);
+            psf2GPU.CopyFrom(psf2, zeroIndex, zeroIndex, sizePSF);
 
             lambdaAlpha = accelerator.Allocate<float>(2);
             lambdaAlpha.CopyFrom(lambda, new Index(0));

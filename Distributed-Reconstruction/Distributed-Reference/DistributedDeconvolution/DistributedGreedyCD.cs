@@ -70,7 +70,7 @@ namespace Distributed_Reference.DistributedDeconvolution
             FFT.Shift(psfTmp);
             var PsfCorr = FFT.Forward(psfTmp, 1.0);
 
-            psfTmp = new double[psf.GetLength(0) + +psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
+            psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
             SetPsf(psfTmp, totalSize, psf, totalSize.YEnd / 2, totalSize.XEnd / 2);
             var tmp = FFT.Forward(psfTmp, 1.0);
             var tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
