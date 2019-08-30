@@ -190,7 +190,7 @@ namespace Single_Reference.Deconvolution
             var A2 = CreateA2(LA);
 
             var inv = AA.Inverse();
-            var arr = inv.ToArray();
+            var arr = AA.ToArray();
 
             var xImage = new double[32, 32];
             var dirty = new double[32, 32];
@@ -217,8 +217,8 @@ namespace Single_Reference.Deconvolution
             var bVec = new DenseVector(4);
             bVec[0] = bMap[16, 16];
             bVec[1] = bMap[16, 17];
-            bVec[2] = bMap[16, 18];
-            bVec[3] = bMap[16, 19];
+            bVec[2] = bMap[17, 16];
+            bVec[3] = bMap[17, 17];
 
             var bVec2 = CopyFrom(bMap, 16 / yBSize, 16 /xBSize, yBSize, xBSize);
 
@@ -240,8 +240,8 @@ namespace Single_Reference.Deconvolution
             var a0 = ToVector(psf);
 
             var a1 = ToVector(Shift(psf, 0, 1));
-            var a2 = ToVector(Shift(psf, 0, 2));
-            var a3 = ToVector(Shift(psf, 0, 3));
+            var a2 = ToVector(Shift(psf, 1, 0));
+            var a3 = ToVector(Shift(psf, 1, 1));
 
             var three = a0 * a1;
             FitsIO.Write(psf, "psf.fits");
