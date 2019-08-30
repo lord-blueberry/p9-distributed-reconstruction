@@ -156,7 +156,7 @@ namespace Single_Reference.Deconvolution
             return A;
         }
 
-        public static void Run()
+        public static void RunToy()
         {
             var psf = new double[32, 32];
             for (int i = 15; i < 18; i++)
@@ -169,38 +169,18 @@ namespace Single_Reference.Deconvolution
 
             var yBSize = 2;
             var xBSize = 2;
-            var aaa = CalcBlockInversion(psf, 2, 2);
-
-            var a = new DenseVector(4);
-            a[0] = Correlate(psf, 0, 0);
-            a[1] = Correlate(psf, 0, 1);
-            a[2] = Correlate(psf, 1, 0);
-            a[3] = Correlate(psf, 1, 1);
-            var a01 = new DenseVector(3);
-            a01[0] = a[0];
-            a01[1] = a[3];
-            a01[2] = a[2];
-            var a10 = new DenseVector(2);
-            a10[0] = a[0];
-            a10[1] = a[1];
-            var LA = new List<DenseVector>(3);
-            LA.Add(a);
-            LA.Add(a01);
-            LA.Add(a10);
-            var A2 = CreateA2(LA);
-
+            var blockInv = CalcBlockInversion(psf, 2, 2);
             var inv = AA.Inverse();
-            var arr = AA.ToArray();
 
             var xImage = new double[32, 32];
-            var dirty = new double[32, 32];
+            var groundTruth = new double[32, 32];
 
-            dirty[16, 16] = 1.0;
-            dirty[16, 17] = 1.8;
+            groundTruth[16, 16] = 1.0;
+            //dirty[16, 17] = 1.8;
             //dirty[17, 16] = 1.1;
             //dirty[17, 17] = 0.5;
             //dirty[16, 20] = 0.5;
-            var IMG = FFT.Forward(dirty, 1.0);
+            var IMG = FFT.Forward(groundTruth, 1.0);
             var PSF = FFT.Forward(psf, 1.0);
             var CONV = Common.Fourier2D.Multiply(IMG, PSF);
             var residuals = FFT.Backward(CONV, (double)(IMG.GetLength(0) * IMG.GetLength(1)));
@@ -212,26 +192,25 @@ namespace Single_Reference.Deconvolution
             var bMap = FFT.Backward(BMAP, (double)(BMAP.GetLength(0) * BMAP.GetLength(1)));
             FFT.Shift(bMap);
 
-            FitsIO.Write(bMap, "resConf.fits");
+            FitsIO.Write(bMap, "bMapToy.fits");
+            Console.WriteLine(AA.Inverse());
 
-            var bVec = new DenseVector(4);
-            bVec[0] = bMap[16, 16];
-            bVec[1] = bMap[16, 17];
-            bVec[2] = bMap[17, 16];
-            bVec[3] = bMap[17, 17];
-
-            var bVec2 = CopyFrom(bMap, 16 / yBSize, 16 /xBSize, yBSize, xBSize);
+            var bVec = CopyFrom(bMap, 16 / yBSize, 16 /xBSize, yBSize, xBSize);
 
             var res3 = ( inv * bVec);
             var array = res3.ToArray();
+            Deconvolve(xImage, residuals, psf, 0.0, 1.0, 1);
+
+            /*
             AddInto(xImage, res3, 16 / yBSize, 16 / xBSize, yBSize, xBSize);
             var XIMG = FFT.Forward(xImage, 1.0);
             var RESCONV = Common.Fourier2D.Multiply(XIMG, PSF);
             var results = FFT.Backward(RESCONV, (double)(BMAP.GetLength(0) * BMAP.GetLength(1)));
             FFT.Shift(results);
             FitsIO.Write(results, "dirtyConf.fits");
-            FitsIO.Write(xImage, "dXXConf.fits");
-            Console.Write(inv);
+            FitsIO.Write(xImage, "dXXConf.fits");*/
+
+
 
         }
 
@@ -243,9 +222,6 @@ namespace Single_Reference.Deconvolution
             var a2 = ToVector(Shift(psf, 1, 0));
             var a3 = ToVector(Shift(psf, 1, 1));
 
-            var three = a0 * a1;
-            FitsIO.Write(psf, "psf.fits");
-            FitsIO.Write(Shift(psf, 0, 1), "psfShift.fits");
             var output = new DenseMatrix(a0.Count, 4);
             output.SetColumn(0, a0);
             output.SetColumn(1, a1);
@@ -254,9 +230,7 @@ namespace Single_Reference.Deconvolution
             
 
             var A = output.Transpose() * output;
-            Console.WriteLine(A);
-
-
+            
             return A;
         }
 
