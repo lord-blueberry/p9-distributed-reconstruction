@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
+using Single_Reference.Deconvolution.ToyImplementations;
 using System.Numerics;
 using static System.Math;
 using System.Diagnostics;

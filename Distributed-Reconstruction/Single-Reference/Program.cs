@@ -6,7 +6,7 @@ namespace Single_Reference
     {
         static void Main()
         {
-            //Deconvolution.RandomBlockCD.RunToy();
+            Deconvolution.ToyImplementations.RandomBlockCD2.RunToy();
             //DebugMethods.DebugSimulatedGreedy2();
             DebugMethods.DebugSimulatedPCDM();
             
