@@ -54,7 +54,7 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        public bool Deconvolve(float[,] xImage, float[,] residuals, float lambda, float alpha, int maxIteration, float epsilon)
+        public bool Deconvolve(float[,] xImage, float[,] residuals, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
         {
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
             return DeconvolveImpl(xImage, bMap, lambda, alpha, maxIteration, epsilon);

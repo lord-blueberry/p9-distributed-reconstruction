@@ -133,7 +133,6 @@ namespace Single_Reference.Deconvolution
 
         public bool Deconvolve(float[,] reconstruction, float[,] residuals, float lambda, float alpha, int iterations, float epsilon=1e-4f)
         {
-            
             bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
             for (int i = 0; i < bMap.GetLength(0); i++)
