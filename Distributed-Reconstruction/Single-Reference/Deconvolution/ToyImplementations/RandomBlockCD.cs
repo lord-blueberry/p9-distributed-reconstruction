@@ -6,7 +6,7 @@ using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
 
 
-namespace Single_Reference.Deconvolution
+namespace Single_Reference.Deconvolution.ToyImplementations
 {
     public class RandomBlockCD
     {

@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Single_Reference.Deconvolution
+namespace Single_Reference.Deconvolution.ToyImplementations
 {
-    class GradientDebug
+    class RandomCD
     {
         private static double CalcV(double[,] img)
         {

@@ -7,7 +7,7 @@ using static System.Math;
 using System.Diagnostics;
 using System.IO;
 
-namespace Single_Reference.Deconvolution
+namespace Single_Reference.Deconvolution.ToyImplementations
 {
     public class NaiveGreedyCD
     {

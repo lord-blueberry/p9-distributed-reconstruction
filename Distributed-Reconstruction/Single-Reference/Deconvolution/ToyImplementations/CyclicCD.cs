@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Single_Reference.Deconvolution
+namespace Single_Reference.Deconvolution.ToyImplementations
 {
     class CyclicCD
     {

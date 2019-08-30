@@ -4,7 +4,7 @@ using System.Text;
 using Single_Reference.IDGSequential;
 using System.Numerics;
 
-namespace Single_Reference.Deconvolution
+namespace Single_Reference.Deconvolution.ToyImplementations
 {
     public class CyclicCD2
     {

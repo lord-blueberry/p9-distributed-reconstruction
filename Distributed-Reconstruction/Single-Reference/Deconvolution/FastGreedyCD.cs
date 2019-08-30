@@ -8,7 +8,7 @@ namespace Single_Reference.Deconvolution
     {
         private float[,] aMap;
 
-        public FastGreedyCD()
+        public FastGreedyCD(int nCores)
         {
 
         }

@@ -4,7 +4,7 @@ using System.Text;
 using System.Numerics;
 using Single_Reference.IDGSequential;
 
-namespace Single_Reference.Deconvolution
+namespace Single_Reference.Deconvolution.ToyImplementations
 {
     public class DebugCyclic
     {
