@@ -25,7 +25,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var psf2Fourier = Common.Fourier2D.Multiply(psfCorrelated, psfCorrelated);
 
             var xDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
-            var blockInversion = CalcBlockInversion(psf, yBlockSize, xBlockSize);
+            var blockInversion = CalcBlock(psf, yBlockSize, xBlockSize).Inverse();
             var random = new Random(123);
 
             var iter = 0;
@@ -83,7 +83,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return output;
         }
 
-        private static Matrix<double> CalcBlockInversion(double[,] psf, int yBlockSize, int xBlockSize)
+        private static Matrix<double> CalcBlock(double[,] psf, int yBlockSize, int xBlockSize)
         {
             var size = yBlockSize * xBlockSize;
 
@@ -109,7 +109,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 }
             }
 
-            return correlationMatrix.Inverse();
+            return correlationMatrix;
         }
 
         private static Vector<double> CopyFrom(double[,] image, int yB, int xB, int yBlockSize, int xBlockSize)
@@ -135,6 +135,21 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             for (int y = 0; y < yBlockSize; y++)
                 for (int x = 0; x < xBlockSize; x++)
                     image[yOffset + y, xOffset + x] += vec[i++];
+        }
+
+
+        private static double ApproximateLipschitz(double[,] psf, int yBlockSize, int xBlockSize)
+        {
+            var a00 = 0.0;
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                    a00 += psf[i, j] * psf[i,j];
+
+            var lipschitz = 0.0;
+            for (int i = 0; i < yBlockSize * xBlockSize; i++)
+                lipschitz += a00 * a00;
+            lipschitz = Math.Sqrt(lipschitz);
+            return lipschitz;
         }
 
         #region toDelete
@@ -168,23 +183,24 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
             var AA = CalcAgain(psf);
 
-            var yBSize = 2;
-            var xBSize = 2;
-            var blockInv = CalcBlockInversion(psf, 2, 2);
+            var yBSize = 16;
+            var xBSize = 16;
+            var A = CalcBlock(psf, yBSize, xBSize);
+            var blockInv =A.Inverse();
             var inv = AA.Inverse();
 
             var lipschitz = 0.0;
-            foreach (var cell in inv.Enumerate())
+            foreach (var cell in blockInv.Enumerate())
                 lipschitz += cell * cell;
 
             var lipschitz2 = 0.0;
-            foreach (var cell in AA.Enumerate())
+            foreach (var cell in A.Enumerate())
                 lipschitz2 += cell * cell;
             lipschitz2 = Math.Sqrt(lipschitz2);
 
             var lipschitz3 = 0.0;
-            var a00 = AA[0, 0];
-            for (int i = 0; i < 4; i++)
+            var a00 = A[0, 0];
+            for (int i = 0; i < yBSize * xBSize; i++)
                 lipschitz3 += a00 * a00;
             lipschitz3 = Math.Sqrt(lipschitz3);
 
@@ -214,7 +230,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             {
                 var bVec = CopyFrom(bMap, 16 / yBSize, 16 / xBSize, yBSize, xBSize);
 
-                var optimized = (inv * bVec);
+                var optimized = (blockInv * bVec);
                 var tmp = optimized.ToArray();
 
                 var optLipschitz = (bVec / lipschitz3);
