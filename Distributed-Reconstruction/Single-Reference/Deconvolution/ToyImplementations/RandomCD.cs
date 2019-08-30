@@ -19,7 +19,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var aMap = CommonDeprecated.PSF.CalcAMap(xImage, psf);
             var padding = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
             var psfCorrelated = PSF.CalcPaddedFourierCorrelation(ToFloatImage(psf), padding);
-            var psf2 = Common.PSF.CalcPSFSquared(psfCorrelated);
+            var psf2 = Common.PSF.CalcPSFSquared(ToFloatImage(psf));
             var xDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
             var imageSection = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
 

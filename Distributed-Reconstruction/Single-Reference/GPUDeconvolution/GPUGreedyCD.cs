@@ -44,8 +44,8 @@ namespace Single_Reference.GPUDeconvolution
         readonly float[,] aMap;
         readonly FFT fft;
         
-        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation):
-            this(totalSize, imageSection, psf, psfCorrelation, PSF.CalcPSFSquared(psfCorrelation))
+        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf):
+            this(totalSize, imageSection, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf))
         {
             
         }

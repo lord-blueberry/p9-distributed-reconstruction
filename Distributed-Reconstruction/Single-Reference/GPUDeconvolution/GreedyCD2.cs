@@ -432,7 +432,7 @@ namespace Single_Reference.GPUDeconvolution
             {
                 var padding = new Common.Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
                 var psfCorrelated = Common.PSF.CalcPaddedFourierCorrelation(Common.ToFloatImage(psf), padding);
-                var psf2 = Common.PSF.CalcPSFSquared(psfCorrelated);
+                var psf2 = Common.PSF.CalcPSFSquared(Common.ToFloatImage(psf));
                 var aMap = CommonDeprecated.PSF.CalcAMap(xImage, psf);
                 var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
                 if (gpuIds.Any())

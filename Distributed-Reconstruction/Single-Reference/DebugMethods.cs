@@ -242,7 +242,7 @@ namespace Single_Reference
 
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10000);
+                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.8, 10000);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -380,12 +380,20 @@ namespace Single_Reference
             var psf = FFT.Backward(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
 
-            var psfCut = CutImg(psf);
-            FitsIO.Write(psf, "psf.fits");
+            var psfCutDouble = CutImg(psf);
+            var psfCut = ToFloatImage(psfCutDouble);
             FitsIO.Write(psfCut, "psfCut.fits");
 
-            var xImage = new double[gridSize, gridSize];
+            var totalSize = new Rectangle(0, 0, gridSize, gridSize);
+            var fastCD = new FastGreedyCD(totalSize, totalSize, psfCut);
+
+            var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;
+
+            var psf2 = PSF.CalcPSFSquaredDebug(psfCutDouble);
+            FitsIO.Write(psf2, "psf2double.fits");
+
+
             /*var truth = new double[gridSize, gridSize];
             truth[30, 30] = 1.0;
             truth[35, 36] = 1.5;
@@ -404,16 +412,7 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-
-                var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
-                var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-
-                //var converged = GPUDeconvolution.GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
-
-                //var deconvolver = new GPUDeconvolution.GPUGreedyCD();
-                //deconvolver.DeconvolvePath(null, null, null, null, 0.5f, 0.5f, 1, 10, 100);
-
-                var converged = GPUDeconvolution.StupidGreedy.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
+                var converged = fastCD.Deconvolve(xImage, ToFloatImage(dirtyImage), 0.5f, 0.8f, 10000, 1e-4f);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");

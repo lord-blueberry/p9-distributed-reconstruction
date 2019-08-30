@@ -16,13 +16,8 @@ namespace Single_Reference.Deconvolution
         readonly float[,] psf2;
         readonly float[,] aMap;
 
-        public FastGreedyCD(int nCores)
-        {
-
-        }
-
-        public FastGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation) :
-            this(totalSize, imageSection, psf, psfCorrelation, PSF.CalcPSFSquared(psfCorrelation))
+        public FastGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf) :
+            this(totalSize, imageSection, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf))
         {
 
         }
@@ -36,25 +31,24 @@ namespace Single_Reference.Deconvolution
             aMap = PSF.CalcAMap(psf, totalSize, imageSection);
         }
 
-
-        public bool DeconvolvePath(float[,] reconstruction, float[,] residuals, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
+        public bool DeconvolvePath(float[,] xImage, float[,] residuals, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
             bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
-                var max = GetAbsMax(reconstruction, bMap, 0.0f, 1.0f);
+                var max = GetAbsMax(xImage, bMap, 0.0f, 1.0f);
 
                 var lambdaMax = 1 / alpha * max.PixelMaxDiff;
                 var lambdaCurrent = lambdaMax / lambdaFactor;
                 Console.WriteLine("-----------------------------FastGreedyCD with lambda " + lambdaCurrent + "------------------------");
                 if (lambdaCurrent > lambdaMin)
                 {
-                    Deconvolve(reconstruction, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
+                    DeconvolveImpl(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
                 }
                 else
                 {
-                    converged = Deconvolve(reconstruction, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
+                    converged = DeconvolveImpl(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
                     if (converged)
                         break;
                 }
@@ -63,10 +57,18 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        public bool Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon)
+        public bool Deconvolve(float[,] xImage, float[,] residuals, float lambda, float alpha, int maxIteration, float epsilon)
+        {
+            var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
+            return DeconvolveImpl(xImage, bMap, lambda, alpha, maxIteration, epsilon);
+        }
+
+        private bool DeconvolveImpl(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon)
         {
             var watch = new Stopwatch();
             watch.Start();
+            FitsIO.Write(bMap, "bMapFast.fits");
+            FitsIO.Write(psf2, "psf2Fast.fits");
 
             int iter = 0;
             bool converged = false;
@@ -81,11 +83,15 @@ namespace Single_Reference.Deconvolution
                     var pixelOld = xImage[yLocal, xLocal];
                     xImage[yLocal, xLocal] = maxPixel.PixelNew;
                     UpdateBSingle(bMap, psf2, imageSection, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
-
-                    if(iter % 50 == 0)
+                    if (iter % 50 == 0)
                         Console.WriteLine("iter\t" + iter + "\tcurrentUpdate\t" + Math.Abs(maxPixel.PixelNew - pixelOld));
+                    iter++;
                 }
             }
+            watch.Stop();
+            double iterPerSecond = iter;
+            iterPerSecond = iterPerSecond / watch.ElapsedMilliseconds * 1000.0;
+            Console.WriteLine(iter + " iterations in:" + watch.Elapsed + "\t" + iterPerSecond + " iterations per second");
 
             return converged;
         }

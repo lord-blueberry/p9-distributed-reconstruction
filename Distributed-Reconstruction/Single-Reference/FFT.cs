@@ -281,30 +281,7 @@ namespace Single_Reference
         /// Swap the 4 quadrants, 1 <--> 3 and 2 <--> 4
         /// </summary>
         /// <param name="grid"></param>
-        public static void Shift(Complex[,] grid)
-        {
-            var n2 = grid.GetLength(0) / 2;
-            for (int i = 0; i < n2; i++)
-            {
-                for (int j = 0; j < n2; j++)
-                {
-                    var tmp13 = grid[i, j];
-                    grid[i, j] = grid[i + n2, j + n2];
-                    grid[i + n2, j + n2] = tmp13;
-
-                    var tmp24 = grid[i + n2, j];
-                    grid[i + n2, j] = grid[i, j + n2];
-                    grid[i, j + n2] = tmp24;
-
-                }
-            }
-        }
-
-        /// <summary>
-        /// Swap the 4 quadrants, 1 <--> 3 and 2 <--> 4
-        /// </summary>
-        /// <param name="grid"></param>
-        public static void Shift(double[,] grid)
+        public static void Shift<T>(T[,] grid)
         {
             var n2 = grid.GetLength(0) / 2;
             for (int i = 0; i < n2; i++)

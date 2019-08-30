@@ -104,15 +104,32 @@ namespace Single_Reference
             /// </summary>
             /// <param name="psfCorrelated"></param>
             /// <returns></returns>
-            public static float[,] CalcPSFSquared(Complex[,] psfCorrelated)
+            public static float[,] CalcPSFSquared(float[,] psf)
             {
-                var PSF2 = Fourier2D.Multiply(psfCorrelated, psfCorrelated);
+                var psfCorrelated = CalcPaddedFourierCorrelation(psf, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+                var psfPadded = new float[psf.GetLength(0) * 2, psf.GetLength(1) * 2];
+                var fullWindow = new Rectangle(0, 0, psfPadded.GetLength(0), psfPadded.GetLength(1));
+                SetPsfInWindow(psfPadded, psf, fullWindow, psf.GetLength(0), psf.GetLength(1));
+                var PSF = FFT.Forward(psfPadded);
+                var PSF2 = Fourier2D.Multiply(PSF, psfCorrelated);
                 var psf2 = FFT.Backward(PSF2, psfCorrelated.Length);
+                FFT.Shift(psf2);
                 return ToFloatImage(psf2);
             }
 
-            public static void SetPsfInWindow(double[,] psfOutput, double[,] psf, Rectangle window, int yPixel, int xPixel)
+            public static double[,] CalcPSFSquaredDebug(double[,] psf)
             {
+                var psfCorrelated = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, psf.GetLength(0), psf.GetLength(1));
+                //var psfCorrelated = CalcPaddedFourierCorrelation (psf, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+                var PSF2 = Fourier2D.Multiply(psfCorrelated, psfCorrelated);
+                var psf2 = FFT.Backward(PSF2, psfCorrelated.Length);
+                FFT.Shift(psf2);
+                return psf2;
+            }
+
+            private static void SetPsfInWindow(float[,] psfOutput, float[,] psf, Rectangle window, int yPixel, int xPixel)
+            {
+                ///TODO: is this method still necessary??
                 var yPsfHalf = psf.GetLength(0) / 2;
                 var xPsfHalf = psf.GetLength(1) / 2;
                 for (int i = 0; i < psf.GetLength(0); i++)
