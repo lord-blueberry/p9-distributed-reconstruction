@@ -37,7 +37,7 @@ namespace Single_Reference.GPUDeconvolution
         public bool RunsOnGPU { get; }
         readonly Context c;
         readonly Accelerator accelerator;
-        readonly Common.Rectangle xImageSection;
+        readonly Common.Rectangle imageSection;
         readonly Complex[,] psfCorrelation;
         readonly float[,] psf2;
         readonly float[,] aMap;
@@ -48,9 +48,12 @@ namespace Single_Reference.GPUDeconvolution
             
         }
 
-        public GPUGreedyCD(Rectangle totalSize, Rectangle windowSize, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared)
+        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared)
         {
-
+            this.imageSection = imageSection;
+            this.psfCorrelation = psfCorrelation;
+            psf2 = psfSquared;
+            aMap = PSF.CalcAMap(psf, totalSize, imageSection);
         }
 
 

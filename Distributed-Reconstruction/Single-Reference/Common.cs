@@ -33,6 +33,23 @@ namespace Single_Reference
                 return scan;
             }
 
+            public static float[,] CalcPSFScan(float[,] psf)
+            {
+                var scan = new float[psf.GetLength(0), psf.GetLength(1)];
+                for (int i = 0; i < psf.GetLength(0); i++)
+                    for (int j = 0; j < psf.GetLength(1); j++)
+                    {
+                        var iBefore = i > 0 ? scan[i - 1, j] : 0.0f;
+                        var jBefore = j > 0 ? scan[i, j - 1] : 0.0f;
+                        var ijBefore = i > 0 & j > 0 ? scan[i - 1, j - 1] : 0.0f;
+                        var current = psf[i, j] * psf[i, j];
+                        scan[i, j] = current + iBefore + jBefore - ijBefore;
+                    }
+
+                return scan;
+            }
+
+
             public static double QueryScan(double[,] psfScan, int yPixel, int xPixel, int yLength, int xLength)
             {
                 var yOverShoot = (yPixel + (psfScan.GetLength(0) - psfScan.GetLength(0) / 2)) - yLength;
@@ -63,6 +80,51 @@ namespace Single_Reference
                 return psfScan[psfScan.GetLength(0) - 1 - yOverShoot, psfScan.GetLength(1) - 1 - xOverShoot] - correction;
             }
 
+            private static float QueryScan(float[,] psfScan, int yPixel, int xPixel, int yLength, int xLength)
+            {
+                var yOverShoot = (yPixel + (psfScan.GetLength(0) - psfScan.GetLength(0) / 2)) - yLength;
+                var xOverShoot = (xPixel + (psfScan.GetLength(1) - psfScan.GetLength(1) / 2)) - xLength;
+                yOverShoot = Math.Max(0, yOverShoot);
+                xOverShoot = Math.Max(0, xOverShoot);
+                var yUnderShoot = (-1) * (yPixel - psfScan.GetLength(0) / 2);
+                var xUnderShoot = (-1) * (xPixel - psfScan.GetLength(1) / 2);
+                var yUnderShootIdx = Math.Max(1, yUnderShoot) - 1;
+                var xUnderShootIdx = Math.Max(1, xUnderShoot) - 1;
+
+                //PSF completely in picture
+                if (yOverShoot <= 0 & xOverShoot <= 0 & yUnderShoot <= 0 & xUnderShoot <= 0)
+                    return psfScan[psfScan.GetLength(0) - 1, psfScan.GetLength(1) - 1];
+
+                if (yUnderShoot > 0 & xUnderShoot > 0)
+                    return psfScan[psfScan.GetLength(0) - 1, psfScan.GetLength(1) - 1]
+                           - psfScan[psfScan.GetLength(0) - 1, xUnderShootIdx]
+                           - psfScan[yUnderShootIdx, psfScan.GetLength(1) - 1]
+                           + psfScan[yUnderShootIdx, xUnderShootIdx];
+
+                var correction = 0.0f;
+                if (yUnderShoot > 0)
+                    correction += psfScan[yUnderShootIdx, psfScan.GetLength(1) - xOverShoot - 1];
+                if (xUnderShoot > 0)
+                    correction += psfScan[psfScan.GetLength(0) - yOverShoot - 1, xUnderShootIdx];
+
+                return psfScan[psfScan.GetLength(0) - 1 - yOverShoot, psfScan.GetLength(1) - 1 - xOverShoot] - correction;
+            }
+
+            public static float[,] CalcAMap(float[,] psf, Rectangle totalSize, Rectangle imageSection)
+            {
+                var scan = CalcPSFScan(psf);
+                var aMap = new float[imageSection.YExtent(), imageSection.XExtent()];
+                for (int y = imageSection.Y; y < imageSection.YEnd; y++)
+                    for (int x = imageSection.X; x < imageSection.XEnd; x++)
+                    {
+                        var yLocal = y - imageSection.Y;
+                        var xLocal = x - imageSection.X;
+                        aMap[yLocal, xLocal] = QueryScan(scan, y, x, totalSize.YEnd, totalSize.XEnd);
+                    }
+
+                return aMap;
+            }
+
             public static double[,] CalcAMap(double[,] image, double[,] psf)
             {
                 var scan = CalcPSFScan(psf);
@@ -73,7 +135,15 @@ namespace Single_Reference
                 return aMap;
             }
 
-            public static Complex[,] CalculatePaddedFourierCorrelation(float[,] psf, Rectangle padding)
+
+
+            /// <summary>
+            /// invert PSF to calculate the CORRELATION in fourier space (multiplication in fourier space == convolution, multiplication with inverted kernel in fourier space == correlation)
+            /// </summary>
+            /// <param name="psf"></param>
+            /// <param name="padding"></param>
+            /// <returns></returns>
+            public static Complex[,] CalcPaddedFourierCorrelation(float[,] psf, Rectangle padding)
             {
                 var yPadding = padding.YEnd;
                 var xPadding = padding.XEnd;
@@ -91,6 +161,11 @@ namespace Single_Reference
                 return PSFPadded;
             }
 
+            /// <summary>
+            /// Correlate the PSF with itself
+            /// </summary>
+            /// <param name="psfCorrelated"></param>
+            /// <returns></returns>
             public static float[,] CalcPSFSquared(Complex[,] psfCorrelated)
             {
                 var PSF2 = Fourier2D.Multiply(psfCorrelated, psfCorrelated);
@@ -258,6 +333,10 @@ namespace Single_Reference
                 YEnd = yEnd;
                 XEnd = xEnd;
             }
+
+            public int YExtent() => YEnd - Y;
+
+            public int XExtent() => XEnd - X;
         }
     }
 }

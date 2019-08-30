@@ -5,6 +5,7 @@ using System.Numerics;
 
 namespace Single_Reference
 {
+    [Obsolete("Only here so toy examples still work")]
     static class CommonDeprecated
     {
         public static class PSF
