@@ -183,8 +183,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
             var AA = CalcAgain(psf);
 
-            var yBSize = 16;
-            var xBSize = 16;
+            var yBSize = 8;
+            var xBSize = 8;
             var A = CalcBlock(psf, yBSize, xBSize);
             var blockInv =A.Inverse();
             var inv = AA.Inverse();
@@ -208,6 +208,9 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var groundTruth = new double[32, 32];
 
             groundTruth[16, 16] = 1.0;
+            for (int i = 0; i < yBSize; i++)
+                for (int j = 0; j < yBSize; j++)
+                    groundTruth[16 + i, 16 + j] = 1 + i + j;
             //dirty[16, 17] = 1.8;
             //dirty[17, 16] = 1.1;
             //dirty[17, 17] = 0.5;
