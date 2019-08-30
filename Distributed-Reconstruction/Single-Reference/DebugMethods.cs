@@ -385,6 +385,7 @@ namespace Single_Reference
             FitsIO.Write(psfCut, "psfCut.fits");
 
             var totalSize = new Rectangle(0, 0, gridSize, gridSize);
+            var imageSection = new Rectangle(0, 128, gridSize, gridSize);
             var fastCD = new FastGreedyCD(totalSize, totalSize, psfCut);
 
             var xImage = new float[gridSize, gridSize];
@@ -408,7 +409,7 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = fastCD.Deconvolve(xImage, ToFloatImage(dirtyImage), 0.5f, 0.8f, 10000, 1e-4f);
+                var converged = fastCD.Deconvolve(xImage, ToFloatImage(dirtyImage), 0.5f, 0.8f, 50000, 1e-6f);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");

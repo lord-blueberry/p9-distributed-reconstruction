@@ -67,8 +67,6 @@ namespace Single_Reference.Deconvolution
         {
             var watch = new Stopwatch();
             watch.Start();
-            FitsIO.Write(bMap, "bMapFast.fits");
-            FitsIO.Write(psf2, "psf2Fast.fits");
 
             int iter = 0;
             bool converged = false;
@@ -82,7 +80,7 @@ namespace Single_Reference.Deconvolution
                     var xLocal = maxPixel.X - imageSection.X;
                     var pixelOld = xImage[yLocal, xLocal];
                     xImage[yLocal, xLocal] = maxPixel.PixelNew;
-                    UpdateBSingle(bMap, psf2, imageSection, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
+                    UpdateB(bMap, psf2, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
                     if (iter % 50 == 0)
                         Console.WriteLine("iter\t" + iter + "\tcurrentUpdate\t" + Math.Abs(maxPixel.PixelNew - pixelOld));
                     iter++;
@@ -132,44 +130,44 @@ namespace Single_Reference.Deconvolution
             return maxPixel;
         }
 
-        private static void UpdateBSingle(float[,] b, float[,] bUpdate, Rectangle imageSection, int yPixel, int xPixel, float xDiff)
+        private static void UpdateBSingle(float[,] bMap, float[,] psf2, int yPixel, int xPixel, float xDiff)
         {
-            var yBHalf = bUpdate.GetLength(0) / 2;
-            var xBHalf = bUpdate.GetLength(1) / 2;
+            var yPsf2Half = psf2.GetLength(0) / 2;
+            var xPsf2Half = psf2.GetLength(1) / 2;
 
-            var yBMin = Math.Max(yPixel - yBHalf, imageSection.Y);
-            var xBMin = Math.Max(xPixel - xBHalf, imageSection.X);
-            var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imageSection.YEnd);
-            var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imageSection.XEnd);
-            for (int i = yBMin; i < yBMax; i++)
-                for (int j = xBMin; j < xBMax; j++)
+            var yMin = Math.Max(yPixel - yPsf2Half, 0);
+            var xMin = Math.Max(xPixel - xPsf2Half, 0);
+            var yMax = Math.Min(yPixel - yPsf2Half + psf2.GetLength(0), bMap.GetLength(0));
+            var xMax = Math.Min(xPixel - xPsf2Half + psf2.GetLength(1), bMap.GetLength(1));
+            for (int i = yMin; i < yMax; i++)
+                for (int j = xMin; j < xMax; j++)
                 {
-                    var yLocal = i - imageSection.Y;
-                    var xLocal = j - imageSection.X;
-                    var yBUpdate = i + yBHalf - yPixel;
-                    var xBUpdate = j + xBHalf - xPixel;
-                    b[yLocal, xLocal] += bUpdate[yBUpdate, xBUpdate] * xDiff;
+                    var yLocal = i;
+                    var xLocal = j;
+                    var yBUpdate = i + yPsf2Half - yPixel;
+                    var xBUpdate = j + xPsf2Half - xPixel;
+                    bMap[yLocal, xLocal] += psf2[yBUpdate, xBUpdate] * xDiff;
                 }
         }
 
-        private static void UpdateB(float[,] b, float[,] bUpdate, Rectangle imageSection, int yPixel, int xPixel, float xDiff)
+        private static void UpdateB(float[,] bMap, float[,] psf2,  int yPixel, int xPixel, float xDiff)
         {
-            var yBHalf = bUpdate.GetLength(0) / 2;
-            var xBHalf = bUpdate.GetLength(1) / 2;
+            var yPsf2Half = psf2.GetLength(0) / 2;
+            var xPsf2Half = psf2.GetLength(1) / 2;
 
-            var yBMin = Math.Max(yPixel - yBHalf, imageSection.Y);
-            var xBMin = Math.Max(xPixel - xBHalf, imageSection.X);
-            var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imageSection.YEnd);
-            var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imageSection.XEnd);
-            Parallel.For(yBMin, yBMax, (i) =>
+            var yMin = Math.Max(yPixel - yPsf2Half, 0);
+            var xMin = Math.Max(xPixel - xPsf2Half, 0);
+            var yMax = Math.Min(yPixel - yPsf2Half + psf2.GetLength(0), bMap.GetLength(0));
+            var xMax = Math.Min(xPixel - xPsf2Half + psf2.GetLength(1), bMap.GetLength(1));
+            Parallel.For(yMin, yMax, (i) =>
             {
-                for (int j = xBMin; j < xBMax; j++)
+                for (int j = xMin; j < xMax; j++)
                 {
-                    var yLocal = i - imageSection.Y;
-                    var xLocal = j - imageSection.X;
-                    var yBUpdate = i + yBHalf - yPixel;
-                    var xBUpdate = j + xBHalf - xPixel;
-                    b[yLocal, xLocal] += bUpdate[yBUpdate, xBUpdate] * xDiff;
+                    var yLocal = i;
+                    var xLocal = j;
+                    var yBUpdate = i + yPsf2Half - yPixel;
+                    var xBUpdate = j + xPsf2Half - xPixel;
+                    bMap[yLocal, xLocal] += psf2[yBUpdate, xBUpdate] * xDiff;
                 }
             });
         }
