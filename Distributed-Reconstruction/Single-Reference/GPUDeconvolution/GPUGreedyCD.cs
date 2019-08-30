@@ -14,7 +14,7 @@ using ILGPU.Runtime.Cuda;
 
 namespace Single_Reference.GPUDeconvolution
 {
-    public class GreedyCD : IDisposable
+    public class GPUGreedyCD : Deconvolution.IDeconvolver, IDisposable
     {
         private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => XMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
@@ -38,7 +38,7 @@ namespace Single_Reference.GPUDeconvolution
         readonly Context c;
         readonly Accelerator accelerator;
 
-        public GreedyCD()
+        public GPUGreedyCD()
         {
             c = new Context(ContextFlags.FastMath);
             var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
@@ -49,6 +49,7 @@ namespace Single_Reference.GPUDeconvolution
             }  
             else
             {
+                Console.WriteLine("GPU vendor not supported. ILGPU switches to !!!!VERY!!!! slow CPU implementation");
                 RunsOnGPU = false;
                 accelerator = new CPUAccelerator(c, 4);
             }
@@ -58,10 +59,10 @@ namespace Single_Reference.GPUDeconvolution
             updateCandidates = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateCandidatesKernel);
         }
 
-        public bool DeconvolvePath(float[,] xImage, float[,] bMap, float[,] aMap, float[,] psf2, float lambda, float alpha)
+        public bool DeconvolvePath(float[,] reconstruction, float[,] residuals, Common.Rectangle residualsWindow, float[,] psf, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, double epsilon = 0.0001)
         {
             bool converged = false;
-            AllocateGPU(xImage, bMap, aMap, psf2, lambda, alpha);
+            //AllocateGPU(reconstruction, residuals, psf, psf2, lambda, alpha);
 
             FreeGPU();
             return converged;
@@ -262,7 +263,6 @@ namespace Single_Reference.GPUDeconvolution
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -278,10 +278,6 @@ namespace Single_Reference.GPUDeconvolution
             disposed = true;
         }
 
-        ~GreedyCD()
-        {
-            Dispose(false);
-        }
         #endregion
     }
 }
