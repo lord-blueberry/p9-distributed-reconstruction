@@ -14,8 +14,9 @@ namespace Single_Reference.Deconvolution
         public static bool Deconvolve(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
         {
             FitsIO.Write(residuals, "res.fits");
-            var yBlockSize = 16;
-            var xBlockSize = 16;
+            var yBlockSize = 2;
+            var xBlockSize = 2;
+
             var psfCorrelated = Common.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0) - psf.GetLength(0), residuals.GetLength(1) - psf.GetLength(1));
             var residualsFourier = FFT.Forward(residuals);
             residualsFourier = Common.Fourier2D.Multiply(residualsFourier, psfCorrelated);
@@ -34,8 +35,8 @@ namespace Single_Reference.Deconvolution
             {
                 var yB = random.Next(xImage.GetLength(0) / yBlockSize);
                 var xB = random.Next(xImage.GetLength(1) / xBlockSize);
-                yB = 6;
-                xB = 8;
+                yB = 16 / yBlockSize;
+                xB = 16/ xBlockSize;
                 var block = CopyFrom(bMap, yB, xB, yBlockSize, xBlockSize);
 
                 var optimized = block * blockInversion;
@@ -54,7 +55,7 @@ namespace Single_Reference.Deconvolution
                 XDIFF = Common.Fourier2D.Multiply(XDIFF, psf2Fourier);
                 Common.Fourier2D.SubtractInPlace(residualsFourier, XDIFF);
                 bMap = FFT.Backward(residualsFourier, residualsFourier.Length);
-                //FitsIO.Write(bMap, "bMap2.fits");
+                FitsIO.Write(bMap, "bMap2.fits");
 
                 //clear from xDiff
                 AddInto(xDiff, -optDiff, yB, xB, yBlockSize, xBlockSize);
@@ -171,6 +172,8 @@ namespace Single_Reference.Deconvolution
             var xBSize = 2;
             var blockInv = CalcBlockInversion(psf, 2, 2);
             var inv = AA.Inverse();
+            Console.WriteLine(blockInv);
+            Console.WriteLine(inv);
 
             var xImage = new double[32, 32];
             var groundTruth = new double[32, 32];
