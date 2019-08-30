@@ -35,8 +35,8 @@ namespace Single_Reference.Deconvolution
             {
                 var yB = random.Next(xImage.GetLength(0) / yBlockSize);
                 var xB = random.Next(xImage.GetLength(1) / xBlockSize);
-                yB = 16 / yBlockSize;
-                xB = 16/ xBlockSize;
+                yB = 64 / yBlockSize;
+                xB = 64 / xBlockSize;
                 var block = CopyFrom(bMap, yB, xB, yBlockSize, xBlockSize);
 
                 var optimized = block * blockInversion;
@@ -44,11 +44,13 @@ namespace Single_Reference.Deconvolution
                 optimized = xOld + optimized;
 
                 //shrink
-                for (int i = 0; i < optimized.Count; i++)
-                    optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);
+                /*for (int i = 0; i < optimized.Count; i++)
+                    optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);*/
                 var optDiff = optimized - xOld;
                 AddInto(xDiff, optDiff, yB, xB, yBlockSize, xBlockSize);
                 AddInto(xImage, optDiff, yB, xB, yBlockSize, xBlockSize);
+                FitsIO.Write(xImage, "xImageBlock.fits");
+
 
                 //update b-map
                 var XDIFF = FFT.Forward(xDiff);
