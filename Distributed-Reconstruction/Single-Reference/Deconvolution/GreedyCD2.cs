@@ -62,7 +62,7 @@ namespace Single_Reference.Deconvolution
             var PsfCorr = FFT.Forward(psfTmp, 1.0);
 
             psfTmp = new double[psf.GetLength(0) + psf.GetLength(0), psf.GetLength(1) + psf.GetLength(1)];
-            Common.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
+            CommonDeprecated.PSF.SetPSFInWindow(psfTmp, xImage, psf, xImage.GetLength(0) / 2, xImage.GetLength(1) / 2);
             var tmp = FFT.Forward(psfTmp, 1.0);
             var tmp2 = Common.Fourier2D.Multiply(tmp, PsfCorr);
 

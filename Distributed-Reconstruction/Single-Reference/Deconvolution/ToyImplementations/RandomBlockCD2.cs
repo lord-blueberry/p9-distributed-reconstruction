@@ -15,7 +15,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var yBlockSize = 2;
             var xBlockSize = 2;
 
-            var psfCorrelated = Common.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0) - psf.GetLength(0), residuals.GetLength(1) - psf.GetLength(1));
+            var psfCorrelated = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0) - psf.GetLength(0), residuals.GetLength(1) - psf.GetLength(1));
             var residualsFourier = FFT.Forward(residuals);
             residualsFourier = Common.Fourier2D.Multiply(residualsFourier, psfCorrelated);
             var bMap = FFT.Backward(residualsFourier, residualsFourier.Length);

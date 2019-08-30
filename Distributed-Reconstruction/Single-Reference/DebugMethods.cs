@@ -409,8 +409,9 @@ namespace Single_Reference
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
 
                 //var converged = GPUDeconvolution.GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
-                var deconvolver = new GPUDeconvolution.GPUGreedyCD();
-                deconvolver.DeconvolvePath(null, null, null, null, 0.5f, 0.5f, 1, 10, 100);
+
+                //var deconvolver = new GPUDeconvolution.GPUGreedyCD();
+                //deconvolver.DeconvolvePath(null, null, null, null, 0.5f, 0.5f, 1, 10, 100);
 
                 var converged = GPUDeconvolution.StupidGreedy.Deconvolve(xImage, b, psfCut, 0.5, 0.20);
 

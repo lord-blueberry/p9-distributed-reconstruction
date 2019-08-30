@@ -54,25 +54,21 @@ namespace Single_Reference.GPUDeconvolution
             this.psfCorrelation = psfCorrelation;
             psf2 = psfSquared;
             aMap = PSF.CalcAMap(psf, totalSize, imageSection);
-        }
 
-
-        public GPUGreedyCD()
-        {
             c = new Context(ContextFlags.FastMath);
             var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
             if (gpuIds.Any())
             {
                 RunsOnGPU = true;
                 accelerator = new CudaAccelerator(c, gpuIds.First().DeviceId);
-            }  
+            }
             else
             {
                 Console.WriteLine("GPU vendor not supported. ILGPU switches to !!!!VERY!!!! slow CPU implementation");
                 RunsOnGPU = false;
                 accelerator = new CPUAccelerator(c, 4);
             }
-                
+
             shrink = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>>(ShrinkKernel);
             updateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateXKernel);
             updateCandidates = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateCandidatesKernel);
