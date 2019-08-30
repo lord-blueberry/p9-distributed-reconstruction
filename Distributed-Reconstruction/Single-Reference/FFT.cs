@@ -8,8 +8,90 @@ using System.Numerics;
 
 namespace Single_Reference
 {
-    public class FFT
+    public class FFT : IDisposable
     {
+        private FftwPlanRC fft;
+        private FftwPlanRC ifft;
+        public AlignedArrayDouble ImageBuffer {get; private set;}
+        public AlignedArrayComplex FourierBuffer { get; private set; }
+
+        public FFT(int ySize, int xSize)
+            :this(ySize, xSize, Environment.ProcessorCount)
+        {
+            
+        }
+
+        public FFT(int ySize, int xSize, int nCores)
+        {
+            var dims = new int[] { ySize, xSize };
+            ImageBuffer = new AlignedArrayDouble(16, dims);
+            FourierBuffer = new AlignedArrayComplex(16, dims);
+            fft = FftwPlanRC.Create(ImageBuffer, FourierBuffer, DftDirection.Forwards, PlannerFlags.Default, nCores);
+            ifft = FftwPlanRC.Create(ImageBuffer, FourierBuffer, DftDirection.Backwards, PlannerFlags.Default, nCores);
+        }
+
+        public void CopyToImageBuffer(float[,] image)
+        {
+            for (int i = 0; i < image.GetLength(0); i++)
+                for (int j = 0; j < image.GetLength(1); i++)
+                    ImageBuffer[i, j] = image[i, j];
+        }
+
+        public Complex[,] CopyFromFourierBuffer()
+        {
+            var output = new Complex[FourierBuffer.GetLength(0), FourierBuffer.GetLength(1)];
+            for (int i = 0; i < output.GetLength(0); i++)
+                for (int j = 0; j < output.GetLength(1); i++)
+                    output[i, j] = FourierBuffer[i, j];
+            return output;
+        }
+
+        /// <summary>
+        /// overwrites FourierBuffer
+        /// </summary>
+        public void Forward()
+        {
+            fft.Execute();
+        }
+
+        /// <summary>
+        /// overwrites ImageBuffer
+        /// </summary>
+        public void Backward()
+        {
+            ifft.Execute();
+        }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    fft.Dispose();
+                    ifft.Dispose();
+                    ImageBuffer.Dispose();
+                    FourierBuffer.Dispose();
+                }
+
+                ImageBuffer = null;
+                FourierBuffer = null;
+
+                disposedValue = true;
+            }
+        }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+        #endregion
+
+        #region static methods
         public static Complex[,] Forward(double[,] image, double norm = 1.0)
         {
             Complex[,] output = new Complex[image.GetLength(0), image.GetLength(1)];
@@ -155,9 +237,12 @@ namespace Single_Reference
         }
         #endregion
 
+        /// <summary>
+        /// Swap the 4 quadrants, 1 <--> 3 and 2 <--> 4
+        /// </summary>
+        /// <param name="grid"></param>
         public static void Shift(Complex[,] grid)
         {
-            // Interchange entries in 4 quadrants, 1 <--> 3 and 2 <--> 4
             var n2 = grid.GetLength(0) / 2;
             for (int i = 0; i < n2; i++)
             {
@@ -175,9 +260,12 @@ namespace Single_Reference
             }
         }
 
+        /// <summary>
+        /// Swap the 4 quadrants, 1 <--> 3 and 2 <--> 4
+        /// </summary>
+        /// <param name="grid"></param>
         public static void Shift(double[,] grid)
         {
-            // Interchange entries in 4 quadrants, 1 <--> 3 and 2 <--> 4
             var n2 = grid.GetLength(0) / 2;
             for (int i = 0; i < n2; i++)
             {
@@ -190,10 +278,9 @@ namespace Single_Reference
                     var tmp24 = grid[i + n2, j];
                     grid[i + n2, j] = grid[i, j + n2];
                     grid[i, j + n2] = tmp24;
-
                 }
             }
         }
-
+        #endregion
     }
 }
