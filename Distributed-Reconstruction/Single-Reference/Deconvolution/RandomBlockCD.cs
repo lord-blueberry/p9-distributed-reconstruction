@@ -163,7 +163,9 @@ namespace Single_Reference.Deconvolution
                 for (int j = 15; j < 18; j++)
                     psf[i, j] = 0.5;
             psf[16, 16] = 1.0;
-            psf[17, 17] = 0.8;
+            //psf[17, 17] = 0.8;
+
+            var AA = CalcAgain(psf);
 
             var yBSize = 2;
             var xBSize = 2;
@@ -174,12 +176,10 @@ namespace Single_Reference.Deconvolution
             a[1] = Correlate(psf, 0, 1);
             a[2] = Correlate(psf, 1, 0);
             a[3] = Correlate(psf, 1, 1);
-
             var a01 = new DenseVector(3);
             a01[0] = a[0];
             a01[1] = a[3];
             a01[2] = a[2];
-
             var a10 = new DenseVector(2);
             a10[0] = a[0];
             a10[1] = a[1];
@@ -187,10 +187,9 @@ namespace Single_Reference.Deconvolution
             LA.Add(a);
             LA.Add(a01);
             LA.Add(a10);
-
             var A2 = CreateA2(LA);
 
-            var inv = A2.Inverse();
+            var inv = AA.Inverse();
             var arr = inv.ToArray();
 
             var xImage = new double[32, 32];
@@ -215,9 +214,15 @@ namespace Single_Reference.Deconvolution
 
             FitsIO.Write(bMap, "resConf.fits");
 
-            var bVec = CopyFrom(bMap, 16 / yBSize, 16 /xBSize, yBSize, xBSize);
+            var bVec = new DenseVector(4);
+            bVec[0] = bMap[16, 16];
+            bVec[1] = bMap[16, 17];
+            bVec[2] = bMap[16, 18];
+            bVec[3] = bMap[16, 19];
 
-            var res3 = (bVec * inv);
+            var bVec2 = CopyFrom(bMap, 16 / yBSize, 16 /xBSize, yBSize, xBSize);
+
+            var res3 = ( inv * bVec);
             var array = res3.ToArray();
             AddInto(xImage, res3, 16 / yBSize, 16 / xBSize, yBSize, xBSize);
             var XIMG = FFT.Forward(xImage, 1.0);
@@ -228,6 +233,53 @@ namespace Single_Reference.Deconvolution
             FitsIO.Write(xImage, "dXXConf.fits");
             Console.Write(inv);
 
+        }
+
+        private static Matrix<double> CalcAgain(double[,]psf)
+        {
+            var a0 = ToVector(psf);
+
+            var a1 = ToVector(Shift(psf, 0, 1));
+            var a2 = ToVector(Shift(psf, 0, 2));
+            var a3 = ToVector(Shift(psf, 0, 3));
+
+            var three = a0 * a1;
+            FitsIO.Write(psf, "psf.fits");
+            FitsIO.Write(Shift(psf, 0, 1), "psfShift.fits");
+            var output = new DenseMatrix(a0.Count, 4);
+            output.SetColumn(0, a0);
+            output.SetColumn(1, a1);
+            output.SetColumn(2, a2);
+            output.SetColumn(3, a3);
+            
+
+            var A = output.Transpose() * output;
+            Console.WriteLine(A);
+
+
+            return A;
+        }
+
+        private static Vector<double> ToVector(double[,] img)
+        {
+            var output = new DenseVector(img.Length);
+            int index = 0;
+            for (int i = 0; i < img.GetLength(0); i++)
+                for (int j = 0; j < img.GetLength(1); j++)
+                    output[index++] = img[i, j];
+            return output;
+        }
+
+        private static double[,] Shift(double[,] psf, int yShift, int xShift)
+        {
+            var output = new double[psf.GetLength(0), psf.GetLength(1)];
+
+            for (int i = 0; i < psf.GetLength(0); i++)
+                for (int j = 0; j < psf.GetLength(1); j++)
+                    if (i + yShift < psf.GetLength(0) & j + xShift < psf.GetLength(1))
+                        output[i + yShift, j + xShift] = psf[i, j];
+
+            return output;
         }
         #endregion
     }
