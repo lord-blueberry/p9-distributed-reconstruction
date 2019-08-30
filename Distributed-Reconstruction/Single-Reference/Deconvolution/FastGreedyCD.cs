@@ -41,17 +41,14 @@ namespace Single_Reference.Deconvolution
 
                 var lambdaMax = 1 / alpha * max.PixelMaxDiff;
                 var lambdaCurrent = lambdaMax / lambdaFactor;
+                lambdaCurrent = lambdaCurrent > lambdaMin ? lambdaCurrent : lambdaMin;
+
                 Console.WriteLine("-----------------------------FastGreedyCD with lambda " + lambdaCurrent + "------------------------");
-                if (lambdaCurrent > lambdaMin)
-                {
-                    DeconvolveImpl(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
-                }
-                else
-                {
-                    converged = DeconvolveImpl(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
-                    if (converged)
-                        break;
-                }
+                var pathConverged = DeconvolveImpl(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
+                converged = lambdaMin == lambdaCurrent & pathConverged;
+
+                if (converged)
+                    break;
             }
 
             return converged;

@@ -6,7 +6,7 @@ using Single_Reference.IDGSequential;
 
 namespace Single_Reference.Deconvolution
 {
-    public class GreedyCD2
+    public class GreedyCDReference
     {
         public static bool DeconvolvePath(double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10,  int maxIteration = 100, double epsilon = 1e-4)
         {

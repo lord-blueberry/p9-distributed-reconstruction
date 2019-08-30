@@ -89,7 +89,7 @@ namespace Single_Reference
                 var lambda = 0.8;
                 var alpha = 0.05;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
-                var converged = GreedyCD2.DeconvolvePath(xImage, b, psfCut, currentLambda, 4.0, alpha, 5, 1000, 2e-5);
+                var converged = GreedyCDReference.DeconvolvePath(xImage, b, psfCut, currentLambda, 4.0, alpha, 5, 1000, 2e-5);
                 //var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, currentLambda, alpha, 5000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!! with lambda " + currentLambda + "------------------------");
@@ -162,7 +162,7 @@ namespace Single_Reference
                 var lambda = 100.0;
                 var alpha = 0.95;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
-                var converged = GreedyCD2.DeconvolvePath(xImage, b, psfCut, currentLambda, 5.0, alpha, 5, 6000, 1e-3);
+                var converged = GreedyCDReference.DeconvolvePath(xImage, b, psfCut, currentLambda, 5.0, alpha, 5, 6000, 1e-3);
                 //var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, currentLambda, alpha, 5000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!! with lambda " + currentLambda + "------------------------");
@@ -242,7 +242,7 @@ namespace Single_Reference
 
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, 0.5, 0.8, 10000);
+                var converged = GreedyCDReference.Deconvolve(xImage, b, psfCut, 0.5, 0.8, 10000);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -387,6 +387,7 @@ namespace Single_Reference
             var totalSize = new Rectangle(0, 0, gridSize, gridSize);
             var imageSection = new Rectangle(0, 128, gridSize, gridSize);
             var fastCD = new FastGreedyCD(totalSize, totalSize, psfCut);
+            var gpuCD = new GPUGreedyCD(totalSize, psfCut, 50);
 
             var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;
@@ -409,7 +410,7 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = fastCD.Deconvolve(xImage, ToFloatImage(dirtyImage), 0.5f, 0.8f, 50000, 1e-6f);
+                var converged = gpuCD.Deconvolve(xImage, ToFloatImage(dirtyImage), 0.5f, 0.8f, 100, 1e-4f);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");

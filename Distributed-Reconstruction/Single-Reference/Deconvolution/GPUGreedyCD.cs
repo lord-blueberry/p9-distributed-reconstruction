@@ -12,7 +12,7 @@ using ILGPU.Runtime.Cuda;
 
 using static Single_Reference.Common;
 
-namespace Single_Reference.GPUDeconvolution
+namespace Single_Reference.Deconvolution
 {
     public class GPUGreedyCD : Deconvolution.IDeconvolver, IDisposable
     {
@@ -42,21 +42,28 @@ namespace Single_Reference.GPUDeconvolution
         readonly Complex[,] psfCorrelation;
         readonly float[,] psf2;
         readonly float[,] aMap;
-        readonly FFT fft;
-        
-        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf):
-            this(totalSize, imageSection, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf))
+        readonly int batchIterations;
+
+        public GPUGreedyCD(Rectangle totalSize, float[,] psf, int nrBatchIterations) :
+            this(totalSize, totalSize, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf), nrBatchIterations)
+        {
+
+        }
+
+        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, int nrBatchIterations) :
+            this(totalSize, imageSection, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf), nrBatchIterations)
         {
             
         }
 
-        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared)
+        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared, int nrBatchIterations)
         {
             this.imageSection = imageSection;
             psfSize = new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1));
             this.psfCorrelation = psfCorrelation;
             psf2 = psfSquared;
             aMap = PSF.CalcAMap(psf, totalSize, imageSection);
+            batchIterations = nrBatchIterations;
 
             c = new Context(ContextFlags.FastMath);
             var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
@@ -81,19 +88,60 @@ namespace Single_Reference.GPUDeconvolution
         {
             bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
+            for (int i = 0; i < bMap.GetLength(0); i++)
+                for (int j = 0; j < bMap.GetLength(1); j++)
+                    bMap[i, j] = bMap[i, j] / aMap[i, j];
+
             AllocateGPU(reconstruction, bMap, lambdaMin, alpha);
 
+            for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
+            {
+                //set lambdap
+                lambdaAlpha.CopyFrom(0.0f, new Index(0));
+                shrink(xImageGPU.Extent, xImageGPU.View, candidatesGPU.View, lambdaAlpha.View, maxPixelGPU.View);
+                accelerator.Synchronize();
+                var maxPixel = maxPixelGPU.GetAsArray()[0];
+                var lambdaMax = 1 / alpha * maxPixel.AbsDiff;
+                var lambdaCurrent = lambdaMax / lambdaFactor;
+                lambdaCurrent = lambdaCurrent > lambdaMin ? lambdaCurrent : lambdaMin;
+
+                maxPixelGPU.CopyFrom(new Pixel(0, -1, -1, 0), new Index(0));
+                lambdaAlpha.CopyFrom(lambdaCurrent, new Index(0));
+
+                Console.WriteLine("-----------------------------GPUGreedy with lambda " + lambdaCurrent + "------------------------");
+                bool pathConverged = false;
+                for (int i = 0; i < maxIteration; i += batchIterations)
+                {
+                    DeconvolutionBatchIterations(batchIterations);
+                    var lastPixel = maxPixelGPU.GetAsArray()[0];
+                    if (lastPixel.AbsDiff < epsilon)
+                    {
+                        pathConverged = true;
+                        break;
+                    }
+                }
+
+                converged = lambdaMin == lambdaCurrent & pathConverged;
+                if (converged)
+                    break;
+            }
+
+            xImageGPU.CopyTo(reconstruction, new Index2(0, 0), new Index2(0, 0), new Index2(reconstruction.GetLength(1), reconstruction.GetLength(0)));
             FreeGPU();
             return converged;
         }
 
-        public bool Deconvolve(float[,] reconstruction, float[,] residuals, float lambda, float alpha, float epsilon, int iterations, int batchIterations=500)
+        public bool Deconvolve(float[,] reconstruction, float[,] residuals, float lambda, float alpha, int iterations, float epsilon=1e-4f)
         {
             
             bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
+            for (int i = 0; i < bMap.GetLength(0); i++)
+                for (int j = 0; j < bMap.GetLength(1); j++)
+                    bMap[i, j] = bMap[i, j] / aMap[i, j];
+
             AllocateGPU(reconstruction, bMap, lambda, alpha);
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < iterations; i+=batchIterations)
             {
                 DeconvolutionBatchIterations(batchIterations);
                 var lastPixel = maxPixelGPU.GetAsArray()[0];
@@ -103,6 +151,7 @@ namespace Single_Reference.GPUDeconvolution
                     break;
                 }
             }
+            xImageGPU.CopyTo(reconstruction, new Index2(0, 0), new Index2(0, 0), new Index2(reconstruction.GetLength(1), reconstruction.GetLength(0)));
             FreeGPU();
             return converged;
         }
@@ -135,22 +184,22 @@ namespace Single_Reference.GPUDeconvolution
         private void AllocateGPU(float[,] xImage, float[,] bMap, float lambda, float alpha)
         {
             //TODO:windowing
-            for (int i = 0; i < bMap.GetLength(0); i++)
-                for (int j = 0; j < bMap.GetLength(1); j++)
-                    bMap[i, j] = bMap[i, j] / aMap[i, j];
+            
 
             var zeroIndex = new Index2(0, 0);
             var size = new Index2(xImage.GetLength(1), xImage.GetLength(0));
             xImageGPU = accelerator.Allocate<float>(size);
             xImageGPU.CopyFrom(xImage, zeroIndex, zeroIndex, size);
 
-            candidatesGPU = accelerator.Allocate<float>(size);
-            candidatesGPU.CopyFrom(bMap, zeroIndex, zeroIndex, size);
+            var bMapSize = new Index2(bMap.GetLength(1), bMap.GetLength(0));
+            candidatesGPU = accelerator.Allocate<float>(bMapSize);
+            candidatesGPU.CopyFrom(bMap, zeroIndex, zeroIndex, bMapSize);
 
             aMapGPU = accelerator.Allocate<float>(size);
             aMapGPU.CopyFrom(aMap, zeroIndex, zeroIndex, size);
 
             var sizePSF = new Index2(psf2.GetLength(1), psf2.GetLength(0));
+            psf2GPU = accelerator.Allocate<float>(sizePSF);
             psf2GPU.CopyFrom(psf2, zeroIndex, zeroIndex, sizePSF);
 
             lambdaAlpha = accelerator.Allocate<float>(2);
@@ -181,6 +230,14 @@ namespace Single_Reference.GPUDeconvolution
             public int Y;
             public int X;
             public int Sign;
+
+            public Pixel(float abs, int x, int y, int sign)
+            {
+                AbsDiff = abs;
+                Y = y;
+                X = x;
+                Sign = sign;
+            }
 
             public bool Equals(Pixel other)
             {
