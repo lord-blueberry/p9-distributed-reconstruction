@@ -386,7 +386,7 @@ namespace Single_Reference
 
             var totalSize = new Rectangle(0, 0, gridSize, gridSize);
             var imageSection = new Rectangle(0, 128, gridSize, gridSize);
-            var fastCD = new FastGreedyCD(totalSize, totalSize, psfCut);
+            var fastCD = new FastGreedyCD(totalSize, psfCut);
 
             var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;

@@ -10,31 +10,43 @@ namespace Single_Reference.Deconvolution
 {
     public class FastGreedyCD : IDeconvolver
     {
-        readonly Rectangle imageSection;
+        readonly Rectangle residualSection;
+        readonly Rectangle imageSection;    //image section in residuals. Meaning what window we actually optimize in residuals
         readonly Rectangle psfSize;
         readonly Complex[,] psfCorrelation;
         readonly float[,] psf2;
         readonly float[,] aMap;
 
-        public FastGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf) :
-            this(totalSize, imageSection, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf))
+        public FastGreedyCD(Rectangle totalSize, float[,] psf) :
+            this(totalSize, totalSize, totalSize, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf))
         {
 
         }
 
-        public FastGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared)
+        public FastGreedyCD(Rectangle totalSize, Rectangle residualSection, Rectangle imageSection, float[,] psf) :
+            this(totalSize, residualSection, imageSection, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf))
         {
+
+        }
+
+        public FastGreedyCD(Rectangle totalSize, Rectangle residualSection, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared)
+        {
+            this.residualSection = residualSection;
             this.imageSection = imageSection;
             psfSize = new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1));
             this.psfCorrelation = psfCorrelation;
             psf2 = psfSquared;
-            aMap = PSF.CalcAMap(psf, totalSize, imageSection);
+            aMap = PSF.CalcAMap(psf, totalSize, residualSection);
         }
 
         public bool DeconvolvePath(float[,] xImage, float[,] residuals, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
             bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
+            for (int y = 0; y < bMap.GetLength(0); y++)
+                for (int x = 0; x < bMap.GetLength(1); x++)
+                    bMap[y, x] /= aMap[y, x];
+
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
                 var max = GetAbsMax(xImage, bMap, 0.0f, 1.0f);
@@ -60,6 +72,9 @@ namespace Single_Reference.Deconvolution
         public bool Deconvolve(float[,] xImage, float[,] residuals, float lambda, float alpha, int maxIteration, float epsilon)
         {
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
+            for (int y = 0; y < bMap.GetLength(0); y++)
+                for (int x = 0; x < bMap.GetLength(1); x++)
+                    bMap[y, x] /= aMap[y, x];
             return DeconvolveImpl(xImage, bMap, lambda, alpha, maxIteration, epsilon);
         }
 
@@ -80,7 +95,7 @@ namespace Single_Reference.Deconvolution
                     var xLocal = maxPixel.X - imageSection.X;
                     var pixelOld = xImage[yLocal, xLocal];
                     xImage[yLocal, xLocal] = maxPixel.PixelNew;
-                    UpdateB(bMap, psf2, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
+                    UpdateB(bMap, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
                     if (iter % 50 == 0)
                         Console.WriteLine("iter\t" + iter + "\tcurrentUpdate\t" + Math.Abs(maxPixel.PixelNew - pixelOld));
                     iter++;
@@ -105,9 +120,8 @@ namespace Single_Reference.Deconvolution
                 for (int x = imageSection.X; x < imageSection.XEnd; x++)
                 {
                     var xLocal = x - imageSection.X;
-                    var currentA = aMap[yLocal, xLocal];
                     var old = xImage[yLocal, xLocal];
-                    var xTmp = old + bMap[y, x] / currentA;
+                    var xTmp = old + bMap[y, x];
                     xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
                     var xDiff = old - xTmp;
 
@@ -130,7 +144,7 @@ namespace Single_Reference.Deconvolution
             return maxPixel;
         }
 
-        private static void UpdateBSingle(float[,] bMap, float[,] psf2, int yPixel, int xPixel, float xDiff)
+        private void UpdateBSingle(float[,] bMap, int yPixel, int xPixel, float xDiff)
         {
             var yPsf2Half = psf2.GetLength(0) / 2;
             var xPsf2Half = psf2.GetLength(1) / 2;
@@ -150,7 +164,7 @@ namespace Single_Reference.Deconvolution
                 }
         }
 
-        private static void UpdateB(float[,] bMap, float[,] psf2,  int yPixel, int xPixel, float xDiff)
+        private void UpdateB(float[,] bMap, int yPixel, int xPixel, float xDiff)
         {
             var yPsf2Half = psf2.GetLength(0) / 2;
             var xPsf2Half = psf2.GetLength(1) / 2;
@@ -163,11 +177,9 @@ namespace Single_Reference.Deconvolution
             {
                 for (int j = xMin; j < xMax; j++)
                 {
-                    var yLocal = i;
-                    var xLocal = j;
                     var yBUpdate = i + yPsf2Half - yPixel;
                     var xBUpdate = j + xPsf2Half - xPixel;
-                    bMap[yLocal, xLocal] += psf2[yBUpdate, xBUpdate] * xDiff;
+                    bMap[i, j] += (psf2[yBUpdate, xBUpdate] * xDiff) / aMap[i, j];
                 }
             });
         }

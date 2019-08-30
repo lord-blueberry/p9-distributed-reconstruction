@@ -59,16 +59,16 @@ namespace Single_Reference
                 return psfScan[psfScan.GetLength(0) - 1 - yOverShoot, psfScan.GetLength(1) - 1 - xOverShoot] - correction;
             }
 
-            public static float[,] CalcAMap(float[,] psf, Rectangle totalSize, Rectangle imageSection)
+            public static float[,] CalcAMap(float[,] psf, Rectangle totalSize, Rectangle residualSection)
             {
                 //TODO: change this?
                 var scan = CalcPSFScan(psf);
-                var aMap = new float[imageSection.YExtent(), imageSection.XExtent()];
-                for (int y = imageSection.Y; y < imageSection.YEnd; y++)
-                    for (int x = imageSection.X; x < imageSection.XEnd; x++)
+                var aMap = new float[residualSection.YExtent(), residualSection.XExtent()];
+                for (int y = residualSection.Y; y < residualSection.YEnd; y++)
+                    for (int x = residualSection.X; x < residualSection.XEnd; x++)
                     {
-                        var yLocal = y - imageSection.Y;
-                        var xLocal = x - imageSection.X;
+                        var yLocal = y - residualSection.Y;
+                        var xLocal = x - residualSection.X;
                         aMap[yLocal, xLocal] = QueryScan(scan, y, x, totalSize.YEnd, totalSize.XEnd);
                     }
 
