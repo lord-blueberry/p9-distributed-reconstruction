@@ -10,7 +10,8 @@ using Single_Reference;
 using static Single_Reference.Common;
 using static Distributed_Reference.SimpleDistributedReconstruction;
 
-using Distributed_Reference.DistributedDeconvolution;
+
+
 namespace Distributed_Reference
 {
     class DistributedParallelReconstruction
@@ -27,8 +28,7 @@ namespace Distributed_Reference
             //var imgSection = CalculateLocalImageSection(comm.Rank, comm.Size, c.GridSize, c.GridSize);
             var totalImage = new Rectangle(0, 0, c.GridSize, c.GridSize);
 
-            var psf = CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies);
-            var maxSidelobe = PSF.CalcMaxSidelobe(psf);
+            
 
             var residualVis = local.Visibilities;
             for (int cycle = 0; cycle < maxCycle; cycle++)

@@ -40,7 +40,7 @@ namespace Distributed_Reference
             var uvw = FitsIO.ReadUVW(System.IO.Path.Combine(folder, "uvw.fits"));
             var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
             double norm = 2.0;
-            var visibilities = FitsIO.ReadVisibilities(System.IO.Path.Combine(folder, "vis0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, 2.0);
+            var visibilities = FitsIO.ReadVisibilities(System.IO.Path.Combine(folder, "vis.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, 2.0);
 
             return new LocalDataset(frequencies, uvw, flags, visibilities);
         }

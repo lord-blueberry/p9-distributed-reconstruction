@@ -1,21 +1,21 @@
 ﻿using System;
 using MPI;
 using System.Diagnostics;
-using Single_Reference.IDGSequential;
-using Single_Reference.Deconvolution;
+
 using Single_Reference;
 using static System.Math;
 using System.Numerics;
 using System.Collections.Generic;
 using System.IO;
-using Distributed_Reference.DistributedDeconvolution;
+
+using Single_Reference.IDGSequential;
+using Single_Reference.Deconvolution;
 using static Single_Reference.Common;
 
 namespace Distributed_Reference
 {
     class RunningMethods
     { 
-
         public static void RunTest(string[] args)
         {
             using (var env = new MPI.Environment(ref args, MPI.Threading.Serialized))
@@ -109,12 +109,13 @@ namespace Distributed_Reference
                 var proc = Process.GetCurrentProcess();
                 var name = proc.ProcessName;
                 Console.WriteLine(" name: " + name);
-                //System.Threading.Thread.Sleep(17000);
+                System.Threading.Thread.Sleep(17000);
 
                 var comm = Communicator.world;
                 //READ DATA
 
                 var folder = @"C:\dev\GitHub\p9-data\small\fits\simulation_point\";
+                var bla = @"C:\dev\GitHub\p9-data\small\fits\simulation_point";
                 var fullData = DistributedData.LoadSimulated(folder);
                 var data = DistributedData.SplitDataAmongNodes(comm, fullData);
                 var totalVisibilitiesCount = fullData.VisibilitiesCount;

@@ -9,8 +9,6 @@ using Single_Reference.Deconvolution;
 using Single_Reference;
 using static Single_Reference.Common;
 
-using Distributed_Reference.DistributedDeconvolution;
-
 
 namespace Distributed_Reference
 {
