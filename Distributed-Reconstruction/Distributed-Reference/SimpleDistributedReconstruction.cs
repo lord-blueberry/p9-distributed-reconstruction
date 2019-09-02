@@ -61,19 +61,22 @@ namespace Distributed_Reference
                 if (comm.Rank == 0)
                     watchDeconv.Start();
 
-                var converged = false;
-                if(usePathDeconvolution)
+                var totalStatistics = new MPIGreedyCD.Statistics(false, 0, 0);
+                var lastRun = new MPIGreedyCD.Statistics(false, 0, 0);
+                if (usePathDeconvolution)
                 {
                     var currentLambda = Math.Max(1.0f / alpha * dirtyImage.MaxSidelobeLevel, lambda);
-                    converged = deconvovler.DeconvolvePath(xLocal, bLocal, currentLambda, 4.0f, alpha, 5, iterPerCycle, 2e-5f);
+                    lastRun = deconvovler.DeconvolvePath(xLocal, bLocal, currentLambda, 4.0f, alpha, 5, iterPerCycle, 2e-5f);
                 } else
                 {
-                    converged = deconvovler.Deconvolve(xLocal, bLocal, lambda, alpha, 1000, 2e-5f);
+                    lastRun = deconvovler.Deconvolve(xLocal, bLocal, lambda, alpha, 1000, 2e-5f);
+                    
                 }
-                
+                totalStatistics += lastRun;
+
                 if (comm.Rank == 0)
                 {
-                    if (converged)
+                    if (lastRun.Converged)
                         Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                     else
                         Console.WriteLine("-------------------------------not converged----------------------");

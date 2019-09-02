@@ -24,9 +24,10 @@ namespace Distributed_Reference
             aMap = PSF.CalcAMap(psf, totalSize, imageSection);
         }
 
-        public bool DeconvolvePath(float[,] xImage, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
+        public Statistics DeconvolvePath(float[,] xImage, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
             bool converged = false;
+            var totalStats = new Statistics(false, 0, 0);
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
                 var max = GetAbsMax(xImage, bMap, 0.0f, 1.0f);
@@ -37,21 +38,22 @@ namespace Distributed_Reference
 
                 Console.WriteLine("-----------------------------MPIGreedy with lambda " + lambdaCurrent + "------------------------");
                 var pathConverged = DeconvolveImpl(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
-                converged = lambdaMin == lambdaCurrent & pathConverged;
+                converged = lambdaMin == lambdaCurrent & pathConverged.Converged;
 
+                totalStats += pathConverged;
                 if (converged)
                     break;
             }
 
-            return converged;
+            return new Statistics(converged, totalStats.IterationsRun, totalStats.ElapsedMilliseconds);
         }
 
-        public bool Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
+        public Statistics Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
         {
             return DeconvolveImpl(xImage, bMap, lambda, alpha, maxIteration, epsilon);
         }
 
-        private bool DeconvolveImpl(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon)
+        private Statistics DeconvolveImpl(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon)
         {
             var watch = new Stopwatch();
             watch.Start();
@@ -83,7 +85,7 @@ namespace Distributed_Reference
             if (comm.Rank == 0)
                 Console.WriteLine(iter + " iterations in:" + watch.Elapsed + "\t" + iterPerSecond + " iterations per second");
 
-            return converged;
+            return new Statistics(converged, iter, watch.ElapsedMilliseconds);
         }
 
         private Pixel GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
@@ -182,5 +184,25 @@ namespace Distributed_Reference
             }
         }
         #endregion
+
+        public class Statistics
+        {
+            public bool Converged { get; private set; }
+            public long IterationsRun { get; private set; }
+            public long ElapsedMilliseconds { get; private set; }
+
+            public Statistics(bool converged, long iterations, long elapsed)
+            {
+                Converged = converged;
+                IterationsRun = iterations;
+                ElapsedMilliseconds = elapsed;
+            }
+
+            public static Statistics operator +(Statistics s0, Statistics s1)
+            {
+                return new Statistics(s0.Converged & s1.Converged, s0.IterationsRun + s1.IterationsRun, s0.ElapsedMilliseconds + s1.ElapsedMilliseconds);
+            }
+
+        }
     }
 }
