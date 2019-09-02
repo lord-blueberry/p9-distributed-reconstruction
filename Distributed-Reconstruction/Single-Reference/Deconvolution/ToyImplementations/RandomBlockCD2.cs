@@ -12,8 +12,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
         public static bool Deconvolve(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
         {
             FitsIO.Write(residuals, "res.fits");
-            var yBlockSize = 2;
-            var xBlockSize = 2;
+            var yBlockSize = 16;
+            var xBlockSize = 16;
 
             var psfCorrelated = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0) - psf.GetLength(0), residuals.GetLength(1) - psf.GetLength(1));
             var residualsFourier = FFT.Forward(residuals);
@@ -28,6 +28,9 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var blockInversion = CalcBlock(psf, yBlockSize, xBlockSize).Inverse();
             var random = new Random(123);
 
+            var lipschitz = ApproximateLipschitz(psf, yBlockSize, xBlockSize);
+            var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
+
             var iter = 0;
             while (iter < maxIteration)
             {
@@ -37,7 +40,9 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 xB = 64 / xBlockSize;
                 var block = CopyFrom(bMap, yB, xB, yBlockSize, xBlockSize);
 
-                var optimized = block * blockInversion;
+                //var optimized = block * blockInversion;
+
+                var optimized = block / lipschitz;
                 var xOld = CopyFrom(xImage, yB, xB, yBlockSize, xBlockSize);
                 optimized = xOld + optimized;
 

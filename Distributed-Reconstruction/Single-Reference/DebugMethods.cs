@@ -328,7 +328,7 @@ namespace Single_Reference
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 //var converged = GradientDebug.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10000);
-                var converged = RandomBlockCD.Deconvolve(xImage, dirtyImage, psf, 0.0, 1.0, 1);
+                var converged = RandomBlockCD2.Deconvolve(xImage, dirtyImage, psf, 0.0, 1.0, 1);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
