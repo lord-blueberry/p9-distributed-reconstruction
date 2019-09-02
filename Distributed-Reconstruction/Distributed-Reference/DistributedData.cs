@@ -45,7 +45,7 @@ namespace Distributed_Reference
             return new LocalDataset(frequencies, uvw, flags, visibilities);
         }
 
-        public static LocalDataset LoadSubsetTinyMeerKAT(Intracommunicator comm, string folder)
+        public static LocalDataset LoadSubsetTinyMeerKAT(string folder)
         {
             var frequencies = FitsIO.ReadFrequencies(System.IO.Path.Combine(folder, "freq.fits"));
             var uvw = FitsIO.ReadUVW(System.IO.Path.Combine(folder, "uvw0.fits"));
