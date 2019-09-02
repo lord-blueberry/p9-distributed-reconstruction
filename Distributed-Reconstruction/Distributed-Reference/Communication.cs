@@ -23,24 +23,7 @@ namespace Distributed_Reference
             }
         }
 
-        [Serializable]
-        public class Candidate
-        {
-            public double XDiffMax { get; private set; }
-            public double XDiff { get; private set; }
 
-            public int YPixel { get; private set; }
-            public int XPixel { get; private set; }
-
-
-            public Candidate(double o, double xDiff, int y, int x)
-            {
-                XDiffMax = o;
-                XDiff = xDiff;
-                YPixel = y;
-                XPixel = x;
-            }
-        }
 
     }
 }

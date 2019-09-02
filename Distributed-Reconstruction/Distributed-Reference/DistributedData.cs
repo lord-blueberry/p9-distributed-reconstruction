@@ -34,6 +34,17 @@ namespace Distributed_Reference
             }
         }
 
+        public static LocalDataset LoadSimulated(string folder)
+        {
+            var frequencies = FitsIO.ReadFrequencies(System.IO.Path.Combine(folder, "freq.fits"));
+            var uvw = FitsIO.ReadUVW(System.IO.Path.Combine(folder, "uvw.fits"));
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+            double norm = 2.0;
+            var visibilities = FitsIO.ReadVisibilities(System.IO.Path.Combine(folder, "vis0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, 2.0);
+
+            return new LocalDataset(frequencies, uvw, flags, visibilities);
+        }
+
         public static LocalDataset LoadSubsetTinyMeerKAT(Intracommunicator comm, string folder)
         {
             var frequencies = FitsIO.ReadFrequencies(System.IO.Path.Combine(folder, "freq.fits"));
@@ -65,6 +76,32 @@ namespace Distributed_Reference
             }
 
             return new LocalDataset(frequencies, uvw, flags, visibilities);
+        }
+
+        public static LocalDataset SplitDataAmongNodes(Intracommunicator comm, LocalDataset data)
+        {
+            var nrBaselines = data.UVW.GetLength(0) / comm.Size;
+            var nrFrequencies = data.Frequencies.Length;
+            var uvwSplit = new double[nrBaselines, data.UVW.GetLength(1), 3];
+            var visSplit = new Complex[nrBaselines, data.UVW.GetLength(1), nrFrequencies];
+            var flagsSplit = new bool[nrBaselines, data.UVW.GetLength(1), nrFrequencies];
+            var blOffset = data.UVW.GetLength(0) / comm.Size * comm.Rank;
+            for (int i = 0; i < nrBaselines; i++)
+            {
+                for (int j = 0; j < data.UVW.GetLength(1); j++)
+                {
+                    for (int k = 0; k < nrFrequencies; k++)
+                    {
+                        visSplit[i, j, k] = data.Visibilities[blOffset + i, j, k];
+                        flagsSplit[i, j, k] = data.Flags[blOffset + i, j, k];
+                    }
+                    uvwSplit[i, j, 0] = data.UVW[blOffset + i, j, 0];
+                    uvwSplit[i, j, 1] = data.UVW[blOffset + i, j, 1];
+                    uvwSplit[i, j, 2] = data.UVW[blOffset + i, j, 2];
+                }
+            }
+
+            return new LocalDataset(data.Frequencies, uvwSplit, flagsSplit, visSplit);
         }
 
     }
