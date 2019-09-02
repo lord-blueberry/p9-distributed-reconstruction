@@ -88,9 +88,6 @@ namespace Single_Reference.Deconvolution
         {
             bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
-            for (int i = 0; i < bMap.GetLength(0); i++)
-                for (int j = 0; j < bMap.GetLength(1); j++)
-                    bMap[i, j] = bMap[i, j] / aMap[i, j];
 
             AllocateGPU(reconstruction, bMap, lambdaMin, alpha);
 
@@ -135,17 +132,14 @@ namespace Single_Reference.Deconvolution
         {
             bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
-            /*
-            for (int i = 0; i < bMap.GetLength(0); i++)
-                for (int j = 0; j < bMap.GetLength(1); j++)
-                    bMap[i, j] = bMap[i, j] / aMap[i, j];*/
 
             AllocateGPU(reconstruction, bMap, lambda, alpha);
-            for (int i = 0; i < iterations; i+=batchIterations)
+            for (int iter = 0; iter < iterations; iter+=batchIterations)
             {
                 DeconvolutionBatchIterations(batchIterations);
                 var lastPixel = maxPixelGPU.GetAsArray()[0];
-                if(lastPixel.AbsDiff < epsilon)
+                Console.WriteLine("iter\t" + (iter + batchIterations) + "\tcurrentUpdate\t" + lastPixel.AbsDiff);
+                if (lastPixel.AbsDiff < epsilon)
                 {
                     converged = true;
                     break;
@@ -319,7 +313,10 @@ namespace Single_Reference.Deconvolution
             ArrayView2D<float> xImage,
             ArrayView<Pixel> pixel)
         {
-            xImage[pixel[0].X, pixel[0].Y] += pixel[0].Sign * pixel[0].AbsDiff;
+            if (pixel[0].AbsDiff > 0)
+            {
+                xImage[pixel[0].X, pixel[0].Y] += pixel[0].Sign * pixel[0].AbsDiff;
+            }
         }
 
         private static void UpdateCandidatesKernel(Index2 index,
@@ -329,7 +326,7 @@ namespace Single_Reference.Deconvolution
             ArrayView<Pixel> pixel)
         {
             var indexCandidate = index.Add(new Index2(pixel[0].X, pixel[0].Y)).Subtract(psf2.Extent / 2);
-            if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(candidates.Extent))
+            if (index.InBounds(psf2.Extent) & indexCandidate.InBounds(candidates.Extent) & pixel[0].AbsDiff > 0)
             {
                 candidates[indexCandidate] -= (psf2[index] * pixel[0].Sign * pixel[0].AbsDiff);
             }
