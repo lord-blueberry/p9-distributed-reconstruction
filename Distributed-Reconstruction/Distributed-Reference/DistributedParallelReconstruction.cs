@@ -16,7 +16,7 @@ namespace Distributed_Reference
 {
     class DistributedParallelReconstruction
     {
-        public const int PSF_CUTFACTOR = 8;
+        public const int PSF_CUTFACTOR = 16;
         public static float[,] Reconstruct(Intracommunicator comm, DistributedData.LocalDataset local, GriddingConstants c, int maxCycle)
         {
 
@@ -27,7 +27,7 @@ namespace Distributed_Reference
 
             var metadata = Partitioner.CreatePartition(c, local.UVW, local.Frequencies);
 
-            var imgSection = CalculateLocalImageSection(comm.Rank, comm.Size, c.GridSize, c.GridSize);
+            var patchSize = CalculateLocalImageSection(comm.Rank, comm.Size, c.GridSize, c.GridSize);
             var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
 
             //calculate psf and prepare for correlation in the Fourier space
@@ -35,16 +35,26 @@ namespace Distributed_Reference
             var psfCut = PSF.Cut(psf, PSF_CUTFACTOR);
             var maxSidelobe = PSF.CalcMaxSidelobe(psf, PSF_CUTFACTOR);
             PaddedConvolver bMapCalculator = null;
-            if (comm.Rank ==0)
+            if (comm.Rank == 0)
             {
                 var PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psfCut, totalSize);
                 bMapCalculator = new PaddedConvolver(PsfCorrelation, new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             }
-            
+
+            var subPatchDeconv = SplitIntoSubpatches(patchSize);
             var residualVis = local.Visibilities;
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
-
+                var residuals = new float[1, 1];
+                bMapCalculator.ConvolveInPlace(residuals);
+                for (int subIter = 0; subIter < 10; subIter++) {
+                    for (int subPatchIter = 0; subPatchIter < 4; subPatchIter++)
+                    {
+                        var xImg = new float[1, 1];
+                        subPatchDeconv[subPatchIter].Deconvolve(xImg, residuals, 0.5f, 0.8f, 100);
+                        //exchange residuals
+                    }
+                }
             }
 
             return null;

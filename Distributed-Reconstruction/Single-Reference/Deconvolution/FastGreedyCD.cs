@@ -8,39 +8,47 @@ using static Single_Reference.Common;
 
 namespace Single_Reference.Deconvolution
 {
-    public class FastGreedyCD : IDeconvolver
+    public class FastGreedyCD : IDeconvolver, ISubpatchDeconvolver
     {
-        readonly Rectangle imageSection;
-        readonly Rectangle psfSize;
+        /*
+         * ImageSize, patchSize and subPatchSize. Only relevant for ISubpatchDeconvolver
+         * 
+         * imagesize: size of the whole image consisting of several patches.
+         * patchSize: a patch inside the image, consisting of several subpatches. bMap.Size == xImage.Size == patchSize
+         * subPatchsize: size of a patch inside a patch = subpatch.
+         */
+        
+        readonly Rectangle patch;
         readonly float[,] psf2;
         readonly float[,] aMap;
 
-        public FastGreedyCD(Rectangle totalSize, float[,] psf) :
-            this(totalSize, totalSize, psf, PSF.CalcPSFSquared(psf))
+        public FastGreedyCD(Rectangle imageSize, float[,] psf) :
+            this(imageSize, imageSize, psf, PSF.CalcPSFSquared(psf))
         {
 
         }
 
-        public FastGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, float[,] psfSquared)
+        public FastGreedyCD(Rectangle imageSize, Rectangle patchSize, float[,] psf, float[,] psfSquared)
         {
-            this.imageSection = imageSection;
+            this.patch = patchSize;
             psf2 = psfSquared;
-            aMap = PSF.CalcAMap(psf, totalSize, imageSection);
+            aMap = PSF.CalcAMap(psf, imageSize, patchSize);
         }
 
-        public bool DeconvolvePath(float[,] xImage, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
+        #region ISubpatchDeconvolver implementation
+        public bool DeconvolvePath(Rectangle subpatch, float[,] reconstruction, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001F)
         {
             bool converged = false;
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
-                var max = GetAbsMax(xImage, bMap, 0.0f, 1.0f);
+                var max = GetAbsMax(subpatch, reconstruction, bMap, 0.0f, 1.0f);
 
                 var lambdaMax = 1 / alpha * max.PixelMaxDiff;
                 var lambdaCurrent = lambdaMax / lambdaFactor;
                 lambdaCurrent = lambdaCurrent > lambdaMin ? lambdaCurrent : lambdaMin;
 
                 Console.WriteLine("-----------------------------FastGreedyCD with lambda " + lambdaCurrent + "------------------------");
-                var pathConverged = DeconvolveImpl(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
+                var pathConverged = Deconvolve(subpatch, reconstruction, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
                 converged = lambdaMin == lambdaCurrent & pathConverged;
 
                 if (converged)
@@ -50,28 +58,23 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        public bool Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
-        {
-            return DeconvolveImpl(xImage, bMap, lambda, alpha, maxIteration, epsilon);
-        }
-
-        private bool DeconvolveImpl(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon)
+        public bool Deconvolve(Rectangle subpatch, float[,] reconstruction, float[,] bMap, float lambda, float alpha, int iterations, float epsilon = 0.0001F)
         {
             var watch = new Stopwatch();
             watch.Start();
 
             bool converged = false;
             int iter = 0;
-            while (!converged & iter < maxIteration)
+            while (!converged & iter < iterations)
             {
-                var maxPixel = GetAbsMax(xImage, bMap, lambda, alpha);
+                var maxPixel = GetAbsMax(subpatch, reconstruction, bMap, lambda, alpha);
                 converged = maxPixel.PixelMaxDiff < epsilon;
                 if (!converged)
                 {
-                    var yLocal = maxPixel.Y - imageSection.Y;
-                    var xLocal = maxPixel.X - imageSection.X;
-                    var pixelOld = xImage[yLocal, xLocal];
-                    xImage[yLocal, xLocal] = maxPixel.PixelNew;
+                    var yLocal = maxPixel.Y - patch.Y;
+                    var xLocal = maxPixel.X - patch.X;
+                    var pixelOld = reconstruction[yLocal, xLocal];
+                    reconstruction[yLocal, xLocal] = maxPixel.PixelNew;
                     UpdateB(bMap, psf2, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
                     if (iter % 50 == 0)
                         Console.WriteLine("iter\t" + iter + "\tcurrentUpdate\t" + Math.Abs(maxPixel.PixelNew - pixelOld));
@@ -85,18 +88,31 @@ namespace Single_Reference.Deconvolution
 
             return converged;
         }
+        #endregion
 
-        private Pixel GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
+        #region IDeconvolver implementation
+        public bool DeconvolvePath(float[,] xImage, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
-            var maxPixels = new Pixel[imageSection.YExtent()];
-            Parallel.For(imageSection.Y, imageSection.YEnd, (y) =>
+            return DeconvolvePath(patch, xImage, bMap, lambdaMin, lambdaFactor, alpha, maxPathIteration, maxIteration, epsilon);
+        }
+
+        public bool Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
+        {
+            return Deconvolve(patch, xImage, bMap, lambda, alpha, maxIteration, epsilon);
+        }
+        #endregion
+
+        private Pixel GetAbsMax(Rectangle subpatch, float[,] xImage, float[,] bMap, float lambda, float alpha)
+        {
+            var maxPixels = new Pixel[subpatch.YExtent()];
+            Parallel.For(subpatch.Y, subpatch.YEnd, (y) =>
             {
-                var yLocal = y - imageSection.Y;
+                var yLocal = y;
 
                 var currentMax = new Pixel(-1, -1, 0, 0);
-                for (int x = imageSection.X; x < imageSection.XEnd; x++)
+                for (int x = subpatch.X; x < subpatch.XEnd; x++)
                 {
-                    var xLocal = x - imageSection.X;
+                    var xLocal = x;
                     var currentA = aMap[yLocal, xLocal];
                     var old = xImage[yLocal, xLocal];
                     var xTmp = old + bMap[y, x] / currentA;
@@ -134,11 +150,9 @@ namespace Single_Reference.Deconvolution
             for (int i = yMin; i < yMax; i++)
                 for (int j = xMin; j < xMax; j++)
                 {
-                    var yLocal = i;
-                    var xLocal = j;
                     var yBUpdate = i + yPsf2Half - yPixel;
                     var xBUpdate = j + xPsf2Half - xPixel;
-                    bMap[yLocal, xLocal] += psf2[yBUpdate, xBUpdate] * xDiff;
+                    bMap[i, j] += psf2[yBUpdate, xBUpdate] * xDiff;
                 }
         }
 
@@ -155,11 +169,9 @@ namespace Single_Reference.Deconvolution
             {
                 for (int j = xMin; j < xMax; j++)
                 {
-                    var yLocal = i;
-                    var xLocal = j;
                     var yBUpdate = i + yPsf2Half - yPixel;
                     var xBUpdate = j + xPsf2Half - xPixel;
-                    bMap[yLocal, xLocal] += psf2[yBUpdate, xBUpdate] * xDiff;
+                    bMap[i, j] += psf2[yBUpdate, xBUpdate] * xDiff;
                 }
             });
         }

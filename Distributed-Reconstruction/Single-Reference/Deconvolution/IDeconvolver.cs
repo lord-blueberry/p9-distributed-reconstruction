@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using static Single_Reference.Common;
+
 
 namespace Single_Reference.Deconvolution
 {

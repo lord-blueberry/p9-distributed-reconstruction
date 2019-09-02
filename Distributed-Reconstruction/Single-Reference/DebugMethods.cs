@@ -385,8 +385,6 @@ namespace Single_Reference
             FitsIO.Write(psfCut, "psfCut.fits");
 
             
-
-
             var totalSize = new Rectangle(0, 0, gridSize, gridSize);
             var imageSection = new Rectangle(0, 128, gridSize, gridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize) , new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
@@ -407,14 +405,15 @@ namespace Single_Reference
                 //FORWARD
                 watchForward.Start();
                 var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
-                var dirtyImage = FFT.Backward(dirtyGrid, c.VisibilitiesCount);
+                var dirtyImage = FFT.BackwardFloat(dirtyGrid, c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
                 FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
                 watchForward.Stop();
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = fastCD.Deconvolve(xImage, ToFloatImage(dirtyImage), 0.5f, 0.8f, 100, 1e-4f);
+                bMapCalculator.ConvolveInPlace(dirtyImage);
+                var converged = fastCD.Deconvolve(xImage, dirtyImage, 0.5f, 0.8f, 100, 1e-4f);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
