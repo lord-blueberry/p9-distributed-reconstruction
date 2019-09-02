@@ -9,8 +9,6 @@ using Single_Reference.Deconvolution;
 using Single_Reference;
 using static Single_Reference.Common;
 
-using Distributed_Reference.DistributedDeconvolution;
-
 
 namespace Distributed_Reference
 {
@@ -28,17 +26,18 @@ namespace Distributed_Reference
             }
         }
 
-        public static double[,] Reconstruct(Intracommunicator comm, DistributedData.LocalDataset local, GriddingConstants c, int maxCycle)
+        public static float[,] Reconstruct(Intracommunicator comm, DistributedData.LocalDataset local, GriddingConstants c, int maxCycle, float lambda, float alpha, int iterPerCycle = 1000,bool usePathDeconvolution = false)
         {
             var watchTotal = new Stopwatch();
             var watchForward = new Stopwatch();
             var watchBackward = new Stopwatch();
             var watchDeconv = new Stopwatch();
+            watchTotal.Start();
 
             var metadata = Partitioner.CreatePartition(c, local.UVW, local.Frequencies);
 
-            var imgSection = CalculateLocalImageSection(comm.Rank, comm.Size, c.GridSize, c.GridSize);
-            var totalImage = new Rectangle(0, 0, c.GridSize, c.GridSize);
+            var patchSize = CalculateLocalImageSection(comm.Rank, comm.Size, c.GridSize, c.GridSize);
+            var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
 
             //calculate psf and prepare for correlation in the Fourier space
             var psf = ToFloatImage(CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies));
@@ -48,25 +47,34 @@ namespace Distributed_Reference
             
             if (comm.Rank == 0)
             {
-                PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psfCut, totalImage);
+                PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psfCut, totalSize);
             }
 
+            var deconvovler = new MPIGreedyCD(comm, totalSize, patchSize, psfCut);
+
             var residualVis = local.Visibilities;
-            var xLocal = new float[imgSection.YEnd - imgSection.Y, imgSection.XEnd - imgSection.X];
+            var xLocal = new float[patchSize.YEnd - patchSize.Y, patchSize.XEnd - patchSize.X];
+            var totalStatistics = new MPIGreedyCD.Statistics(false, 0, 0);
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
                 var dirtyImage = ForwardCalculateB(comm, c, metadata, residualVis, local.UVW, local.Frequencies, PsfCorrelation, psfCut, maxSidelobe, watchForward);
-                var bLocal = GetImgSection(dirtyImage.Image, imgSection);
-                if (comm.Rank == 0)
-                    watchDeconv.Start();
+                var bLocal = GetImgSection(dirtyImage.Image, patchSize);
 
-                var lambda = 0.8;
-                var alpha = 0.05;
-                var currentLambda = Math.Max(1.0 / alpha * dirtyImage.MaxSidelobeLevel, lambda);
-                var converged = DistributedGreedyCD.DeconvolvePath(comm, imgSection, totalImage, xLocal, bLocal, psfCut, currentLambda, 4.0, alpha, 5, 1000, 2e-5);
+                MPIGreedyCD.Statistics lastRun;
+                if (usePathDeconvolution)
+                {
+                    var currentLambda = Math.Max(1.0f / alpha * dirtyImage.MaxSidelobeLevel, lambda);
+                    lastRun = deconvovler.DeconvolvePath(xLocal, bLocal, currentLambda, 4.0f, alpha, 5, iterPerCycle, 2e-5f);
+                } else
+                {
+                    lastRun = deconvovler.Deconvolve(xLocal, bLocal, lambda, alpha, iterPerCycle, 2e-5f);
+                    
+                }
+                totalStatistics += lastRun;
+
                 if (comm.Rank == 0)
                 {
-                    if (converged)
+                    if (lastRun.Converged)
                         Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                     else
                         Console.WriteLine("-------------------------------not converged----------------------");
@@ -81,7 +89,7 @@ namespace Distributed_Reference
                 if (comm.Rank == 0)
                 {
                     watchBackward.Start();
-                    var x = new double[c.GridSize, c.GridSize];
+                    var x = new float[c.GridSize, c.GridSize];
                     StitchImage(totalX, x, comm.Size);
                     FitsIO.Write(x, "xImage_" + cycle + ".fits");
                     FFT.Shift(x);
@@ -95,17 +103,17 @@ namespace Distributed_Reference
 
             float[][,] gatherX = null;
             comm.Gather(xLocal, 0, ref gatherX);
-            double[,] reconstructed = null;
+            float[,] reconstructed = null;
             if (comm.Rank == 0) 
             {
-                reconstructed = new double[c.GridSize, c.GridSize]; ;
+                reconstructed = new float[c.GridSize, c.GridSize]; ;
                 StitchImage(gatherX, reconstructed, comm.Size);
             }
             
             return reconstructed;
         }
 
-        private static Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
+        public static Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
         {
             var yPatchCount = (int)Math.Floor(Math.Sqrt(nodeCount));
             var xPatchCount = (nodeCount / yPatchCount);

@@ -384,9 +384,13 @@ namespace Single_Reference
             var psfCut = ToFloatImage(psfCutDouble);
             FitsIO.Write(psfCut, "psfCut.fits");
 
+            
+
+
             var totalSize = new Rectangle(0, 0, gridSize, gridSize);
             var imageSection = new Rectangle(0, 128, gridSize, gridSize);
-            var fastCD = new FastGreedyCD(totalSize, totalSize, psfCut);
+            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize) , new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
+            var fastCD = new FastGreedyCD(totalSize, psfCut);
             var gpuCD = new GPUGreedyCD(totalSize, psfCut, 50);
 
             var xImage = new float[gridSize, gridSize];
@@ -410,7 +414,7 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-                var converged = gpuCD.Deconvolve(xImage, ToFloatImage(dirtyImage), 0.5f, 0.8f, 100, 1e-4f);
+                var converged = fastCD.Deconvolve(xImage, ToFloatImage(dirtyImage), 0.5f, 0.8f, 100, 1e-4f);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
