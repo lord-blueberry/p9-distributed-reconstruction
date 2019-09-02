@@ -12,29 +12,25 @@ namespace Single_Reference.Deconvolution
     {
         readonly Rectangle imageSection;
         readonly Rectangle psfSize;
-        readonly Complex[,] psfCorrelation;
         readonly float[,] psf2;
         readonly float[,] aMap;
 
-        public FastGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf) :
-            this(totalSize, imageSection, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf))
+        public FastGreedyCD(Rectangle totalSize, float[,] psf) :
+            this(totalSize, totalSize, psf, PSF.CalcPSFSquared(psf))
         {
 
         }
 
-        public FastGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared)
+        public FastGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, float[,] psfSquared)
         {
             this.imageSection = imageSection;
-            psfSize = new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1));
-            this.psfCorrelation = psfCorrelation;
             psf2 = psfSquared;
             aMap = PSF.CalcAMap(psf, totalSize, imageSection);
         }
 
-        public bool DeconvolvePath(float[,] xImage, float[,] residuals, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
+        public bool DeconvolvePath(float[,] xImage, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
             bool converged = false;
-            var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
                 var max = GetAbsMax(xImage, bMap, 0.0f, 1.0f);
@@ -54,9 +50,8 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        public bool Deconvolve(float[,] xImage, float[,] residuals, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
+        public bool Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
         {
-            var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
             return DeconvolveImpl(xImage, bMap, lambda, alpha, maxIteration, epsilon);
         }
 

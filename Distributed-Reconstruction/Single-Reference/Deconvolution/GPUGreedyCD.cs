@@ -42,28 +42,27 @@ namespace Single_Reference.Deconvolution
         readonly Accelerator accelerator;
         readonly Rectangle imageSection;
         readonly Rectangle psfSize;
-        readonly Complex[,] psfCorrelation;
         readonly float[,] psf2;
         readonly float[,] aMap;
         readonly int batchIterations;
 
         public GPUGreedyCD(Rectangle totalSize, float[,] psf, int nrBatchIterations) :
-            this(totalSize, totalSize, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf), nrBatchIterations)
+            this(totalSize, totalSize, psf, PSF.CalcPSFSquared(psf), nrBatchIterations)
         {
 
         }
 
         public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, int nrBatchIterations) :
-            this(totalSize, imageSection, psf, PSF.CalcPaddedFourierCorrelation(psf, totalSize), PSF.CalcPSFSquared(psf), nrBatchIterations)
+            this(totalSize, imageSection, psf, PSF.CalcPSFSquared(psf), nrBatchIterations)
         {
             
         }
 
-        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, Complex[,] psfCorrelation, float[,] psfSquared, int nrBatchIterations)
+        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, float[,] psfSquared, int nrBatchIterations)
         {
             this.imageSection = imageSection;
             psfSize = new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1));
-            this.psfCorrelation = psfCorrelation;
+ 
             psf2 = psfSquared;
             aMap = PSF.CalcAMap(psf, totalSize, imageSection);
             batchIterations = nrBatchIterations;
@@ -89,11 +88,9 @@ namespace Single_Reference.Deconvolution
 
         
 
-        public bool DeconvolvePath(float[,] reconstruction, float[,] residuals, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
+        public bool DeconvolvePath(float[,] reconstruction, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
             bool converged = false;
-            var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
-
             AllocateGPU(reconstruction, bMap, lambdaMin, alpha);
 
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
@@ -133,9 +130,8 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        public bool Deconvolve(float[,] reconstruction, float[,] residuals, float lambda, float alpha, int maxIteration, float epsilon=1e-4f)
+        public bool Deconvolve(float[,] reconstruction, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon=1e-4f)
         {
-            var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
             AllocateGPU(reconstruction, bMap, lambda, alpha);
 
             var watch = new Stopwatch();

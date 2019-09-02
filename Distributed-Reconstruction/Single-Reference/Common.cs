@@ -174,7 +174,7 @@ namespace Single_Reference
             }
         }
 
-        public static class Residuals
+        public class Residuals
         {
             public static float[,] CalcBMap(float[,] residuals, Complex[,] psfCorrelation, Rectangle psfSize)
             {

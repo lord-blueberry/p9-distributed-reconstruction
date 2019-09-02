@@ -113,7 +113,7 @@ namespace Distributed_Reference
             return reconstructed;
         }
 
-        private static Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
+        public static Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
         {
             var yPatchCount = (int)Math.Floor(Math.Sqrt(nodeCount));
             var xPatchCount = (nodeCount / yPatchCount);
@@ -165,7 +165,6 @@ namespace Distributed_Reference
                 //remove spheroidal
 
                 image = Residuals.CalcBMap(dirtyImage, PsfCorrelation, new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
-
                 watchIdg.Stop();
             }
             comm.Broadcast(ref maxSideLobeLevel, 0);
