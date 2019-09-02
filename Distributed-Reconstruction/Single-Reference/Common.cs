@@ -309,6 +309,13 @@ namespace Single_Reference
             public int YExtent() => YEnd - Y;
 
             public int XExtent() => XEnd - X;
+
+            public bool PointInRectangle(int pointY, int pointX)
+            {
+                bool output = pointY >= Y  & pointY < YEnd;
+                output = output & pointX >= X  & pointX < XEnd;
+                return output;
+            }
         }
     }
 }

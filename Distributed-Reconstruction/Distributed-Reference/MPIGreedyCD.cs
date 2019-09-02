@@ -31,7 +31,7 @@ namespace Distributed_Reference
             {
                 var max = GetAbsMax(xImage, bMap, 0.0f, 1.0f);
 
-                var lambdaMax = 1 / alpha * max.PixelMaxDiff;
+                var lambdaMax = 1 / alpha * max.MaxDiff;
                 var lambdaCurrent = lambdaMax / lambdaFactor;
                 lambdaCurrent = lambdaCurrent > lambdaMin ? lambdaCurrent : lambdaMin;
 
@@ -61,23 +61,27 @@ namespace Distributed_Reference
             while (!converged & iter < maxIteration)
             {
                 var maxPixel = GetAbsMax(xImage, bMap, lambda, alpha);
-                converged = maxPixel.PixelMaxDiff < epsilon;
+                converged = maxPixel.MaxDiff < epsilon;
                 if (!converged)
                 {
-                    var yLocal = maxPixel.Y - imageSection.Y;
-                    var xLocal = maxPixel.X - imageSection.X;
-                    var pixelOld = xImage[yLocal, xLocal];
-                    xImage[yLocal, xLocal] = maxPixel.PixelNew;
-                    UpdateB(bMap, psf2, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
-                    if (iter % 50 == 0)
-                        Console.WriteLine("iter\t" + iter + "\tcurrentUpdate\t" + Math.Abs(maxPixel.PixelNew - pixelOld));
+                    if(imageSection.PointInRectangle(maxPixel.Y, maxPixel.X))
+                    {
+                        var yLocal = maxPixel.Y - imageSection.Y;
+                        var xLocal = maxPixel.X - imageSection.X;
+                        xImage[yLocal, xLocal] += maxPixel.MaxDiff * maxPixel.Sign;
+                    }
+                    
+                    UpdateB(bMap, psf2, maxPixel.Y, maxPixel.X, maxPixel);
+                    if (iter % 50 == 0 & comm.Rank == 0)
+                        Console.WriteLine("iter\t" + iter + "\tcurrentUpdate\t" + maxPixel.MaxDiff);
                     iter++;
                 }
             }
             watch.Stop();
             double iterPerSecond = iter;
             iterPerSecond = iterPerSecond / watch.ElapsedMilliseconds * 1000.0;
-            Console.WriteLine(iter + " iterations in:" + watch.Elapsed + "\t" + iterPerSecond + " iterations per second");
+            if (comm.Rank == 0)
+                Console.WriteLine(iter + " iterations in:" + watch.Elapsed + "\t" + iterPerSecond + " iterations per second");
 
             return converged;
         }
@@ -85,41 +89,37 @@ namespace Distributed_Reference
         private Pixel GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
         {
             var maxPixels = new Pixel[imageSection.YExtent()];
-            Parallel.For(imageSection.Y, imageSection.YEnd, (y) =>
+            Parallel.For(0, imageSection.YExtent(), (y) =>
             {
-                var yLocal = y - imageSection.Y;
-
-                var currentMax = new Pixel(-1, -1, 0, 0);
-                for (int x = imageSection.X; x < imageSection.XEnd; x++)
+                var currentMax = new Pixel(0, -1, -1);
+                for (int x = 0; x < imageSection.XExtent(); x++)
                 {
-                    var xLocal = x - imageSection.X;
-                    var currentA = aMap[yLocal, xLocal];
-                    var old = xImage[yLocal, xLocal];
+                    var currentA = aMap[y, x];
+                    var old = xImage[y, x];
                     var xTmp = old + bMap[y, x] / currentA;
                     xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
-                    var xDiff = old - xTmp;
+                    var xDiff = xTmp - old;
 
-                    if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
+                    if (currentMax.MaxDiff < Math.Abs(xDiff))
                     {
-                        currentMax.Y = y;
-                        currentMax.X = x;
-                        currentMax.PixelMaxDiff = Math.Abs(xDiff);
-                        currentMax.PixelNew = xTmp;
+                        var yGlobal = y + imageSection.Y;
+                        var xGlobal = x + imageSection.X;
+                        currentMax = new Pixel(xDiff, yGlobal, xGlobal);
                     }
                 }
-                maxPixels[yLocal] = currentMax;
+                maxPixels[y] = currentMax;
             });
 
-            var maxPixelLocal = new Pixel(-1, -1, 0, 0);
+            var maxPixelLocal = new Pixel(0, -1, -1);
             for (int i = 0; i < maxPixels.Length; i++)
-                if (maxPixelLocal.PixelMaxDiff < maxPixels[i].PixelMaxDiff)
+                if (maxPixelLocal.MaxDiff < maxPixels[i].MaxDiff)
                     maxPixelLocal = maxPixels[i];
 
-            var maxPixelGlobal = comm.Allreduce(maxPixelLocal, (aC, bC) => aC.PixelMaxDiff > bC.PixelMaxDiff ? aC : bC);
+            var maxPixelGlobal = comm.Allreduce(maxPixelLocal, (aC, bC) => aC.MaxDiff > bC.MaxDiff ? aC : bC);
             return maxPixelGlobal;
         }
 
-        private void UpdateBSingle(double[,] b, double[,] bUpdate, int yPixel, int xPixel, double xDiff)
+        private void UpdateBSingle(double[,] b, double[,] bUpdate, int yPixel, int xPixel, Pixel max)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
             var xBHalf = bUpdate.GetLength(1) / 2;
@@ -135,11 +135,11 @@ namespace Distributed_Reference
                     var xLocal = j - imageSection.X;
                     var yBUpdate = i + yBHalf - yPixel;
                     var xBUpdate = j + xBHalf - xPixel;
-                    b[yLocal, xLocal] += bUpdate[yBUpdate, xBUpdate] * xDiff;
+                    b[yLocal, xLocal] -= bUpdate[yBUpdate, xBUpdate] * (max.MaxDiff * max.Sign);
                 }
         }
 
-        private void UpdateB(float[,] b, float[,] bUpdate, int yPixel, int xPixel, float xDiff)
+        private void UpdateB(float[,] b, float[,] bUpdate, int yPixel, int xPixel, Pixel max)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
             var xBHalf = bUpdate.GetLength(1) / 2;
@@ -156,7 +156,7 @@ namespace Distributed_Reference
                     var xLocal = j - imageSection.X;
                     var yBUpdate = i + yBHalf - yPixel;
                     var xBUpdate = j + xBHalf - xPixel;
-                    b[yLocal, xLocal] += bUpdate[yBUpdate, xBUpdate] * xDiff;
+                    b[yLocal, xLocal] -= bUpdate[yBUpdate, xBUpdate] * (max.MaxDiff * max.Sign);
                 }
             });
 
@@ -166,17 +166,17 @@ namespace Distributed_Reference
         [Serializable]
         private class Pixel
         {
-            public float PixelMaxDiff { get;  set; }
-            public float PixelNew { get; set; }
+            public float MaxDiff { get;  set; }
+            public int Sign { get; set; }
 
             public int Y { get;  set; }
             public int X { get; set; }
 
 
-            public Pixel(float o, float xDiff, int y, int x)
+            public Pixel(float pixelValue, int y, int x)
             {
-                PixelMaxDiff = o;
-                PixelNew = xDiff;
+                MaxDiff = Math.Abs(pixelValue);
+                Sign = Math.Sign(pixelValue);
                 Y = y;
                 X = x;
             }
