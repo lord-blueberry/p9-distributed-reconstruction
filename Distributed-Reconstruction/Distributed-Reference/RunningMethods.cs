@@ -109,7 +109,7 @@ namespace Distributed_Reference
                 var proc = Process.GetCurrentProcess();
                 var name = proc.ProcessName;
                 Console.WriteLine(" name: " + name);
-                System.Threading.Thread.Sleep(17000);
+                //System.Threading.Thread.Sleep(17000);
 
                 var comm = Communicator.world;
                 //READ DATA
@@ -120,18 +120,18 @@ namespace Distributed_Reference
                 var data = DistributedData.SplitDataAmongNodes(comm, fullData);
                 var totalVisibilitiesCount = fullData.VisibilitiesCount;
 
-                int gridSize = 128;
+                int gridSize = 256;
                 int subgridsize = 16;
                 int kernelSize = 8;
                 int max_nr_timesteps = 512;
-                double cellSize = 2.0 / 3600.0 * PI / 180.0;
+                double cellSize = 1.0 / 3600.0 * PI / 180.0;
                 var c = new GriddingConstants(totalVisibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
                 comm.Barrier();
                 if (comm.Rank == 0)
                     Console.WriteLine("Done Reading, Starting reconstruction");
 
-                var reconstruction = SimpleDistributedReconstruction.Reconstruct(comm, data, c, 5, 0.1f, 0.8f);
+                var reconstruction = SimpleDistributedReconstruction.Reconstruct(comm, data, c, 1, 0.5f, 0.8f, 1000);
 
                 if (comm.Rank == 0)
                     FitsIO.Write(reconstruction, "simulatedReconstruction.fits");

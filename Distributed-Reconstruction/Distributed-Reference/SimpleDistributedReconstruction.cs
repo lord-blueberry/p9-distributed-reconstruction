@@ -54,22 +54,20 @@ namespace Distributed_Reference
 
             var residualVis = local.Visibilities;
             var xLocal = new float[patchSize.YEnd - patchSize.Y, patchSize.XEnd - patchSize.X];
+            var totalStatistics = new MPIGreedyCD.Statistics(false, 0, 0);
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
                 var dirtyImage = ForwardCalculateB(comm, c, metadata, residualVis, local.UVW, local.Frequencies, PsfCorrelation, psfCut, maxSidelobe, watchForward);
                 var bLocal = GetImgSection(dirtyImage.Image, patchSize);
-                if (comm.Rank == 0)
-                    watchDeconv.Start();
 
-                var totalStatistics = new MPIGreedyCD.Statistics(false, 0, 0);
-                var lastRun = new MPIGreedyCD.Statistics(false, 0, 0);
+                MPIGreedyCD.Statistics lastRun;
                 if (usePathDeconvolution)
                 {
                     var currentLambda = Math.Max(1.0f / alpha * dirtyImage.MaxSidelobeLevel, lambda);
                     lastRun = deconvovler.DeconvolvePath(xLocal, bLocal, currentLambda, 4.0f, alpha, 5, iterPerCycle, 2e-5f);
                 } else
                 {
-                    lastRun = deconvovler.Deconvolve(xLocal, bLocal, lambda, alpha, 1000, 2e-5f);
+                    lastRun = deconvovler.Deconvolve(xLocal, bLocal, lambda, alpha, iterPerCycle, 2e-5f);
                     
                 }
                 totalStatistics += lastRun;
@@ -167,6 +165,7 @@ namespace Distributed_Reference
                 //remove spheroidal
 
                 image = Residuals.CalcBMap(dirtyImage, PsfCorrelation, new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
+
                 watchIdg.Stop();
             }
             comm.Broadcast(ref maxSideLobeLevel, 0);
