@@ -18,7 +18,7 @@ namespace Single_Reference.Deconvolution
     {
         private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => XMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
-        #region GPU allocated data buffers
+        #region GPU operations and GPU allocated data 
         private MemoryBuffer2D<float> xImageGPU;
         private MemoryBuffer2D<float> bMapGPU;
         private MemoryBuffer2D<float> aMapGPU;
@@ -26,12 +26,14 @@ namespace Single_Reference.Deconvolution
 
         private MemoryBuffer<float> lambdaAlpha;
         private MemoryBuffer<Pixel> maxPixelGPU;
-        #endregion
 
-        #region Loaded GPU kernels
         readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>> shrink;
         readonly Action<Index, ArrayView2D<float>, ArrayView<Pixel>> updateX;
-        readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>> updateCandidates;
+        readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>> updateB;
+
+        private void ShrinkGPU() => shrink(xImageGPU.Extent, xImageGPU.View, bMapGPU.View, aMapGPU.View, lambdaAlpha.View, maxPixelGPU.View);
+        private void UpdateXGPU() => updateX(new Index(1), xImageGPU.View, maxPixelGPU.View);
+        private void UpdateBGPU() => updateB(psf2GPU.Extent, bMapGPU.View, psf2GPU.View, maxPixelGPU.View);
         #endregion
 
         public bool RunsOnGPU { get; }
@@ -81,8 +83,10 @@ namespace Single_Reference.Deconvolution
 
             shrink = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>>(ShrinkKernel);
             updateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateXKernel);
-            updateCandidates = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateCandidatesKernel);
+            updateB = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateBKernel);
         }
+
+        
 
         public bool DeconvolvePath(float[,] reconstruction, float[,] residuals, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
@@ -95,7 +99,7 @@ namespace Single_Reference.Deconvolution
             {
                 //set lambdap
                 lambdaAlpha.CopyFrom(0.0f, new Index(0));
-                shrink(xImageGPU.Extent, xImageGPU.View, bMapGPU.View, aMapGPU.View, lambdaAlpha.View, maxPixelGPU.View);
+                ShrinkGPU();
                 accelerator.Synchronize();
                 var maxPixel = maxPixelGPU.GetAsArray()[0];
                 var lambdaMax = 1 / alpha * maxPixel.AbsDiff;
@@ -159,11 +163,10 @@ namespace Single_Reference.Deconvolution
         {
             for(int i = 0; i < batchIterations; i++)
             {
-                shrink(xImageGPU.Extent, xImageGPU.View, bMapGPU.View, aMapGPU.View, lambdaAlpha.View, maxPixelGPU.View);
+                ShrinkGPU();
                 accelerator.Synchronize();
-
-                updateX(new Index(1), xImageGPU.View, maxPixelGPU.View);
-                updateCandidates(psf2GPU.Extent, bMapGPU.View, aMapGPU.View, psf2GPU.View, maxPixelGPU.View);
+                UpdateXGPU();
+                UpdateBGPU();
                 accelerator.Synchronize();
             }
         }
@@ -319,9 +322,8 @@ namespace Single_Reference.Deconvolution
             }
         }
 
-        private static void UpdateCandidatesKernel(Index2 index,
+        private static void UpdateBKernel(Index2 index,
             ArrayView2D<float> candidates,
-            ArrayView2D<float> aMap,
             ArrayView2D<float> psf2,
             ArrayView<Pixel> pixel)
         {
