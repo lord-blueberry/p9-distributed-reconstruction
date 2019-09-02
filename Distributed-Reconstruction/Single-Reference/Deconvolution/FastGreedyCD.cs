@@ -65,8 +65,8 @@ namespace Single_Reference.Deconvolution
             var watch = new Stopwatch();
             watch.Start();
 
-            int iter = 0;
             bool converged = false;
+            int iter = 0;
             while (!converged & iter < maxIteration)
             {
                 var maxPixel = GetAbsMax(xImage, bMap, lambda, alpha);

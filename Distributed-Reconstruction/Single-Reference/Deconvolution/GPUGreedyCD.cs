@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Numerics;
+using System.Diagnostics;
 
 using ILGPU;
 using ILGPU.AtomicOperations;
@@ -132,25 +133,36 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        public bool Deconvolve(float[,] reconstruction, float[,] residuals, float lambda, float alpha, int iterations, float epsilon=1e-4f)
+        public bool Deconvolve(float[,] reconstruction, float[,] residuals, float lambda, float alpha, int maxIteration, float epsilon=1e-4f)
         {
-            bool converged = false;
             var bMap = Residuals.CalcBMap(residuals, psfCorrelation, psfSize);
-
             AllocateGPU(reconstruction, bMap, lambda, alpha);
-            for (int iter = 0; iter < iterations; iter+=batchIterations)
+
+            var watch = new Stopwatch();
+            watch.Start();
+            bool converged = false;
+            int iter = 0;
+            while (!converged & iter < maxIteration)
             {
                 DeconvolutionBatchIterations(batchIterations);
                 var lastPixel = maxPixelGPU.GetAsArray()[0];
-                Console.WriteLine("iter\t" + (iter + batchIterations) + "\tcurrentUpdate\t" + lastPixel.AbsDiff);
                 if (lastPixel.AbsDiff < epsilon)
                 {
                     converged = true;
                     break;
                 }
+                Console.WriteLine("iter\t" + (iter + batchIterations) + "\tcurrentUpdate\t" + lastPixel.AbsDiff);
+                iter += batchIterations;
             }
+            watch.Stop();
+
+            double iterPerSecond = iter;
+            iterPerSecond = iterPerSecond / watch.ElapsedMilliseconds * 1000.0;
+            Console.WriteLine(iter + " iterations in:" + watch.Elapsed + "\t" + iterPerSecond + " iterations per second");
+
             xImageGPU.CopyTo(reconstruction, new Index2(0, 0), new Index2(0, 0), new Index2(reconstruction.GetLength(1), reconstruction.GetLength(0)));
             FreeGPU();
+
             return converged;
         }
 
