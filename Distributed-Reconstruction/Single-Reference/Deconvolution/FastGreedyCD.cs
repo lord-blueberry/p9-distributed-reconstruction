@@ -91,14 +91,14 @@ namespace Single_Reference.Deconvolution
             return converged;
         }
 
-        private MaxPixel GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
+        private Pixel GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
         {
-            var maxPixels = new MaxPixel[imageSection.YExtent()];
+            var maxPixels = new Pixel[imageSection.YExtent()];
             Parallel.For(imageSection.Y, imageSection.YEnd, (y) =>
             {
                 var yLocal = y - imageSection.Y;
 
-                var currentMax = new MaxPixel(-1, -1, 0, 0);
+                var currentMax = new Pixel(-1, -1, 0, 0);
                 for (int x = imageSection.X; x < imageSection.XEnd; x++)
                 {
                     var xLocal = x - imageSection.X;
@@ -119,7 +119,7 @@ namespace Single_Reference.Deconvolution
                 maxPixels[yLocal] = currentMax;
             });
 
-            var maxPixel = new MaxPixel(-1, -1, 0, 0);
+            var maxPixel = new Pixel(-1, -1, 0, 0);
             for (int i = 0; i < maxPixels.Length; i++)
                 if (maxPixel.PixelMaxDiff < maxPixels[i].PixelMaxDiff)
                     maxPixel = maxPixels[i];
@@ -169,14 +169,14 @@ namespace Single_Reference.Deconvolution
             });
         }
 
-        private struct MaxPixel
+        private struct Pixel
         {
             public int Y;
             public int X;
             public float PixelMaxDiff;
             public float PixelNew;
 
-            public MaxPixel(int y, int x, float xMax, int xNew)
+            public Pixel(int y, int x, float xMax, int xNew)
             {
                 Y = y;
                 X = x;
