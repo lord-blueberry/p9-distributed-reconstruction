@@ -10,16 +10,16 @@ namespace Distributed_Reference.DistributedDeconvolution
 {
     class DistributedGreedyCD
     { 
-        public static bool DeconvolvePath(Intracommunicator comm, Common.Rectangle imgSection, Common.Rectangle totalSize, double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10, int maxIteration = 100, double epsilon = 1e-4)
+        public static bool DeconvolvePath(Intracommunicator comm, Common.Rectangle imgSection, Common.Rectangle totalSize, float[,] xImage, float[,] b, float[,] psf, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 1e-4)
         {
             //TODO: Debug this
-            var aMap = Common.PSF.CalcAMap(Common.ToFloatImage(psf), totalSize, imgSection);
+            var aMap = Common.PSF.CalcAMap(psf, totalSize, imgSection);
             
             var converged = false;
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
-                var xMaxAbsDiff = 0.0;
-                var xMaxDiff = 0.0;
+                var xMaxAbsDiff = 0.0f;
+                var xMaxDiff = 0.0f;
                 for (int y = 0; y < b.GetLength(0); y++)
                     for (int x = 0; x < b.GetLength(1); x++)
                     {
@@ -50,7 +50,7 @@ namespace Distributed_Reference.DistributedDeconvolution
             return converged;
         }
 
-        public static bool Deconvolve(Intracommunicator comm, Common.Rectangle imgSection, Common.Rectangle totalSize, double[,] xImage, float[,] aMap, double[,] b, double[,] psf, double lambda, double alpha, int maxIteration = 1000, double epsilon = 1e-4)
+        public static bool Deconvolve(Intracommunicator comm, Common.Rectangle imgSection, Common.Rectangle totalSize, float[,] xImage, float[,] aMap, float[,] b, float[,] psf, float lambda, float alpha, int maxIteration = 1000, float epsilon = 1e-4)
         {
             var yPsfHalf = psf.GetLength(0) / 2;
             var xPsfHalf = psf.GetLength(1) / 2;
@@ -169,7 +169,7 @@ namespace Distributed_Reference.DistributedDeconvolution
                 }
         }
 
-        private static void UpdateB(double[,] b, double[,] bUpdate, Common.Rectangle imgSection, int yPixel, int xPixel, double xDiff)
+        private static void UpdateB(float[,] b, float[,] bUpdate, Common.Rectangle imgSection, int yPixel, int xPixel, float xDiff)
         {
             var yBHalf = bUpdate.GetLength(0) / 2;
             var xBHalf = bUpdate.GetLength(1) / 2;

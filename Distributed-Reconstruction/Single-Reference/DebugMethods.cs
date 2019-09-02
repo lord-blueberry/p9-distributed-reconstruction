@@ -13,7 +13,7 @@ using System.IO;
 
 namespace Single_Reference
 {
-    public class DebugMethods
+    class DebugMethods
     {
     
         #region full
@@ -69,7 +69,7 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
             var psfCut = CutImg(psf, 2);
             FitsIO.Write(psfCut, "psfCut.fits");
-            var maxSidelobe = PSF.CalcMaxSidelobe(psf);
+            var maxSidelobe = CommonDeprecated.PSF.CalcMaxSidelobe(psf);
             var psfCorrelated = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
 
             var xImage = new double[gridSize, gridSize];
@@ -85,7 +85,7 @@ namespace Single_Reference
                 watchDeconv.Start();
                 var sideLobe = maxSidelobe * GetMax(dirtyImage);
                 Console.WriteLine("sideLobeLevel: " + sideLobe);
-                var b = Common.Residuals.CalculateBMap(dirtyImage, psfCorrelated, psfCut.GetLength(0), psfCut.GetLength(1));
+                var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, psfCorrelated, psfCut.GetLength(0), psfCut.GetLength(1));
                 var lambda = 0.8;
                 var alpha = 0.05;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -142,7 +142,7 @@ namespace Single_Reference
             FitsIO.Write(psf, "psf.fits");
             var psfCut = CutImg(psf, 2);
             FitsIO.Write(psfCut, "psfCut.fits");
-            var maxSidelobe = Common.PSF.CalcMaxSidelobe(psf);
+            var maxSidelobe = CommonDeprecated.PSF.CalcMaxSidelobe(psf);
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
@@ -158,7 +158,7 @@ namespace Single_Reference
                 var sideLobe = maxSidelobe * GetMax(dirtyImage);
                 Console.WriteLine("sideLobeLevel: " + sideLobe);
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
-                var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
+                var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 var lambda = 100.0;
                 var alpha = 0.95;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
@@ -241,7 +241,7 @@ namespace Single_Reference
                 watchDeconv.Start();
 
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
-                var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
+                var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 var converged = GreedyCDReference.Deconvolve(xImage, b, psfCut, 0.5, 0.8, 10000);
 
                 if (converged)
@@ -293,7 +293,7 @@ namespace Single_Reference
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
             var psf = FFT.Backward(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
-            var maxSidelobe = Common.PSF.CalcMaxSidelobe(psf);
+            var maxSidelobe = CommonDeprecated.PSF.CalcMaxSidelobe(psf);
             var avgSidelobe = CalcAvgSidelobe(psf);
 
             var psfCut = CutImg(psf);
@@ -326,7 +326,7 @@ namespace Single_Reference
                 watchDeconv.Start();
 
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
-                var b = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
+                var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 //var converged = GradientDebug.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10000);
                 var converged = RandomBlockCD.Deconvolve(xImage, dirtyImage, psf, 0.0, 1.0, 1);
 

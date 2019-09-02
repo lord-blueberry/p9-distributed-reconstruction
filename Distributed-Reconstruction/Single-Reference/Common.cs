@@ -77,9 +77,11 @@ namespace Single_Reference
 
             /// <summary>
             /// invert PSF to calculate the CORRELATION in fourier space (multiplication in fourier space == convolution, multiplication with inverted kernel in fourier space == correlation)
+            /// 
+            /// its padded, otherwise we would calculate the circular convolution which is physically implausible
             /// </summary>
             /// <param name="psf"></param>
-            /// <param name="padding"></param>
+            /// <param name="padding">padding to be used. Use the total image size as padding</param>
             /// <returns></returns>
             public static Complex[,] CalcPaddedFourierCorrelation(float[,] psf, Rectangle padding)
             {
@@ -139,39 +141,41 @@ namespace Single_Reference
                     }
             }
 
-
             /// <summary>
             /// Find maximum pixel value that is outside the cut
             /// </summary>
             /// <param name="fullPsf"></param>
             /// <param name="cutFactor"></param>
             /// <returns></returns>
-            public static double CalcMaxSidelobe(double[,] fullPsf, int cutFactor = 2)
+            public static float CalcMaxSidelobe(float[,] fullPsf, int cutFactor = 2)
             {
                 var yOffset = fullPsf.GetLength(0) / 2 - (fullPsf.GetLength(0) / cutFactor) / 2;
                 var xOffset = fullPsf.GetLength(1) / 2 - (fullPsf.GetLength(1) / cutFactor) / 2;
 
-                double output = 0.0;
+                var output = 0.0f;
                 for (int y = 0; y < fullPsf.GetLength(0); y++)
                     for (int x = 0; x < fullPsf.GetLength(1); x++)
                         if (!(y >= yOffset & y < (yOffset + fullPsf.GetLength(0) / cutFactor)) | !(x >= xOffset & x < (xOffset + fullPsf.GetLength(1) / cutFactor)))
                             output = Math.Max(output, fullPsf[y, x]);
                 return output;
             }
+
+
+            public static float[,] Cut(float[,] psf, int factor = 2)
+            {
+                var output = new float[psf.GetLength(0) / factor, psf.GetLength(1) / factor];
+                var yOffset = psf.GetLength(0) / 2 - output.GetLength(0) / 2;
+                var xOffset = psf.GetLength(1) / 2 - output.GetLength(1) / 2;
+
+                for (int y = 0; y < output.GetLength(0); y++)
+                    for (int x = 0; x < output.GetLength(0); x++)
+                        output[y, x] = psf[yOffset + y, xOffset + x];
+                return output;
+            }
         }
 
         public static class Residuals
         {
-            public static double[,] CalculateBMap(double[,] residuals, Complex[,] psfCorrelation, int yPadding, int xPadding)
-            {
-                var resPadded = Pad(residuals, yPadding, xPadding);
-                var ResPAdded = FFT.Forward(resPadded, 1.0);
-                var B = Fourier2D.Multiply(ResPAdded, psfCorrelation);
-                var bPadded = FFT.Backward(B, (double)(B.GetLength(0) * B.GetLength(1)));
-                var bMap = RemovePadding(bPadded, yPadding, xPadding);
-                return bMap;
-            }
-
             public static float[,] CalcBMap(float[,] residuals, Complex[,] psfCorrelation, Rectangle psfSize)
             {
                 var yPadding = psfSize.YEnd;
@@ -209,28 +213,13 @@ namespace Single_Reference
                 return imgNoPadding;
             }
 
-            private static double[,] Pad(double[,] image, int yPadding, int xPadding)
+            public static float GetMax(float[,] image)
             {
-                var yPsfHalf = yPadding / 2;
-                var xPsfHalf = xPadding / 2;
-                var resPadded = new double[image.GetLength(0) + yPadding, image.GetLength(1) + xPadding];
+                var max = 0.0f;
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
-                        resPadded[y + yPsfHalf, x + xPsfHalf] = image[y, x];
-
-                return resPadded;
-            }
-
-            private static double[,] RemovePadding(double[,] image, int yPadding, int xPadding)
-            {
-                var yPsfHalf = yPadding / 2;
-                var xPsfHalf = xPadding / 2;
-                var imgNoPadding = new double[image.GetLength(0) - yPadding, image.GetLength(1) - xPadding];
-                for (int y = 0; y < imgNoPadding.GetLength(0); y++)
-                    for (int x = 0; x < imgNoPadding.GetLength(1); x++)
-                        imgNoPadding[y, x] = image[y + yPsfHalf, x + xPsfHalf];
-
-                return imgNoPadding;
+                        max = Math.Max(max, image[y, x]);
+                return max;
             }
         }
 

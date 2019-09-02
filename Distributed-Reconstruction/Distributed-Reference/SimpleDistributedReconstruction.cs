@@ -18,10 +18,10 @@ namespace Distributed_Reference
     {
         private class DirtyImage
         {
-            public double[,] Image;
-            public double MaxSidelobeLevel;
+            public float[,] Image;
+            public float MaxSidelobeLevel;
 
-            public DirtyImage(double[,] dirty, double maxLevel)
+            public DirtyImage(float[,] dirty, float maxLevel)
             {
                 Image = dirty;
                 MaxSidelobeLevel = maxLevel;
@@ -38,21 +38,21 @@ namespace Distributed_Reference
             var metadata = Partitioner.CreatePartition(c, local.UVW, local.Frequencies);
 
             var imgSection = CalculateLocalImageSection(comm.Rank, comm.Size, c.GridSize, c.GridSize);
-            var totalImage = new Common.Rectangle(0, 0, c.GridSize, c.GridSize);
+            var totalImage = new Rectangle(0, 0, c.GridSize, c.GridSize);
 
             //calculate psf and prepare for correlation in the Fourier space
-            var psf = CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies);
-            var psfCut = CutImg(psf);
+            var psf = ToFloatImage(CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies));
+            var psfCut = PSF.Cut(psf);
             Complex[,] PsfCorrelation = null;
             var maxSidelobe = PSF.CalcMaxSidelobe(psf);
             
             if (comm.Rank == 0)
             {
-                PsfCorrelation = PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
+                PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psfCut, totalImage);
             }
 
             var residualVis = local.Visibilities;
-            var xLocal = new double[imgSection.YEnd - imgSection.Y, imgSection.XEnd - imgSection.X];
+            var xLocal = new float[imgSection.YEnd - imgSection.Y, imgSection.XEnd - imgSection.X];
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
                 var dirtyImage = ForwardCalculateB(comm, c, metadata, residualVis, local.UVW, local.Frequencies, PsfCorrelation, psfCut, maxSidelobe, watchForward);
@@ -75,7 +75,7 @@ namespace Distributed_Reference
                 if (comm.Rank == 0)
                     watchDeconv.Stop();
 
-                double[][,] totalX = null;
+                float[][,] totalX = null;
                 comm.Gather(xLocal, 0, ref totalX);
                 Complex[,] modelGrid = null;
                 if (comm.Rank == 0)
@@ -93,7 +93,7 @@ namespace Distributed_Reference
                 residualVis = IDG.Substract(local.Visibilities, modelVis, local.Flags);
             }
 
-            double[][,] gatherX = null;
+            float[][,] gatherX = null;
             comm.Gather(xLocal, 0, ref gatherX);
             double[,] reconstructed = null;
             if (comm.Rank == 0) 
@@ -122,12 +122,12 @@ namespace Distributed_Reference
             return new Rectangle(yPatchOffset, xPatchOffset, yPatchEnd, xPatchEnd);
         }
 
-        private static double[,] GetImgSection(double[,] b, Common.Rectangle imgSection)
+        private static float[,] GetImgSection(float[,] b, Rectangle imgSection)
         {
             var yLen = imgSection.YEnd - imgSection.Y;
             var xLen = imgSection.XEnd - imgSection.X;
 
-            var bLocal = new double[yLen, xLen];
+            var bLocal = new float[yLen, xLen];
             for (int i = 0; i < yLen; i++)
                 for (int j = 0; j < xLen; j++)
                     bLocal[i, j] = b[i + imgSection.Y, j + imgSection.X];
@@ -135,9 +135,7 @@ namespace Distributed_Reference
             return bLocal;
         }
 
-
-
-        private static DirtyImage ForwardCalculateB(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, Complex[,] PsfCorrelation, double[,] psfCut, double maxSidelobe, Stopwatch watchIdg)
+        private static DirtyImage ForwardCalculateB(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, Complex[,] PsfCorrelation, float[,] psfCut, float maxSidelobe, Stopwatch watchIdg)
         {
             Stopwatch another = new Stopwatch();
             comm.Barrier();
@@ -147,18 +145,18 @@ namespace Distributed_Reference
             }
 
             var localGrid = IDG.Grid(c, metadata, visibilities, uvw, frequencies);
-            double[,] image = null;
-            double maxSideLobeLevel = 0.0;
+            float[,] image = null;
+            float maxSideLobeLevel = 0.0f;
             var grid_total = comm.Reduce<Complex[,]>(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
-                var dirtyImage = FFT.Backward(grid_total, c.VisibilitiesCount);
+                var dirtyImage = FFT.BackwardFloat(grid_total, c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
 
-                maxSideLobeLevel = maxSidelobe * DebugMethods.GetMax(dirtyImage);
+                maxSideLobeLevel = maxSidelobe * Residuals.GetMax(dirtyImage);
                 //remove spheroidal
 
-                image = Common.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
+                image = Residuals.CalcBMap(dirtyImage, PsfCorrelation, new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
                 watchIdg.Stop();
             }
             comm.Broadcast(ref maxSideLobeLevel, 0);
@@ -167,7 +165,7 @@ namespace Distributed_Reference
         }
 
 
-        private static void StitchImage(double[][,] totalX, double[,] stitched, int nodeCount)
+        private static void StitchImage(float[][,] totalX, float[,] stitched, int nodeCount)
         {
             var yPatchCount = (int)Math.Floor(Math.Sqrt(nodeCount));
             var xPatchCount = (nodeCount / yPatchCount);
@@ -216,19 +214,6 @@ namespace Distributed_Reference
             }
 
             return a;
-        }
-
-
-        private static double[,] CutImg(double[,] image)
-        {
-            var output = new double[image.GetLength(0) / 2, image.GetLength(1) / 2];
-            var yOffset = image.GetLength(0) / 2 - output.GetLength(0) / 2;
-            var xOffset = image.GetLength(1) / 2 - output.GetLength(1) / 2;
-
-            for (int y = 0; y < output.GetLength(0); y++)
-                for (int x = 0; x < output.GetLength(0); x++)
-                    output[y, x] = image[yOffset + y, xOffset + x];
-            return output;
         }
     }
 }
