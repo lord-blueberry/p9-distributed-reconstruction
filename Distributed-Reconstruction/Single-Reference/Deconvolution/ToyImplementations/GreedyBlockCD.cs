@@ -11,7 +11,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
     public class GreedyBlockCD
     {
 
-        public static bool Deconvolve2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
+        public static bool Deconvolve2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int blockSize, int maxIteration = 100, double epsilon = 1e-4)
         {
             var xImage2 = ToFloatImage(xImage);
 
@@ -22,8 +22,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var resUpdateCalculator = new PaddedConvolver(PSFConvolution, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var bMapUpdateCalculator = new PaddedConvolver(PSFSquared, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
 
-            var yBlockSize = 4;
-            var xBlockSize = 4;
+            var yBlockSize = blockSize;
+            var xBlockSize = blockSize;
             lambda = lambda / (yBlockSize * xBlockSize);
             var bMap = ToFloatImage(residuals);
             bMapCalculator.ConvolveInPlace(bMap);
@@ -77,28 +77,41 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     //FitsIO.Write(bMap, "bMap2.fits");
 
                     //calc residuals for debug purposes
-                    /*AddInto(xDiff, optDiff, yB, xB, yBlockSize, xBlockSize);
-                    resUpdateCalculator.ConvolveInPlace(xDiff);
-                    //FitsIO.Write(xDiff, "residualsUpdate.fits");
-                    for (int i = 0; i < xDiff.GetLength(0); i++)
-                        for (int j = 0; j < xDiff.GetLength(1); j++)
-                        {
-                            residuals[i, j] -= xDiff[i, j];
-                            xDiff[i, j] = 0;
-                        }
-                    //FitsIO.Write(residuals, "residuals2.fits");*/
-                    //var l2 = NaiveGreedyCD.CalcDataObjective(residuals);
-                    if (maxBlock.Item3 < epsilon)
-                        break;
+                    
+                    /*if (maxBlock.Item3 < epsilon)
+                        break;*/
 
                     Console.WriteLine(maxBlock.Item3 +"\t yB = " + yB + "\t xB =" + xB);
                 }
                 iter++;
             }
-
+            var elasticNet = 0.0;
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
+                {
+                    xDiff[i, j] = xImage2[i, j] - (float)xImage[i,j];
                     xImage[i, j] = xImage2[i, j];
+                    
+                    elasticNet += lambda * 2 * lipschitz * ElasticNetPenalty(xImage2[i, j], (float)alpha);
+                }
+
+            
+            resUpdateCalculator.ConvolveInPlace(xDiff);
+            //FitsIO.Write(xDiff, "residualsUpdate.fits");
+            for (int i = 0; i < xDiff.GetLength(0); i++)
+                for (int j = 0; j < xDiff.GetLength(1); j++)
+                {
+                    residuals[i, j] -= xDiff[i, j];
+                    xDiff[i, j] = 0;
+                }
+            var l2Penalty = NaiveGreedyCD.CalcDataObjective(residuals);
+            Console.WriteLine("-------------------------");
+            Console.WriteLine((l2Penalty + elasticNet));
+            var io = System.IO.File.AppendText("penalty" + yBlockSize + ".txt");
+            io.WriteLine("l2: " + l2Penalty + "\telastic: " + elasticNet+ "\t " + (l2Penalty+elasticNet));
+            io.Close();
+            Console.WriteLine("-------------------------");
+
             return false;
         }
 
@@ -170,5 +183,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
             return new Tuple<int, int, double>(yBlockIdx, xBlockIdx, maxSum);
         }
+
+        public static float ElasticNetPenalty(float value, float alpha) => 1.0f / 2.0f * (1 - alpha) * (value * value) + alpha * Math.Abs(value);
     }
 }

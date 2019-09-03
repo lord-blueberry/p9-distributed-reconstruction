@@ -326,17 +326,17 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
-
+                
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 
                 //var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(2*2), 1.0, random, 100000);
-                var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 1.0, 5000);
+                var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 1, 500);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");
-                FitsIO.Write(xImage, "xImageBlock_" + cycle + ".fits");
+                FitsIO.Write(xImage, "xImageBlock1_" + cycle + ".fits");
                 FitsIO.Write(b, "bMap_" + cycle + ".fits");
                 watchDeconv.Stop();
 
