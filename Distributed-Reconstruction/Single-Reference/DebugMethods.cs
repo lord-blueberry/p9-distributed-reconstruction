@@ -275,11 +275,11 @@ namespace Single_Reference
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
             var visibilitiesCount = visibilities.Length;
-            int gridSize = 128;
+            int gridSize = 256;
             int subgridsize = 8;
             int kernelSize = 4;
             int max_nr_timesteps = 1024;
-            double cellSize = 2.0 / 3600.0 * PI / 180.0;
+            double cellSize = 1.0 / 3600.0 * PI / 180.0;
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
             var watchTotal = new Stopwatch();
@@ -304,14 +304,15 @@ namespace Single_Reference
             FitsIO.Write(psfCut, "psfCut.fits");
 
             var xImage = new double[gridSize, gridSize];
-            //var residualVis = visibilities;
+            var residualVis = visibilities;
 
+            /*
             var truth = new double[gridSize, gridSize];
             truth[64, 64] = 1.0;
             //truth[64, 65] = 1.5;
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
-            var residualVis = truthVis;
+            var residualVis = truthVis;*/
             for (int cycle = 0; cycle < 5; cycle++)
             {
                 //FORWARD
@@ -328,7 +329,7 @@ namespace Single_Reference
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 //var converged = GradientDebug.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10000);
-                var converged = RandomBlockCD2.Deconvolve(xImage, dirtyImage, psf, 0.0, 1.0, 1);
+                var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(8*8), 0.8, 10000);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");

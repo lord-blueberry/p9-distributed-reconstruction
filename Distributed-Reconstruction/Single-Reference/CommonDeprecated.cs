@@ -101,6 +101,15 @@ namespace Single_Reference
                 return PSFPadded;
             }
 
+            public static Complex[,] CalcPaddedFourierConvolution(double[,] psf, int yPadding, int xPadding)
+            {
+                var psfPadded = Residuals.Pad(psf, yPadding, xPadding);
+                FFT.Shift(psfPadded);
+                var PSFPadded = FFT.Forward(psfPadded, 1.0);
+
+                return PSFPadded;
+            }
+
             public static double CalcMaxSidelobe(double[,] fullPsf, int cutFactor = 2)
             {
                 var yOffset = fullPsf.GetLength(0) / 2 - (fullPsf.GetLength(0) / cutFactor) / 2;
@@ -127,7 +136,7 @@ namespace Single_Reference
                 return bMap;
             }
 
-            private static double[,] Pad(double[,] image, int yPadding, int xPadding)
+            public static double[,] Pad(double[,] image, int yPadding, int xPadding)
             {
                 var yPsfHalf = yPadding / 2;
                 var xPsfHalf = xPadding / 2;

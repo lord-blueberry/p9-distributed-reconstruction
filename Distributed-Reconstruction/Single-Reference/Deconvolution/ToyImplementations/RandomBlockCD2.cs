@@ -4,30 +4,32 @@ using System.Text;
 
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
+using static Single_Reference.Common;
 
 namespace Single_Reference.Deconvolution.ToyImplementations
 {
     public class RandomBlockCD2
     {
-        public static bool Deconvolve(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
+
+        public static bool Deconvolve2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
         {
-            FitsIO.Write(residuals, "res.fits");
-            var yBlockSize = 16;
-            var xBlockSize = 16;
+            var xImage2 = ToFloatImage(xImage);
 
-            var psfCorrelated = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0) - psf.GetLength(0), residuals.GetLength(1) - psf.GetLength(1));
-            var residualsFourier = FFT.Forward(residuals);
-            residualsFourier = Common.Fourier2D.Multiply(residualsFourier, psfCorrelated);
-            var bMap = FFT.Backward(residualsFourier, residualsFourier.Length);
-            //FFT.Shift(bMap);
-            FitsIO.Write(bMap, "bMap.fits");
+            var PSFConvolution = CommonDeprecated.PSF.CalcPaddedFourierConvolution(psf, residuals.GetLength(0), residuals.GetLength(1));
+            var PSFCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0), residuals.GetLength(1));
+            var PSFSquared = Fourier2D.Multiply(PSFConvolution, PSFCorrelation);
+            var bMapCalculator = new PaddedConvolver(PSFCorrelation, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            var resUpdateCalculator = new PaddedConvolver(PSFConvolution, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            var bMapUpdateCalculator = new PaddedConvolver(PSFSquared, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
 
-            var psf2Fourier = Common.Fourier2D.Multiply(psfCorrelated, psfCorrelated);
+            var yBlockSize = 8;
+            var xBlockSize = 8;
+            var bMap = ToFloatImage(residuals);
+            bMapCalculator.ConvolveInPlace(bMap);
+            FitsIO.Write(bMap, "bmapFirst.fits");
 
-            var xDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
-            var blockInversion = CalcBlock(psf, yBlockSize, xBlockSize).Inverse();
-            var random = new Random(123);
-
+            var xDiff = new float[xImage.GetLength(0), xImage.GetLength(1)];
+            var random = new Random();
             var lipschitz = ApproximateLipschitz(psf, yBlockSize, xBlockSize);
             var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
 
@@ -36,34 +38,141 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             {
                 var yB = random.Next(xImage.GetLength(0) / yBlockSize);
                 var xB = random.Next(xImage.GetLength(1) / xBlockSize);
+                //yB = 64 / yBlockSize;
+                //xB = 64 / xBlockSize;
+                var block = CopyFrom(bMap, yB, xB, yBlockSize, xBlockSize);
+
+                //var optimized = block * blockInversion;
+
+                var update = block / lipschitz;
+                var xOld = CopyFrom(xImage2, yB, xB, yBlockSize, xBlockSize);
+                var optimized = xOld + update;
+
+                //shrink
+                bool containsNonZero = false;
+                bool containsNonZero2 = false;
+                for (int i = 0; i < optimized.Count; i++)
+                {
+                    optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);
+                    containsNonZero  |=  optimized[i] != 0.0;
+                    if (optimized[i] != 0.0)
+                        containsNonZero2 = true;
+                }
+
+                if (containsNonZero != containsNonZero2)
+                    Console.Write("");
+
+                if(containsNonZero)
+                {
+                    var optDiff = optimized - xOld;
+                    AddInto(xDiff, optDiff, yB, xB, yBlockSize, xBlockSize);
+                    AddInto(xImage2, optDiff, yB, xB, yBlockSize, xBlockSize);
+                    //FitsIO.Write(xImage2, "xImageBlock.fits");
+                    //FitsIO.Write(xDiff, "xDiff.fits");
+
+                    //update b-map
+                    bMapUpdateCalculator.ConvolveInPlace(xDiff);
+                    //FitsIO.Write(xDiff, "bMapUpdate.fits");
+                    for (int i = 0; i < xDiff.GetLength(0); i++)
+                        for (int j = 0; j < xDiff.GetLength(1); j++)
+                        {
+                            bMap[i, j] -= xDiff[i, j];
+                            xDiff[i, j] = 0;
+                        }
+                    //FitsIO.Write(bMap, "bMap2.fits");
+
+                    //calc residuals for debug purposes
+                    AddInto(xDiff, optDiff, yB, xB, yBlockSize, xBlockSize);
+                    resUpdateCalculator.ConvolveInPlace(xDiff);
+                    //FitsIO.Write(xDiff, "residualsUpdate.fits");
+                    for (int i = 0; i < xDiff.GetLength(0); i++)
+                        for (int j = 0; j < xDiff.GetLength(1); j++)
+                        {
+                            residuals[i, j] -= xDiff[i, j];
+                            xDiff[i, j] = 0;
+                        }
+                    //FitsIO.Write(residuals, "residuals2.fits");
+                    var l2 = NaiveGreedyCD.CalcDataObjective(residuals);
+                    Console.WriteLine(l2);
+                }
+                iter++;
+            }
+
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                    xImage[i, j] = xImage2[i, j];
+            return false;
+        }
+
+        public static bool Deconvolve(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
+        {
+            FitsIO.Write(residuals, "res.fits");
+            var yBlockSize = 2;
+            var xBlockSize = 2;
+
+            var PSFCorrelated = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, psf.GetLength(0), psf.GetLength(1));
+            var RES = FFT.Forward(residuals);
+            var BMAPFourier = Common.Fourier2D.Multiply(RES, PSFCorrelated);
+            var bMap = FFT.Backward(BMAPFourier, BMAPFourier.Length);
+            //FFT.Shift(bMap);
+            FitsIO.Write(bMap, "bMap.fits");
+            var PSF = FFT.Forward(CommonDeprecated.Residuals.Pad(psf, psf.GetLength(0), psf.GetLength(1)), 1.0);
+
+            var PSF2Fourier = Common.Fourier2D.Multiply(PSF, PSFCorrelated);
+
+            var xDiff = new double[xImage.GetLength(0), xImage.GetLength(1)];
+            //var blockInversion = CalcBlock(psf, yBlockSize, xBlockSize).Inverse();
+            var random = new Random(123);
+
+            var lipschitz = ApproximateLipschitz(psf, yBlockSize, xBlockSize);
+            var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
+
+            var iter = 0;
+            while (iter < maxIteration)
+            {
+                /*
+                var yB = random.Next(xImage.GetLength(0) / yBlockSize);
+                var xB = random.Next(xImage.GetLength(1) / xBlockSize);
                 yB = 64 / yBlockSize;
                 xB = 64 / xBlockSize;
                 var block = CopyFrom(bMap, yB, xB, yBlockSize, xBlockSize);
 
                 //var optimized = block * blockInversion;
 
-                var optimized = block / lipschitz;
+                var optimized = block / lipschitz /4;
                 var xOld = CopyFrom(xImage, yB, xB, yBlockSize, xBlockSize);
                 optimized = xOld + optimized;
 
                 //shrink
-                /*for (int i = 0; i < optimized.Count; i++)
-                    optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);*/
+                for (int i = 0; i < optimized.Count; i++)
+                    optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);
                 var optDiff = optimized - xOld;
-                AddInto(xDiff, optDiff, yB, xB, yBlockSize, xBlockSize);
+                //AddInto(xDiff, optDiff, yB, xB, yBlockSize, xBlockSize);
                 AddInto(xImage, optDiff, yB, xB, yBlockSize, xBlockSize);
                 FitsIO.Write(xImage, "xImageBlock.fits");
-
+                FitsIO.Write(xDiff, "xDiff.fits");
+                xDiff[64, 64] = 1.0;
 
                 //update b-map
                 var XDIFF = FFT.Forward(xDiff);
-                XDIFF = Common.Fourier2D.Multiply(XDIFF, psf2Fourier);
-                Common.Fourier2D.SubtractInPlace(residualsFourier, XDIFF);
-                bMap = FFT.Backward(residualsFourier, residualsFourier.Length);
+                XDIFF = Common.Fourier2D.Multiply(XDIFF, PSF2Fourier);
+                Common.Fourier2D.SubtractInPlace(BMAPFourier, XDIFF);
+                bMap = FFT.Backward(BMAPFourier, BMAPFourier.Length);
+                //FFT.Shift(bMap);
                 FitsIO.Write(bMap, "bMap2.fits");
 
+                //calc residuals for debug purposes
+                var XDIFF2 = FFT.Forward(xDiff);
+                XDIFF2 = Common.Fourier2D.Multiply(XDIFF2, PSF);
+                var RES2 = Common.Fourier2D.Subtract(RES, XDIFF2);
+                var resDebug = FFT.Backward(RES2, RES2.Length);
+                var L2 = NaiveGreedyCD.CalcDataObjective(resDebug);
+                FitsIO.Write(resDebug, "resDebug.fits");
+                var xDiff3 = FFT.Backward(XDIFF2, XDIFF2.Length);
+                FitsIO.Write(xDiff3, "recDebug.fits");
+
                 //clear from xDiff
-                AddInto(xDiff, -optDiff, yB, xB, yBlockSize, xBlockSize);
+                AddInto(xDiff, -optDiff, yB, xB, yBlockSize, xBlockSize);*/
                 iter++;
             }
 
@@ -117,7 +226,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return correlationMatrix;
         }
 
-        private static Vector<double> CopyFrom(double[,] image, int yB, int xB, int yBlockSize, int xBlockSize)
+        private static Vector<double> CopyFrom(float[,] image, int yB, int xB, int yBlockSize, int xBlockSize)
         {
             var yOffset = yB * yBlockSize;
             var xOffset = xB * xBlockSize;
@@ -131,7 +240,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return vec;
         }
 
-        private static void AddInto(double[,] image, Vector<double> vec, int yB, int xB, int yBlockSize, int xBlockSize)
+        private static void AddInto(float[,] image, Vector<double> vec, int yB, int xB, int yBlockSize, int xBlockSize)
         {
             var yOffset = yB * yBlockSize;
             var xOffset = xB * xBlockSize;
@@ -139,7 +248,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             int i = 0;
             for (int y = 0; y < yBlockSize; y++)
                 for (int x = 0; x < xBlockSize; x++)
-                    image[yOffset + y, xOffset + x] += vec[i++];
+                    image[yOffset + y, xOffset + x] += (float)vec[i++];
         }
 
 
@@ -150,10 +259,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 for (int j = 0; j < psf.GetLength(1); j++)
                     a00 += psf[i, j] * psf[i,j];
 
-            var lipschitz = 0.0;
-            for (int i = 0; i < yBlockSize * xBlockSize; i++)
-                lipschitz += a00 * a00;
-            lipschitz = Math.Sqrt(lipschitz);
+            var lipschitz = a00 * yBlockSize * xBlockSize;
             return lipschitz;
         }
 
@@ -220,6 +326,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             //dirty[17, 16] = 1.1;
             //dirty[17, 17] = 0.5;
             //dirty[16, 20] = 0.5;
+            /*
             var IMG = FFT.Forward(groundTruth, 1.0);
             var PSF = FFT.Forward(psf, 1.0);
             var DIRTY = Common.Fourier2D.Multiply(IMG, PSF);
@@ -265,13 +372,13 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 bMap = FFT.Backward(BMAP, (double)(BMAP.GetLength(0) * BMAP.GetLength(1)));
                 //FFT.Shift(bMap);
                 FitsIO.Write(bMap, "bMap2Toy.fits");
-            }
+            }*/
             
 
 
 
 
-            Deconvolve(xImage, residuals, psf, 0.0, 1.0, 1);
+            //Deconvolve(xImage, residuals, psf, 0.0, 1.0, 1);
 
             /*
             AddInto(xImage, res3, 16 / yBSize, 16 / xBSize, yBSize, xBSize);

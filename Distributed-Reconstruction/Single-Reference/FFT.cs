@@ -10,9 +10,9 @@ namespace Single_Reference
 {
     public class FFT : IDisposable
     {
-        private readonly FftwPlanRC fft;
-        private readonly FftwPlanRC ifft;
-        public AlignedArrayDouble ImageBuffer {get; private set;}
+        private readonly FftwPlanC2C fft;
+        private readonly FftwPlanC2C ifft;
+        public AlignedArrayComplex ImageBuffer {get; private set;}
         public AlignedArrayComplex FourierBuffer { get; private set; }
 
         public FFT(int ySize, int xSize)
@@ -24,10 +24,10 @@ namespace Single_Reference
         public FFT(int ySize, int xSize, int nCores)
         {
             var dims = new int[] { ySize, xSize };
-            ImageBuffer = new AlignedArrayDouble(16, dims);
+            ImageBuffer = new AlignedArrayComplex(16, dims);
             FourierBuffer = new AlignedArrayComplex(16, dims);
-            fft = FftwPlanRC.Create(ImageBuffer, FourierBuffer, DftDirection.Forwards, PlannerFlags.Default, nCores);
-            ifft = FftwPlanRC.Create(ImageBuffer, FourierBuffer, DftDirection.Backwards, PlannerFlags.Default, nCores);
+            fft = FftwPlanC2C.Create(ImageBuffer, FourierBuffer, DftDirection.Forwards, PlannerFlags.Default, nCores);
+            ifft = FftwPlanC2C.Create(FourierBuffer, ImageBuffer, DftDirection.Backwards, PlannerFlags.Default, nCores);
         }
 
         public void CopyToImageBuffer(float[,] image)

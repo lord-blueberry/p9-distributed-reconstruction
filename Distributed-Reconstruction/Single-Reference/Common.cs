@@ -76,9 +76,8 @@ namespace Single_Reference
             }
 
             /// <summary>
-            /// invert PSF to calculate the CORRELATION in fourier space (multiplication in fourier space == convolution, multiplication with inverted kernel in fourier space == correlation)
-            /// 
-            /// its padded, otherwise we would calculate the circular convolution which is physically implausible
+            /// Prepares the CORRELATION kernel in Fourier space. It inverts the PSF and applies the FFT. (multiplication in fourier space == convolution, multiplication with inverted kernel in fourier space == correlation)
+            /// its padded, otherwise the FFT would calculate the circular convolution which is physically implausible
             /// </summary>
             /// <param name="psf"></param>
             /// <param name="padding">padding to be used. Use the total image size as padding</param>
@@ -102,9 +101,25 @@ namespace Single_Reference
             }
 
             /// <summary>
-            /// Correlate the PSF with itself
+            /// Prepares the CONVOLUTION kernel in Fourier space. It pads PSF and applies the FFT. (multiplication in fourier space == convolution, multiplication with inverted kernel in fourier space == correlation)
+            /// its padded, otherwise the FFT would calculate the circular convolution which is physically implausible
             /// </summary>
-            /// <param name="psfCorrelated"></param>
+            /// <param name="psf"></param>
+            /// <param name="padding"></param>
+            /// <returns></returns>
+            public static Complex[,] CalcPaddedFourierConvolution(float[,] psf, Rectangle padding)
+            {
+                var psfPadded = Pad(psf, padding.YExtent(), padding.XExtent());
+                FFT.Shift(psfPadded);
+                var PSFPadded = FFT.Forward(psfPadded, 1.0);
+
+                return PSFPadded;
+            }
+
+            /// <summary>
+            /// Correlate the PSF with itself, and calculate psf squared
+            /// </summary>
+            /// <param name="psf"></param>
             /// <returns></returns>
             public static float[,] CalcPSFSquared(float[,] psf)
             {
@@ -189,30 +204,6 @@ namespace Single_Reference
                 return bMap;
             }
 
-            private static float[,] Pad(float[,] image, int yPadding, int xPadding)
-            {
-                var yPsfHalf = yPadding / 2;
-                var xPsfHalf = xPadding / 2;
-                var resPadded = new float[image.GetLength(0) + yPadding, image.GetLength(1) + xPadding];
-                for (int y = 0; y < image.GetLength(0); y++)
-                    for (int x = 0; x < image.GetLength(1); x++)
-                        resPadded[y + yPsfHalf, x + xPsfHalf] = image[y, x];
-
-                return resPadded;
-            }
-
-            private static float[,] RemovePadding(float[,] image, int yPadding, int xPadding)
-            {
-                var yPsfHalf = yPadding / 2;
-                var xPsfHalf = xPadding / 2;
-                var imgNoPadding = new float[image.GetLength(0) - yPadding, image.GetLength(1) - xPadding];
-                for (int y = 0; y < imgNoPadding.GetLength(0); y++)
-                    for (int x = 0; x < imgNoPadding.GetLength(1); x++)
-                        imgNoPadding[y, x] = image[y + yPsfHalf, x + xPsfHalf];
-
-                return imgNoPadding;
-            }
-
             public static float GetMax(float[,] image)
             {
                 var max = 0.0f;
@@ -288,6 +279,30 @@ namespace Single_Reference
                     output[i, j] = (float)image[i,j];
 
             return output;
+        }
+
+        private static float[,] Pad(float[,] image, int yPadding, int xPadding)
+        {
+            var yPsfHalf = yPadding / 2;
+            var xPsfHalf = xPadding / 2;
+            var resPadded = new float[image.GetLength(0) + yPadding, image.GetLength(1) + xPadding];
+            for (int y = 0; y < image.GetLength(0); y++)
+                for (int x = 0; x < image.GetLength(1); x++)
+                    resPadded[y + yPsfHalf, x + xPsfHalf] = image[y, x];
+
+            return resPadded;
+        }
+
+        private static float[,] RemovePadding(float[,] image, int yPadding, int xPadding)
+        {
+            var yPsfHalf = yPadding / 2;
+            var xPsfHalf = xPadding / 2;
+            var imgNoPadding = new float[image.GetLength(0) - yPadding, image.GetLength(1) - xPadding];
+            for (int y = 0; y < imgNoPadding.GetLength(0); y++)
+                for (int x = 0; x < imgNoPadding.GetLength(1); x++)
+                    imgNoPadding[y, x] = image[y + yPsfHalf, x + xPsfHalf];
+
+            return imgNoPadding;
         }
 
         public class Rectangle

@@ -28,22 +28,32 @@ namespace Single_Reference
             fft.Forward();
             for (int i = 0; i < kernel.GetLength(0); i++)
                 for (int j = 0; j < kernel.GetLength(1); j++)
-                    fft.FourierBuffer[i, j] *= kernel[i, j];
+                    fft.FourierBuffer[i, j] *= kernel[i, j]; 
             fft.Backward();
 
             var yHalf = kernelSize.YExtent() / 2;
             var xHalf = kernelSize.XExtent() / 2;
             for (int i = 0; i < image.GetLength(0); i++)
                 for (int j = 0; j < image.GetLength(0); j++)
-                    image[i, j] = (float)fft.ImageBuffer[i + yHalf, j + xHalf];
+                    image[i, j] = (float)(fft.ImageBuffer[i + yHalf, j + xHalf].Real / kernel.Length);
         }
 
         private void InsertImage(float[,] image)
         {
             var yHalf = kernelSize.YExtent() / 2;
             var xHalf = kernelSize.XExtent() / 2;
+            var imgDimensions = new Rectangle(yHalf, xHalf, image.GetLength(0) + yHalf, image.GetLength(1) + xHalf);
 
-            throw new NotImplementedException();
-        }        
+            for (int i = 0; i < kernel.GetLength(0); i++)
+                for (int j = 0; j < kernel.GetLength(1); j++)
+                    if (imgDimensions.PointInRectangle(i, j))
+                    {
+                        fft.ImageBuffer[i, j] = image[i - yHalf, j - xHalf];
+                    }
+                    else
+                    {
+                        fft.ImageBuffer[i, j] = Complex.Zero;
+                    }
+        }
     }
 }
