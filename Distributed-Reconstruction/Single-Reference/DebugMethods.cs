@@ -227,7 +227,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 1; cycle++)
+            for (int cycle = 0; cycle < 5; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -242,7 +242,7 @@ namespace Single_Reference
 
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                var converged = GreedyCDReference.Deconvolve(xImage, b, psfCut, 0.5, 0.8, 10000);
+                var converged = GreedyCDReference.Deconvolve(xImage, b, psfCut, 0.5, 1.0, 100);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -305,6 +305,7 @@ namespace Single_Reference
 
             var xImage = new double[gridSize, gridSize];
             var residualVis = visibilities;
+            var random = new Random(123);
 
             /*
             var truth = new double[gridSize, gridSize];
@@ -313,7 +314,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 5; cycle++)
+            for (int cycle = 0; cycle < 8; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -328,14 +329,14 @@ namespace Single_Reference
 
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                //var converged = GradientDebug.Deconvolve(xImage, b, psfCut, 0.0, 1.0, 10000);
-                var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(8*8), 0.8, 10000);
-
+                
+                //var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(2*2), 1.0, random, 100000);
+                var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 1.0, 5000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");
-                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
+                FitsIO.Write(xImage, "xImageBlock_" + cycle + ".fits");
                 FitsIO.Write(b, "bMap_" + cycle + ".fits");
                 watchDeconv.Stop();
 

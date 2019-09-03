@@ -11,7 +11,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
     public class RandomBlockCD2
     {
 
-        public static bool Deconvolve2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, int maxIteration = 100, double epsilon = 1e-4)
+        public static bool Deconvolve2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int maxIteration = 100, double epsilon = 1e-4)
         {
             var xImage2 = ToFloatImage(xImage);
 
@@ -22,14 +22,13 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var resUpdateCalculator = new PaddedConvolver(PSFConvolution, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var bMapUpdateCalculator = new PaddedConvolver(PSFSquared, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
 
-            var yBlockSize = 8;
-            var xBlockSize = 8;
+            var yBlockSize = 2;
+            var xBlockSize = 2;
             var bMap = ToFloatImage(residuals);
             bMapCalculator.ConvolveInPlace(bMap);
             FitsIO.Write(bMap, "bmapFirst.fits");
 
             var xDiff = new float[xImage.GetLength(0), xImage.GetLength(1)];
-            var random = new Random();
             var lipschitz = ApproximateLipschitz(psf, yBlockSize, xBlockSize);
             var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
 
@@ -50,21 +49,15 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
                 //shrink
                 bool containsNonZero = false;
-                bool containsNonZero2 = false;
                 for (int i = 0; i < optimized.Count; i++)
                 {
                     optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);
-                    containsNonZero  |=  optimized[i] != 0.0;
-                    if (optimized[i] != 0.0)
-                        containsNonZero2 = true;
+                    containsNonZero  |=  (optimized[i] - xOld[i]) != 0.0;
                 }
 
-                if (containsNonZero != containsNonZero2)
-                    Console.Write("");
-
-                if(containsNonZero)
+                var optDiff = optimized - xOld;
+                if (containsNonZero)
                 {
-                    var optDiff = optimized - xOld;
                     AddInto(xDiff, optDiff, yB, xB, yBlockSize, xBlockSize);
                     AddInto(xImage2, optDiff, yB, xB, yBlockSize, xBlockSize);
                     //FitsIO.Write(xImage2, "xImageBlock.fits");
