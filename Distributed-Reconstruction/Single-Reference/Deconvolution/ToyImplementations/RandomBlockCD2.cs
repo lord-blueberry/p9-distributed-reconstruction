@@ -219,7 +219,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return correlationMatrix;
         }
 
-        private static Vector<double> CopyFrom(float[,] image, int yB, int xB, int yBlockSize, int xBlockSize)
+        public static Vector<double> CopyFrom(float[,] image, int yB, int xB, int yBlockSize, int xBlockSize)
         {
             var yOffset = yB * yBlockSize;
             var xOffset = xB * xBlockSize;
@@ -233,7 +233,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return vec;
         }
 
-        private static void AddInto(float[,] image, Vector<double> vec, int yB, int xB, int yBlockSize, int xBlockSize)
+        public static void AddInto(float[,] image, Vector<double> vec, int yB, int xB, int yBlockSize, int xBlockSize)
         {
             var yOffset = yB * yBlockSize;
             var xOffset = xB * xBlockSize;
@@ -245,7 +245,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
         }
 
 
-        private static double ApproximateLipschitz(double[,] psf, int yBlockSize, int xBlockSize)
+        public static double ApproximateLipschitz(double[,] psf, int yBlockSize, int xBlockSize)
         {
             var a00 = 0.0;
             for (int i = 0; i < psf.GetLength(0); i++)

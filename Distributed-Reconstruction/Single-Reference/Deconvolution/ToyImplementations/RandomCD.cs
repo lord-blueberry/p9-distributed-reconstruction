@@ -30,7 +30,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var blockCount = xImage.Length;
             var beta = 1.0 + (degreeOfSep - 1) * (theta - 1) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling
                                                                                                   /*
-                                                                                                   * Theta-nice sampling := sample theta pixels uniformly at random. I.e. the pixel 
+                                                                                                   * Theta-nice sampling := take theta number of random pixels
                                                                                                    */
 
             var yPsfHalf = psf.GetLength(0) / 2;
@@ -129,7 +129,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 }
         }
 
-        private static int[] CreateSamples(int length, int sampleCount, Random rand)
+        public static int[] CreateSamples(int length, int sampleCount, Random rand)
         {
             var samples = new HashSet<int>(sampleCount);
             while(samples.Count < sampleCount)
@@ -139,7 +139,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return output;
         }
 
-        private static int CountNonZero(double[,] psf)
+        public static int CountNonZero(double[,] psf)
         {
             var count = 0;
             for (int y = 0; y < psf.GetLength(0); y++)
