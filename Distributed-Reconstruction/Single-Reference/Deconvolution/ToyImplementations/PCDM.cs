@@ -10,7 +10,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 {
     class PCDM
     {
-        public static bool DeconvolveRandom(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int maxIteration = 100, double epsilon = 1e-4)
+        public static bool DeconvolveRandom(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, int maxIteration = 100, double epsilon = 1e-4)
         {
             var xImage2 = ToFloatImage(xImage);
 
@@ -21,8 +21,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var resUpdateCalculator = new PaddedConvolver(PSFConvolution, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var bMapUpdateCalculator = new PaddedConvolver(PSFSquared, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
 
-            var yBlockSize = 2;
-            var xBlockSize = 2;
+            var yBlockSize = blockSize;
+            var xBlockSize = blockSize;
             
             var bMap = ToFloatImage(residuals);
             bMapCalculator.ConvolveInPlace(bMap);
@@ -30,10 +30,10 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var xDiff = new float[xImage.GetLength(0), xImage.GetLength(1)];
             var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
 
-            var theta = 1; //2; //theta, also number of processors.
+            var theta = 4; //theta, also number of processors.
             var degreeOfSep = RandomCD.CountNonZero(psf);
             var blockCount = xImage.Length / (yBlockSize * xBlockSize);
-            var beta = 1.0 + (degreeOfSep - 1) * (theta - 1) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling. Look at the original PCDM Paper for the explanation
+            var beta = 1.0 + (degreeOfSep - 1.0) * (theta - 1.0) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling. Look at the original PCDM Paper for the explanation
             //Theta-nice sampling: take theta number of random pixels 
 
             var lipschitz = RandomBlockCD2.ApproximateLipschitz(psf, yBlockSize, xBlockSize);
@@ -52,7 +52,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
                     var block = RandomBlockCD2.CopyFrom(bMap, yBlock, xBlock, yBlockSize, xBlockSize);
 
-                    var update = block / (beta * lipschitz);
+                    var update = block / lipschitz;
 
                     var xOld = RandomBlockCD2.CopyFrom(xImage2, yBlock, xBlock, yBlockSize, xBlockSize);
                     var optimized = xOld + update;
@@ -142,10 +142,10 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var xDiff = new float[xImage.GetLength(0), xImage.GetLength(1)];
             var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
 
-            var theta = 1; //2; //theta, also number of processors.
+            var theta = 1;   //theta, also number of processors.
             var degreeOfSep = RandomCD.CountNonZero(psf);
             var blockCount = xImage.Length / (yBlockSize * xBlockSize);
-            var beta = 1.0 + (degreeOfSep - 1) * (theta - 1) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling. Look at the original PCDM Paper for the explanation
+            var beta = 1.0 + (degreeOfSep - 1.0) * (theta - 1.0) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling. Look at the original PCDM Paper for the explanation
             //Theta-nice sampling: take theta number of random pixels 
 
             var lipschitz = RandomBlockCD2.ApproximateLipschitz(psf, yBlockSize, xBlockSize);
@@ -163,7 +163,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     var xBlock = b.Item2;
                     var block = RandomBlockCD2.CopyFrom(bMap, yBlock, xBlock, yBlockSize, xBlockSize);
 
-                    var update = block / (beta * lipschitz);
+                    var update = block / lipschitz;
 
                     var xOld = RandomBlockCD2.CopyFrom(xImage2, yBlock, xBlock, yBlockSize, xBlockSize);
                     var optimized = xOld + update;

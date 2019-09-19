@@ -242,7 +242,7 @@ namespace Single_Reference
 
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                var converged = GreedyCDReference.Deconvolve(xImage, b, psfCut, 0.5, 1.0, 100);
+                var converged = GreedyCDReference.Deconvolve(xImage, b, psfCut, 0.5, 0.8, 1000);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
@@ -314,7 +314,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 8; cycle++)
+            for (int cycle = 0; cycle < 10; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -331,12 +331,13 @@ namespace Single_Reference
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 
                 //var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(2*2), 1.0, random, 100000);
-                var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 1, 500);
+                //var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 1, 500);
+                var converged = PCDM.DeconvolveRandom(xImage, dirtyImage, psfCut, 0.5, 0.8, random, 4, 200000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");
-                FitsIO.Write(xImage, "xImageBlock1_" + cycle + ".fits");
+                FitsIO.Write(xImage, "xImageBlock4_" + cycle + ".fits");
                 FitsIO.Write(b, "bMap_" + cycle + ".fits");
                 watchDeconv.Stop();
 
@@ -559,9 +560,7 @@ namespace Single_Reference
                     {
                         image[y, x] = 0.0;
                         zeroCount++;
-                    } 
-                
-
+                    }
             return zeroCount;
         }
         #endregion

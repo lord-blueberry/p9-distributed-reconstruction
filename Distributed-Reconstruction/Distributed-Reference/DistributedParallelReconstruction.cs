@@ -47,10 +47,14 @@ namespace Distributed_Reference
             {
                 var residuals = new float[1, 1];
                 bMapCalculator.ConvolveInPlace(residuals);
+
                 for (int subIter = 0; subIter < 10; subIter++) {
                     for (int subPatchIter = 0; subPatchIter < 4; subPatchIter++)
                     {
                         var xImg = new float[1, 1];
+                        //deconvolve
+                        //var localDiff = deconvolve()
+                        //var globalDiffexchange local diff
                         subPatchDeconv[subPatchIter].Deconvolve(xImg, residuals, 0.5f, 0.8f, 100);
                         //exchange residuals
                     }
@@ -60,7 +64,7 @@ namespace Distributed_Reference
             return null;
         }
 
-        private static IDeconvolver[] SplitIntoSubpatches(Rectangle patchSize) 
+        private static ISubpatchDeconvolver[] SplitIntoSubpatches(Rectangle patchSize) 
         {
             return null;
         }
