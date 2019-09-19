@@ -142,7 +142,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var xDiff = new float[xImage.GetLength(0), xImage.GetLength(1)];
             var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
 
-            var theta = 1;   //theta, also number of processors.
+            var theta = 2;   //theta, also number of processors.
             var degreeOfSep = RandomCD.CountNonZero(psf);
             var blockCount = xImage.Length / (yBlockSize * xBlockSize);
             var beta = 1.0 + (degreeOfSep - 1.0) * (theta - 1.0) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling. Look at the original PCDM Paper for the explanation
@@ -255,12 +255,12 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                             var shrink = ShrinkElasticNet(xImage[y, x] + opt, lambda, alpha);
                             sum += Math.Abs(shrink - xImage[y, x]);
                         }
-                    
+                    tmp.Add(new Tuple<int, int, double>(i, j, sum));
                 }
             tmp.Sort((x, y) => x.Item3.CompareTo(y.Item3));
             var output = new Tuple<int, int, double>[theta];
             for (int i = 0; i < theta; i++)
-                output[i] = tmp[tmp.Count - i];
+                output[i] = tmp[tmp.Count - i - 1];
             return output;
         }
 

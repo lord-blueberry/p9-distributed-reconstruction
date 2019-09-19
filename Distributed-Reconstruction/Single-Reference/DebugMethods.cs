@@ -314,7 +314,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 10; cycle++)
+            for (int cycle = 0; cycle < 4; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -332,12 +332,12 @@ namespace Single_Reference
                 
                 //var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(2*2), 1.0, random, 100000);
                 //var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 1, 500);
-                var converged = PCDM.DeconvolveRandom(xImage, dirtyImage, psfCut, 0.5, 0.8, random, 4, 200000);
+                var converged = PCDM.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 4, 2000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");
-                FitsIO.Write(xImage, "xImageBlock4_" + cycle + ".fits");
+                FitsIO.Write(xImage, "xImageBlockG2_" + cycle + ".fits");
                 FitsIO.Write(b, "bMap_" + cycle + ".fits");
                 watchDeconv.Stop();
 
