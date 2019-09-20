@@ -130,7 +130,7 @@ namespace Single_Reference.Experiments
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
-            for (int i = 1; i < 1; i++)
+            for (int i = 1; i < 8; i++)
             {
                 var uvw0 = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + i + ".fits"));
                 var flags0 = FitsIO.ReadFlags(Path.Combine(folder, "flags" + i + ".fits"), uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);

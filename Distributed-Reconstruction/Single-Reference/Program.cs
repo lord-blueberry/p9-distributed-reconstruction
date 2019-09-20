@@ -9,7 +9,7 @@ namespace Single_Reference
             Single_Reference.Experiments.PSFSize.Run();
             //Deconvolution.ToyImplementations.RandomBlockCD2.RunToy();
             //DebugMethods.DebugSimulatedGreedy2();
-            DebugMethods.DebugSimulatedPCDM();
+            //DebugMethods.DebugSimulatedPCDM();
             
             //DebugMethods.DebugILGPU();
 

@@ -96,16 +96,17 @@ namespace Distributed_Reference
             LocalDataset output = null;
             for (int i = 0; i < 8; i++)
             {
+                blSum += baselinesPerFile[i];
                 if (beginBlIdx <= blSum)
                 {
 
                     var start = blSum - beginBlIdx;
-                    var end = Math.Min(blCount, baselinesPerFile[i] - start);
+                    var end = Math.Min(start + blCount, baselinesPerFile[i]);
                     var uvw = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + i + ".fits"), start, end);
                     var flags = FitsIO.ReadFlags(Path.Combine(folder, "flags" + i + ".fits"), start, end, uvw.GetLength(1), frequencies.Length);
                     var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis" + i + ".fits"), start, end, uvw.GetLength(1), frequencies.Length, 2.0);
 
-                    if (endBlIdx - beginBlIdx > baselinesPerFile[i] - start)
+                    if (start + blCount > baselinesPerFile[i])
                     {
                         //continue reading files until all baselines, which belong to the current node, are loaded
                         var baselinesLoaded = end - start;
@@ -132,7 +133,7 @@ namespace Distributed_Reference
                     break;
                 }
 
-                blSum += baselinesPerFile[i];
+                
             }
 
             return output;
