@@ -176,6 +176,25 @@ namespace Single_Reference.Deconvolution
             });
         }
 
+        public static double CalcDataPenalty(float[,] residuals)
+        {
+            double output = 0;
+            for (int i = 0; i < residuals.GetLength(0); i++)
+                for (int j = 0; j < residuals.GetLength(1); j++)
+                    output += residuals[i, j] * residuals[i, j];
+            return output;
+        }
+
+        public double CalcRegularizationPenalty(float[,] xImage, float lambda, float alpha)
+        {
+            double output = 0;
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                    output += ElasticNetPenalty(xImage[i, j], alpha) * lambda * 2 * aMap[i, j];
+
+            return output;
+        }
+
         private struct Pixel
         {
             public int Y;

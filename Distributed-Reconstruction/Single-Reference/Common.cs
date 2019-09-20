@@ -10,6 +10,8 @@ namespace Single_Reference
     {
         public static double ShrinkElasticNet(double value, double lambda, double alpha) => Math.Max(value - lambda * alpha, 0.0) / (1 + lambda * (1 - alpha));
         public static float ShrinkElasticNet(float value, float lambda, float alpha) => Math.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
+        public static float ElasticNetPenalty(float value, float alpha) => 1.0f / 2.0f * (1 - alpha) * (value * value) + alpha * Math.Abs(value);
+
 
         public static class PSF
         {
