@@ -416,9 +416,9 @@ namespace Single_Reference
                 //DECONVOLVE
                 watchDeconv.Start();
                 bMapCalculator.ConvolveInPlace(dirtyImage);
-                var converged = fastCD.Deconvolve(xImage, dirtyImage, 0.5f, 0.8f, 100, 1e-4f);
+                var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f, 0.8f, 100, 1e-4f);
 
-                if (converged)
+                if (result.Converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");

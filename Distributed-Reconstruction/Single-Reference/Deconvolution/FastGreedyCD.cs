@@ -36,9 +36,12 @@ namespace Single_Reference.Deconvolution
         }
 
         #region ISubpatchDeconvolver implementation
-        public bool DeconvolvePath(Rectangle subpatch, float[,] reconstruction, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001F)
+        public DeconvolutionResult DeconvolvePath(Rectangle subpatch, float[,] reconstruction, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001F)
         {
             bool converged = false;
+            var totalIter = 0;
+            var totalTime = new Stopwatch();
+            totalTime.Start();
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
                 var max = GetAbsMax(subpatch, reconstruction, bMap, 0.0f, 1.0f);
@@ -48,17 +51,19 @@ namespace Single_Reference.Deconvolution
                 lambdaCurrent = lambdaCurrent > lambdaMin ? lambdaCurrent : lambdaMin;
 
                 Console.WriteLine("-----------------------------FastGreedyCD with lambda " + lambdaCurrent + "------------------------");
-                var pathConverged = Deconvolve(subpatch, reconstruction, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
-                converged = lambdaMin == lambdaCurrent & pathConverged;
+                var pathResult = Deconvolve(subpatch, reconstruction, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
+                converged = lambdaMin == lambdaCurrent & pathResult.Converged;
+                totalIter += pathResult.IterationCount;
 
                 if (converged)
                     break;
             }
+            totalTime.Stop();
 
-            return converged;
+            return new DeconvolutionResult(converged, totalIter, totalTime.Elapsed);
         }
 
-        public bool Deconvolve(Rectangle subpatch, float[,] reconstruction, float[,] bMap, float lambda, float alpha, int iterations, float epsilon = 0.0001F)
+        public DeconvolutionResult Deconvolve(Rectangle subpatch, float[,] reconstruction, float[,] bMap, float lambda, float alpha, int iterations, float epsilon = 0.0001F)
         {
             var watch = new Stopwatch();
             watch.Start();
@@ -82,21 +87,18 @@ namespace Single_Reference.Deconvolution
                 }
             }
             watch.Stop();
-            double iterPerSecond = iter;
-            iterPerSecond = iterPerSecond / watch.ElapsedMilliseconds * 1000.0;
-            Console.WriteLine(iter + " iterations in:" + watch.Elapsed + "\t" + iterPerSecond + " iterations per second");
 
-            return converged;
+            return new DeconvolutionResult(converged, iter, watch.Elapsed);
         }
         #endregion
 
         #region IDeconvolver implementation
-        public bool DeconvolvePath(float[,] xImage, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
+        public DeconvolutionResult DeconvolvePath(float[,] xImage, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
             return DeconvolvePath(patch, xImage, bMap, lambdaMin, lambdaFactor, alpha, maxPathIteration, maxIteration, epsilon);
         }
 
-        public bool Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
+        public DeconvolutionResult Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
         {
             return Deconvolve(patch, xImage, bMap, lambda, alpha, maxIteration, epsilon);
         }

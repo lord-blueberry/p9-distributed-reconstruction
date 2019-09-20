@@ -86,13 +86,15 @@ namespace Single_Reference.Deconvolution
             updateB = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateBKernel);
         }
 
-        
 
-        public bool DeconvolvePath(float[,] reconstruction, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
+        #region IDeconvolver implementation
+        public DeconvolutionResult DeconvolvePath(float[,] reconstruction, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
             bool converged = false;
             AllocateGPU(reconstruction, bMap, lambdaMin, alpha);
-
+            int totalIter = 0;
+            var totalWatch = new Stopwatch();
+            totalWatch.Start();
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
                 //set lambdap
@@ -109,7 +111,8 @@ namespace Single_Reference.Deconvolution
 
                 Console.WriteLine("-----------------------------GPUGreedy with lambda " + lambdaCurrent + "------------------------");
                 bool pathConverged = false;
-                for (int i = 0; i < maxIteration; i += batchIterations)
+                int i = 0;
+                for (i = 0; i < maxIteration; i += batchIterations)
                 {
                     DeconvolutionBatchIterations(batchIterations);
                     var lastPixel = maxPixelGPU.GetAsArray()[0];
@@ -119,18 +122,21 @@ namespace Single_Reference.Deconvolution
                         break;
                     }
                 }
+                totalIter += i;
 
                 converged = lambdaMin == lambdaCurrent & pathConverged;
                 if (converged)
                     break;
             }
+            totalWatch.Stop();
 
             xImageGPU.CopyTo(reconstruction, new Index2(0, 0), new Index2(0, 0), new Index2(reconstruction.GetLength(1), reconstruction.GetLength(0)));
             FreeGPU();
-            return converged;
+
+            return new DeconvolutionResult(converged, totalIter, totalWatch.Elapsed);
         }
 
-        public bool Deconvolve(float[,] reconstruction, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon=1e-4f)
+        public DeconvolutionResult Deconvolve(float[,] reconstruction, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon=1e-4f)
         {
             AllocateGPU(reconstruction, bMap, lambda, alpha);
 
@@ -152,15 +158,12 @@ namespace Single_Reference.Deconvolution
             }
             watch.Stop();
 
-            double iterPerSecond = iter;
-            iterPerSecond = iterPerSecond / watch.ElapsedMilliseconds * 1000.0;
-            Console.WriteLine(iter + " iterations in:" + watch.Elapsed + "\t" + iterPerSecond + " iterations per second");
-
             xImageGPU.CopyTo(reconstruction, new Index2(0, 0), new Index2(0, 0), new Index2(reconstruction.GetLength(1), reconstruction.GetLength(0)));
             FreeGPU();
 
-            return converged;
+            return new DeconvolutionResult(converged, iter, watch.Elapsed);
         }
+        #endregion
 
         /// <summary>
         /// Make several deconvolution iterations without checking convergence

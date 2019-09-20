@@ -54,7 +54,6 @@ namespace Single_Reference.Experiments
         private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveVal)
         {
             var info = new ReconstructionInfo();
-            var currentDeconv = new Stopwatch();
             var lambda = 0.4f;
             var alpha = 0.1f;
 
@@ -96,15 +95,13 @@ namespace Single_Reference.Experiments
 
                     bMapCalculator.ConvolveInPlace(dirtyImage);
 
-                    currentDeconv.Restart();
                     info.totalDeconv.Start();
-                    var converged = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 10000, 1e-5f);
+                    var result = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 10000, 1e-5f);
                     info.totalDeconv.Stop();
-                    currentDeconv.Stop();
 
                     FitsIO.Write(xImage, xImagePrefix + cycle + ".fits");
 
-                    writer.Write(currentDeconv.Elapsed + "\n");
+                    writer.Write(result.Converged + ";" + result.IterationCount + ";" + result.ElapsedTime.TotalSeconds + "\n");
                     writer.Flush();
 
                     FFT.Shift(xImage);
@@ -135,7 +132,7 @@ namespace Single_Reference.Experiments
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
-            for (int i = 1; i < 1; i++)
+            for (int i = 1; i < 8; i++)
             {
                 var uvw0 = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + i + ".fits"));
                 var flags0 = FitsIO.ReadFlags(Path.Combine(folder, "flags" + i + ".fits"), uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
@@ -176,7 +173,7 @@ namespace Single_Reference.Experiments
             ReconstructionInfo referenceInfo = null;
             using (var writer = new StreamWriter("halfPsf.txt", false))
             {
-                writer.WriteLine("cycle;dataPenalty;regPenalty;regPenaltyFull;ElapsedTime");
+                writer.WriteLine("cycle;dataPenalty;regPenalty;regPenaltyFull;converged;iterCount;ElapsedTime");
                 referenceInfo = Reconstruct(input, 2, 5, "dirtyReference", "xReference", writer, 0.0);
                 File.WriteAllText("halfPsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
             }
