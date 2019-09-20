@@ -97,6 +97,12 @@ namespace Single_Reference.Experiments
 
                 writer.Write(currentDeconv.Elapsed + "\n");
                 writer.Flush();
+
+                FFT.Shift(xImage);
+                var xGrid = FFT.Forward(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
+                residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
             }
 
             return info;
@@ -112,7 +118,7 @@ namespace Single_Reference.Experiments
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
-            for (int i = 1; i < 3; i++)
+            for (int i = 1; i < 1; i++)
             {
                 var uvw0 = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + i + ".fits"));
                 var flags0 = FitsIO.ReadFlags(Path.Combine(folder, "flags" + i + ".fits"), uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
@@ -144,6 +150,7 @@ namespace Single_Reference.Experiments
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
             var psf = FFT.BackwardFloat(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
+            FitsIO.Write(psf, "psfFull.fits");
 
             var input = new InputData(c, metadata, frequencies, visibilities, uvw, flags, psf);
 
