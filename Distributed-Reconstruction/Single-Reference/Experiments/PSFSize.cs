@@ -25,6 +25,7 @@ namespace Single_Reference.Experiments
             public double[,,] uvw;
             public bool[,,] flags;
             public float[,] fullPsf;
+            public FastGreedyCD fullCD;
 
             public InputData(GriddingConstants c, List<List<SubgridHack>> metadata, double[] frequencies, Complex[,,] vis, double[,,] uvw, bool[,,] flags, float[,] fullPsf)
             {
@@ -35,6 +36,7 @@ namespace Single_Reference.Experiments
                 this.uvw = uvw;
                 this.flags = flags;
                 this.fullPsf = fullPsf;
+                this.fullCD = new FastGreedyCD(new Rectangle(0, 0, c.GridSize, c.GridSize), fullPsf);
             }
 
         }
@@ -57,14 +59,11 @@ namespace Single_Reference.Experiments
             var lambda = 0.4f;
             var alpha = 0.1f;
 
-            
-
             var psfCut = PSF.Cut(input.fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
-            var fullCD = new FastGreedyCD(totalSize, input.fullPsf);
 
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
@@ -79,20 +78,19 @@ namespace Single_Reference.Experiments
                 //calc data and reg penalty
                 var dataPenalty = FastGreedyCD.CalcDataPenalty(dirtyImage);
                 var regPenalty = fastCD.CalcRegularizationPenalty(xImage, lambda, alpha);
-                var regPenalty2 = fullCD.CalcRegularizationPenalty(xImage, lambda, alpha);
+                var regPenaltyFull = input.fullCD.CalcRegularizationPenalty(xImage, lambda, alpha);
                 info.lastDataPenalty = dataPenalty;
                 info.lastRegPenalty = regPenalty;
-                info.lastRegPenaltyFull = regPenalty2;
+                info.lastRegPenaltyFull = regPenaltyFull;
+                var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
+                var currentLambda = Math.Max(1.0f / alpha * currentSideLobe, lambda);
 
-                writer.Write(cycle + ";" + dataPenalty + ";" + regPenalty + ";" + regPenalty2 + ";");
+                writer.Write(cycle + ";" + currentLambda + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyFull + ";");
                 writer.Flush();
 
                 //not below objective, go further
-                if (objectiveVal < dataPenalty + regPenalty )
+                if (objectiveVal < dataPenalty + regPenaltyFull)
                 {
-                    var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
-                    var currentLambda = Math.Max(1.0f / alpha * currentSideLobe, lambda);
-
                     bMapCalculator.ConvolveInPlace(dirtyImage);
 
                     info.totalDeconv.Start();
@@ -112,7 +110,7 @@ namespace Single_Reference.Experiments
                 }
                 else
                 {
-                    writer.Write(0);
+                    writer.Write(false + ";0;0");
                     writer.Flush();
                     break;
                 }
@@ -132,7 +130,7 @@ namespace Single_Reference.Experiments
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
-            for (int i = 1; i < 8; i++)
+            for (int i = 1; i < 1; i++)
             {
                 var uvw0 = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + i + ".fits"));
                 var flags0 = FitsIO.ReadFlags(Path.Combine(folder, "flags" + i + ".fits"), uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
@@ -171,15 +169,24 @@ namespace Single_Reference.Experiments
 
             //reconstruct with half the psf
             ReconstructionInfo referenceInfo = null;
-            using (var writer = new StreamWriter("halfPsf.txt", false))
+            using (var writer = new StreamWriter("1Psf.txt", false))
             {
                 writer.WriteLine("cycle;dataPenalty;regPenalty;regPenaltyFull;converged;iterCount;ElapsedTime");
-                referenceInfo = Reconstruct(input, 2, 5, "dirtyReference", "xReference", writer, 0.0);
-                File.WriteAllText("halfPsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
+                referenceInfo = Reconstruct(input, 1, 5, "dirtyReference", "xReference", writer, 0.0);
+                File.WriteAllText("1PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
             }
 
-            var cutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
-                
+            var objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenaltyFull;
+            var psfCuts = new int[] { 2, 4, 8};
+            foreach(var cut in psfCuts)
+            {
+                using (var writer = new StreamWriter(cut + "Psf.txt", false))
+                {
+                    writer.WriteLine("cycle;dataPenalty;regPenalty;regPenaltyFull;converged;iterCount;ElapsedTime");
+                    referenceInfo = Reconstruct(input, cut, 15, cut+"dirtyReference", cut+"xReference", writer, objectiveCutoff);
+                    File.WriteAllText(cut+"PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
+                }
+            }
             
 
 
