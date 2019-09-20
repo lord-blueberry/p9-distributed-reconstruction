@@ -55,7 +55,7 @@ namespace Distributed_Reference
                         //deconvolve
                         //var localDiff = deconvolve()
                         //var globalDiffexchange local diff
-                        subPatchDeconv[subPatchIter].Deconvolve(xImg, residuals, 0.5f, 0.8f, 100);
+                        //subPatchDeconv[subPatchIter].Deconvolve(xImg, residuals, 0.5f, 0.8f, 100);
                         //exchange residuals
                     }
                 }

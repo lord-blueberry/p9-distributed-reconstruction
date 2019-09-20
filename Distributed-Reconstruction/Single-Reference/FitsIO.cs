@@ -375,7 +375,7 @@ namespace Single_Reference
                         if (sum == 0)
                             output[i - fromBl, j, k] = false;
                         else
-                            output[i - toBl, j, k] = true;
+                            output[i - fromBl, j, k] = true;
                     }
                 }
             }
