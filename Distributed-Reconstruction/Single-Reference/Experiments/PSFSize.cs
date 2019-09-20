@@ -43,6 +43,7 @@ namespace Single_Reference.Experiments
             public Stopwatch totalDeconv;
             public double lastDataPenalty;
             public double lastRegPenalty;
+            public double lastRegPenaltyFull;
 
             public ReconstructionInfo()
             {
@@ -50,18 +51,21 @@ namespace Single_Reference.Experiments
             }
         }
 
-        private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer)
+        private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveVal)
         {
             var info = new ReconstructionInfo();
             var currentDeconv = new Stopwatch();
             var lambda = 0.4f;
             var alpha = 0.1f;
 
+            
+
             var psfCut = PSF.Cut(input.fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
+            var fullCD = new FastGreedyCD(totalSize, input.fullPsf);
 
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
@@ -76,33 +80,46 @@ namespace Single_Reference.Experiments
                 //calc data and reg penalty
                 var dataPenalty = FastGreedyCD.CalcDataPenalty(dirtyImage);
                 var regPenalty = fastCD.CalcRegularizationPenalty(xImage, lambda, alpha);
-                writer.Write(cycle + ";" + dataPenalty + ";" + regPenalty + ";");
-                writer.Flush();
-
-                var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
-                var currentLambda = Math.Max(1.0f / alpha * currentSideLobe, lambda);
-
-                bMapCalculator.ConvolveInPlace(dirtyImage);
-
-                currentDeconv.Restart();
-                info.totalDeconv.Start();
-                var converged = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 100, 1e-5f);
-                info.totalDeconv.Stop();
-                currentDeconv.Stop();
-
-                FitsIO.Write(xImage, xImagePrefix + cycle + ".fits");
-
+                var regPenalty2 = fullCD.CalcRegularizationPenalty(xImage, lambda, alpha);
                 info.lastDataPenalty = dataPenalty;
                 info.lastRegPenalty = regPenalty;
+                info.lastRegPenaltyFull = regPenalty2;
 
-                writer.Write(currentDeconv.Elapsed + "\n");
+                writer.Write(cycle + ";" + dataPenalty + ";" + regPenalty + ";" + regPenalty2 + ";");
                 writer.Flush();
 
-                FFT.Shift(xImage);
-                var xGrid = FFT.Forward(xImage);
-                FFT.Shift(xImage);
-                var modelVis = IDG.DeGrid(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
-                residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
+                //not below objective, go further
+                if (objectiveVal < dataPenalty + regPenalty )
+                {
+                    var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
+                    var currentLambda = Math.Max(1.0f / alpha * currentSideLobe, lambda);
+
+                    bMapCalculator.ConvolveInPlace(dirtyImage);
+
+                    currentDeconv.Restart();
+                    info.totalDeconv.Start();
+                    var converged = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 10000, 1e-5f);
+                    info.totalDeconv.Stop();
+                    currentDeconv.Stop();
+
+                    FitsIO.Write(xImage, xImagePrefix + cycle + ".fits");
+
+                    writer.Write(currentDeconv.Elapsed + "\n");
+                    writer.Flush();
+
+                    FFT.Shift(xImage);
+                    var xGrid = FFT.Forward(xImage);
+                    FFT.Shift(xImage);
+                    var modelVis = IDG.DeGrid(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
+                    residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
+                }
+                else
+                {
+                    writer.Write(0);
+                    writer.Flush();
+                    break;
+                }
+
             }
 
             return info;
@@ -149,18 +166,22 @@ namespace Single_Reference.Experiments
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
             var psf = FFT.BackwardFloat(psfGrid, c.VisibilitiesCount);
+            
             FFT.Shift(psf);
             FitsIO.Write(psf, "psfFull.fits");
 
             var input = new InputData(c, metadata, frequencies, visibilities, uvw, flags, psf);
 
             //reconstruct with half the psf
+            ReconstructionInfo referenceInfo = null;
             using (var writer = new StreamWriter("halfPsf.txt", false))
             {
-                writer.WriteLine("cycle;dataPenalty;regPenalty;ElapsedTime");
-                var info = Reconstruct(input, 2, 5, "dirtyReference", "xReference", writer);
-                File.WriteAllText("halfPsfTotal.txt", info.totalDeconv.Elapsed.ToString());
+                writer.WriteLine("cycle;dataPenalty;regPenalty;regPenaltyFull;ElapsedTime");
+                referenceInfo = Reconstruct(input, 2, 5, "dirtyReference", "xReference", writer, 0.0);
+                File.WriteAllText("halfPsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
             }
+
+            var cutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
                 
             
 
