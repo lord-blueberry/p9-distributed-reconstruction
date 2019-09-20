@@ -64,6 +64,7 @@ namespace Single_Reference.Experiments
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
+            FitsIO.Write(psfCut, cutFactor + "psf.fits");
 
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
@@ -148,7 +149,7 @@ namespace Single_Reference.Experiments
                             visCount2++;
             var visibilitiesCount = visCount2;
 
-            int gridSize = 1024;
+            int gridSize = 2048;
             int subgridsize = 16;
             int kernelSize = 4;
             //cell = image / grid
@@ -177,13 +178,13 @@ namespace Single_Reference.Experiments
             }
 
             var objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenaltyFull;
-            var psfCuts = new int[] { 2, 4, 8};
+            var psfCuts = new int[] { 2, 4, 8, 16, 32};
             foreach(var cut in psfCuts)
             {
                 using (var writer = new StreamWriter(cut + "Psf.txt", false))
                 {
                     writer.WriteLine("cycle;dataPenalty;regPenalty;regPenaltyFull;converged;iterCount;ElapsedTime");
-                    referenceInfo = Reconstruct(input, cut, 15, cut+"dirtyReference", cut+"xReference", writer, objectiveCutoff);
+                    referenceInfo = Reconstruct(input, cut, 15, cut+"dirty", cut+"x", writer, objectiveCutoff);
                     File.WriteAllText(cut+"PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
                 }
             }
