@@ -16,6 +16,8 @@ namespace Single_Reference.Experiments
 {
     class PSFSize
     {
+        public const double REFERENCE_L2_PENALTY = 10.9828372552795;
+        public const double REFERENCE_ELASTIC_PENALTY = 57.3688595093645;
         private class InputData
         {
             public GriddingConstants c;
@@ -53,11 +55,11 @@ namespace Single_Reference.Experiments
             }
         }
 
-        private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveVal)
+        private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon)
         {
             var info = new ReconstructionInfo();
             var lambda = 0.4f;
-            var alpha = 0.1f;
+            var alpha = 0.01f;
 
             var psfCut = PSF.Cut(input.fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
@@ -68,6 +70,7 @@ namespace Single_Reference.Experiments
 
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
+            DeconvolutionResult lastResult = null;
             for(int cycle = 0; cycle < maxMajor; cycle++)
             {
                 Console.WriteLine("cycle " + cycle);
@@ -84,24 +87,30 @@ namespace Single_Reference.Experiments
                 info.lastRegPenalty = regPenalty;
                 info.lastRegPenaltyFull = regPenaltyFull;
                 var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
-                var currentLambda = Math.Max(1.0f / alpha * currentSideLobe, lambda);
+                var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
-                writer.Write(cycle + ";" + currentLambda + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyFull + ";");
+                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyFull + ";");
                 writer.Flush();
 
-                //not below objective, go further
-                if (objectiveVal < dataPenalty + regPenaltyFull)
+                //check wether we can minimize the objective further with the current psf
+                var objectiveReached = (dataPenalty + regPenaltyFull) < objectiveCutoff;
+                var minimumReached = (lastResult != null && lastResult.IterationCount < 500 && lastResult.Converged);
+                if (!objectiveReached & !minimumReached)
                 {
                     bMapCalculator.ConvolveInPlace(dirtyImage);
 
                     info.totalDeconv.Start();
-                    var result = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 10000, 1e-5f);
+                    lastResult = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 10000, epsilon);
                     info.totalDeconv.Stop();
 
                     FitsIO.Write(xImage, xImagePrefix + cycle + ".fits");
 
-                    writer.Write(result.Converged + ";" + result.IterationCount + ";" + result.ElapsedTime.TotalSeconds + "\n");
+                    writer.Write(lastResult.Converged + ";" + lastResult.IterationCount + ";" + lastResult.ElapsedTime.TotalSeconds + "\n");
                     writer.Flush();
+
+                    //cannot minimize further
+                    if (lastResult.Converged & lastResult.IterationCount < 500)
+                        break;
 
                     FFT.Shift(xImage);
                     var xGrid = FFT.Forward(xImage);
@@ -168,24 +177,27 @@ namespace Single_Reference.Experiments
 
             var input = new InputData(c, metadata, frequencies, visibilities, uvw, flags, psf);
 
-            //reconstruct with half the psf
+            //reconstruct with full psf
+            var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
+            
             ReconstructionInfo referenceInfo = null;
             using (var writer = new StreamWriter("1Psf.txt", false))
             {
                 writer.WriteLine("cycle;dataPenalty;regPenalty;regPenaltyFull;converged;iterCount;ElapsedTime");
-                referenceInfo = Reconstruct(input, 1, 5, "dirtyReference", "xReference", writer, 0.0);
+                referenceInfo = Reconstruct(input, 1, 8, "dirtyReference", "xReference", writer, 0.0, 1e-5f);
                 File.WriteAllText("1PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
             }
+            objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenaltyFull;
 
-            var objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenaltyFull;
+            ReconstructionInfo experimentInfo = null;
             var psfCuts = new int[] { 2, 4, 8, 16, 32};
             foreach(var cut in psfCuts)
             {
                 using (var writer = new StreamWriter(cut + "Psf.txt", false))
                 {
-                    writer.WriteLine("cycle;dataPenalty;regPenalty;regPenaltyFull;converged;iterCount;ElapsedTime");
-                    referenceInfo = Reconstruct(input, cut, 15, cut+"dirty", cut+"x", writer, objectiveCutoff);
-                    File.WriteAllText(cut+"PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
+                    writer.WriteLine("cycle;currentLambda;dataPenalty;regPenalty;regPenaltyFull;converged;iterCount;ElapsedTime");
+                    experimentInfo = Reconstruct(input, cut, 16, cut+"dirty", cut+"x", writer, objectiveCutoff, 1e-5f);
+                    File.WriteAllText(cut+"PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
             

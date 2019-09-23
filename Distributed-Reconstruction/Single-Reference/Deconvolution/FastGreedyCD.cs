@@ -73,7 +73,7 @@ namespace Single_Reference.Deconvolution
             while (!converged & iter < iterations)
             {
                 var maxPixel = GetAbsMax(subpatch, reconstruction, bMap, lambda, alpha);
-                converged = maxPixel.PixelMaxDiff < epsilon;
+                converged = maxPixel.PixelMaxDiff < epsilon ;
                 if (!converged)
                 {
                     var yLocal = maxPixel.Y - patch.Y;
@@ -131,6 +131,42 @@ namespace Single_Reference.Deconvolution
                 }
                 maxPixels[yLocal] = currentMax;
             });
+
+            var maxPixel = new Pixel(-1, -1, 0, 0);
+            for (int i = 0; i < maxPixels.Length; i++)
+                if (maxPixel.PixelMaxDiff < maxPixels[i].PixelMaxDiff)
+                    maxPixel = maxPixels[i];
+
+            return maxPixel;
+        }
+
+        private Pixel GetAbsMaxSingle(Rectangle subpatch, float[,] xImage, float[,] bMap, float lambda, float alpha)
+        {
+            var maxPixels = new Pixel[subpatch.YExtent()];
+            for(int y = subpatch.Y; y < subpatch.YEnd; y++)
+            {
+                var yLocal = y;
+
+                var currentMax = new Pixel(-1, -1, 0, 0);
+                for (int x = subpatch.X; x < subpatch.XEnd; x++)
+                {
+                    var xLocal = x;
+                    var currentA = aMap[yLocal, xLocal];
+                    var old = xImage[yLocal, xLocal];
+                    var xTmp = old + bMap[y, x] / currentA;
+                    xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                    var xDiff = old - xTmp;
+
+                    if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
+                    {
+                        currentMax.Y = y;
+                        currentMax.X = x;
+                        currentMax.PixelMaxDiff = Math.Abs(xDiff);
+                        currentMax.PixelNew = xTmp;
+                    }
+                }
+                maxPixels[yLocal] = currentMax;
+            }
 
             var maxPixel = new Pixel(-1, -1, 0, 0);
             for (int i = 0; i < maxPixels.Length; i++)
