@@ -19,8 +19,8 @@ namespace Single_Reference.Deconvolution
          */
         
         readonly Rectangle patch;
-        readonly float[,] psf2;
-        readonly float[,] aMap;
+        float[,] psf2;
+        float[,] aMap;
 
         public FastGreedyCD(Rectangle imageSize, float[,] psf) :
             this(imageSize, imageSize, psf, PSF.CalcPSFSquared(psf))
@@ -33,6 +33,22 @@ namespace Single_Reference.Deconvolution
             this.patch = patchSize;
             psf2 = psfSquared;
             aMap = PSF.CalcAMap(psf, imageSize, patchSize);
+            //FitsIO.Write(aMap, "aMapDebug" + psf.GetLength(0) + ".fits");
+            //FitsIO.Write(psfSquared, "psfSquaredDebug" + psf.GetLength(0) + ".fits");
+        }
+
+        public void ResetAMap(float[,] psf)
+        {
+            var psf2Local = PSF.CalcPSFSquared(psf);
+            var maxFull = Residuals.GetMax(psf2Local);
+            var maxCut = Residuals.GetMax(psf2);
+
+            for (int i = 0; i < psf2.GetLength(0); i++)
+                for (int j = 0; j < psf2.GetLength(1); j++)
+                    psf2[i, j] *= (maxFull / maxCut);
+            aMap = PSF.CalcAMap(psf, patch, patch);
+            FitsIO.Write(psf2, "psfSMyDebug" + psf2.GetLength(0) + ".fits");
+
         }
 
         #region ISubpatchDeconvolver implementation
@@ -120,6 +136,14 @@ namespace Single_Reference.Deconvolution
                     var xTmp = old + bMap[y, x] / currentA;
                     xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
                     var xDiff = old - xTmp;
+
+                    if(yLocal == 1905 & xLocal == 1618)
+                    {
+                        var xTmp2 = old + bMap[y, x] / currentA;
+                        var b = bMap[y, x];
+                        var diff = b * 2;
+                    }
+
 
                     if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
                     {

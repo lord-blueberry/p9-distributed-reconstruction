@@ -259,16 +259,18 @@ namespace Single_Reference.Experiments
             var psf = ToFloatImage(FitsIO.ReadImageDouble("psfFull.fits"));
 
 
-
             var input = new InputData(c, metadata, frequencies, visibilities, uvw, flags, psf);
             var lambda = 0.5f;
             var alpha = 0.02f;
-            var cutFactor = 1;
+            var cutFactor = 32;
             var psfCut = PSF.Cut(input.fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
-            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
+            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psf, totalSize), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
+            fastCD.ResetAMap(psf);
+
+
             FFT.Shift(xImage);
             var xGrid2 = FFT.Forward(xImage);
             FFT.Shift(xImage);
