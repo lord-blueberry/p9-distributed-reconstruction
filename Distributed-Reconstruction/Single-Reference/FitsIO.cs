@@ -63,16 +63,16 @@ namespace Single_Reference
             }
         }
 
-        public static void Write(double[,] img, string file = "Outputfile.fits")
+        public static void Write<T>(T[,] img, string file = "Outputfile.fits")
         {
-            var img2 = new double[img.GetLength(0)][];
+            var img2 = new T[img.GetLength(0)][];
             for (int i = 0; i < img2.Length; i++)
             {
-                var gg2 = new double[img.GetLength(1)];
-                img2[i] = gg2;
+                var row = new T[img.GetLength(1)];
+                img2[i] = row;
                 for (int j = 0; j < img.GetLength(1); j++)
                 {
-                    gg2[j] = img[i, j];
+                    row[j] = img[i, j];
                 }
             }
 
@@ -84,50 +84,6 @@ namespace Single_Reference
             {
                 f.Write(fstream);
             }
-        }
-
-        public static void Write(float[,] img, string file = "Outputfile.fits")
-        {
-            var img2 = new double[img.GetLength(0)][];
-            for (int i = 0; i < img2.Length; i++)
-            {
-                var gg2 = new double[img.GetLength(1)];
-                img2[i] = gg2;
-                for (int j = 0; j < img.GetLength(1); j++)
-                {
-                    gg2[j] = img[i, j];
-                }
-            }
-
-            var f = new Fits();
-            var hhdu = FitsFactory.HDUFactory(img2);
-            f.AddHDU(hhdu);
-
-            using (BufferedDataStream fstream = new BufferedDataStream(new FileStream(file, FileMode.Create)))
-            {
-                f.Write(fstream);
-            }
-        }
-
-        public static double[,] ReadImage(string file)
-        {
-            var f = new Fits(file);
-            var h = (ImageHDU)f.ReadHDU();
-
-            var raw = (Array[])h.Kernel;
-            raw = (Array[])raw[0];
-            raw = (Array[])raw[0];
-            var img = new double[raw.Length, raw.Length];
-            for(int i = 0; i < raw.Length; i++)
-            {
-                var col = (float[])raw[i];
-                for(int j = 0; j < col.Length; j++)
-                {
-                    img[i, j] = col[j];
-                }
-            }
-
-            return img;
         }
 
 
@@ -175,6 +131,38 @@ namespace Single_Reference
         #endregion
 
         #region reading
+        public static float[,] ReadImage(string file)
+        {
+            Fits f = new Fits(file);
+            ImageHDU h = (ImageHDU)f.ReadHDU();
+            var imgRaw = (Array[])h.Kernel;
+
+            var output = new float[imgRaw.Length, imgRaw[0].Length];
+            for(int i = 0; i < imgRaw.Length;i++)
+            {
+                var row = (float[])imgRaw[i];
+                for (int j = 0; j < row.Length; j++)
+                    output[i, j] = row[j];
+            }
+            return output;
+        }
+
+        public static double[,] ReadImageDouble(string file)
+        {
+            Fits f = new Fits(file);
+            ImageHDU h = (ImageHDU)f.ReadHDU();
+            var imgRaw = (Array[])h.Kernel;
+
+            var output = new double[imgRaw.Length, imgRaw[0].Length];
+            for (int i = 0; i < imgRaw.Length; i++)
+            {
+                var row = (double[])imgRaw[i];
+                for (int j = 0; j < row.Length; j++)
+                    output[i, j] = row[j];
+            }
+            return output;
+        }
+
         public static double[] ReadFrequencies(string file)
         {
             Fits f = new Fits(file);
