@@ -10,8 +10,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
         public static bool DeconvolveRandom(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, int maxIteration = 100, double epsilon = 1e-4)
         {
             var xImage2 = ToFloatImage(xImage);
-            var uImg = new float[xImage.GetLength(0), xImage.GetLength(1)];
-            var zImg = new float[xImage.GetLength(0), xImage.GetLength(1)];
+            var uImage = new float[xImage.GetLength(0), xImage.GetLength(1)];
+            var gradientUpdate = new float[xImage.GetLength(0), xImage.GetLength(1)];
 
             var PSFConvolution = CommonDeprecated.PSF.CalcPaddedFourierConvolution(psf, residuals.GetLength(0), residuals.GetLength(1));
             var PSFCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0), residuals.GetLength(1));
@@ -26,26 +26,26 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var bMap = ToFloatImage(residuals);
             bMapCalculator.ConvolveInPlace(bMap);
 
-            var xDiff = new float[xImage.GetLength(0), xImage.GetLength(1)];
+            
             var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
 
-            var theta = 4; //theta, also number of processors.
+            var tau = 1; //theta, also number of processors.
             var degreeOfSep = RandomCD.CountNonZero(psf);
             var blockCount = xImage.Length / (yBlockSize * xBlockSize);
-            var beta = 1.0 + (degreeOfSep - 1.0) * (theta - 1.0) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling. Look at the original PCDM Paper for the explanation
+            var beta = 1.0 + (degreeOfSep - 1.0) * (tau - 1.0) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling. Look at the original PCDM Paper for the explanation
             //Theta-nice sampling: take theta number of random pixels 
 
             var lipschitz = RandomBlockCD2.ApproximateLipschitz(psf, yBlockSize, xBlockSize);
             lipschitz *= beta;
             lambda = lambda / (yBlockSize * xBlockSize * beta);
 
-            var omega = theta / (float)blockCount;
+            var omega = tau / (float)blockCount;
 
             var iter = 0;
             while (iter < maxIteration)
             {
                 bool containsNonZero = false;
-                var blockSamples = RandomCD.CreateSamples(blockCount, theta, random);
+                var blockSamples = RandomCD.CreateSamples(blockCount, tau, random);
                 for (int i = 0; i < blockSamples.Length; i++)
                 {
                     var yBlock = blockSamples[i] / (xImage.GetLength(1) / xBlockSize);
@@ -53,27 +53,28 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
                     var block = RandomBlockCD2.CopyFrom(bMap, yBlock, xBlock, yBlockSize, xBlockSize);
 
-                    var update = block / (lipschitz * omega * blockCount / theta);
+                    var update = block / (lipschitz * omega * blockCount/(double)(tau));
 
-                    var xOld = RandomBlockCD2.CopyFrom(zImg, yBlock, xBlock, yBlockSize, xBlockSize);
-                    var optimized = xOld + update;
+                    var xOld = RandomBlockCD2.CopyFrom(xImage2, yBlock, xBlock, yBlockSize, xBlockSize);
+                    var xNew = xOld + update;
 
                     //shrink
-                    for (int j = 0; j < optimized.Count; j++)
+                    for (int j = 0; j < xNew.Count; j++)
                     {
-                        optimized[j] = Common.ShrinkElasticNet(optimized[j], lambda, alpha);
-                        containsNonZero |= (optimized[j] - xOld[j]) != 0.0;
+                        xNew[j] = Common.ShrinkElasticNet(xNew[j], lambda, alpha);
+                        containsNonZero |= (xNew[j] - xOld[j]) != 0.0;
                     }
 
-                    var tUpdate = optimized - xOld;
-                    RandomBlockCD2.AddInto(zImg, tUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
+                    var xUpdate = xNew - xOld;
+                    RandomBlockCD2.AddInto(xImage2, xUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
 
-                    var uUpdate = -(1.0 - blockCount / theta * omega) / (omega * omega) * tUpdate;
-                    RandomBlockCD2.AddInto(uImg, uUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
-
-                    RandomBlockCD2.AddInto(xDiff, tUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
-                    RandomBlockCD2.AddInto(xImage2, tUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
+                    var uUpdate = -(1.0 - blockCount / tau * omega) / (omega * omega) * xUpdate;
+                    RandomBlockCD2.AddInto(uImage, uUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
+                    
+                    RandomBlockCD2.AddInto(gradientUpdate, xUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
+                    RandomBlockCD2.AddInto(gradientUpdate, omega*omega*uUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
                 }
+                omega = (float)(Math.Sqrt((omega * omega * omega * omega) + 4 * (omega * omega)) - omega * omega) / 2.0f;
 
 
                 if (containsNonZero)
@@ -82,13 +83,13 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     //FitsIO.Write(xDiff, "xDiff.fits");
 
                     //update b-map
-                    bMapUpdateCalculator.ConvolveInPlace(xDiff);
+                    bMapUpdateCalculator.ConvolveInPlace(gradientUpdate);
                     //FitsIO.Write(xDiff, "bMapUpdate.fits");
-                    for (int i = 0; i < xDiff.GetLength(0); i++)
-                        for (int j = 0; j < xDiff.GetLength(1); j++)
+                    for (int i = 0; i < gradientUpdate.GetLength(0); i++)
+                        for (int j = 0; j < gradientUpdate.GetLength(1); j++)
                         {
-                            bMap[i, j] -= xDiff[i, j];
-                            xDiff[i, j] = 0;
+                            bMap[i, j] -= gradientUpdate[i, j];
+                            gradientUpdate[i, j] = 0;
                         }
                 }
                 iter++;
@@ -98,20 +99,20 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
                 {
-                    xDiff[i, j] = xImage2[i, j] - (float)xImage[i, j];
+                    gradientUpdate[i, j] = xImage2[i, j] - (float)xImage[i, j];
                     xImage[i, j] = xImage2[i, j];
 
                     elasticNet += lambda * 2 * lipschitz * GreedyBlockCD.ElasticNetPenalty(xImage2[i, j], (float)alpha);
                 }
 
 
-            resUpdateCalculator.ConvolveInPlace(xDiff);
+            resUpdateCalculator.ConvolveInPlace(gradientUpdate);
             //FitsIO.Write(xDiff, "residualsUpdate.fits");
-            for (int i = 0; i < xDiff.GetLength(0); i++)
-                for (int j = 0; j < xDiff.GetLength(1); j++)
+            for (int i = 0; i < gradientUpdate.GetLength(0); i++)
+                for (int j = 0; j < gradientUpdate.GetLength(1); j++)
                 {
-                    residuals[i, j] -= xDiff[i, j];
-                    xDiff[i, j] = 0;
+                    residuals[i, j] -= gradientUpdate[i, j];
+                    gradientUpdate[i, j] = 0;
                 }
             var l2Penalty = NaiveGreedyCD.CalcDataObjective(residuals);
             Console.WriteLine("-------------------------");
@@ -124,7 +125,124 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
-                    xImage[i, j] = xImage2[i, j];
+                    xImage[i, j] = (omega*omega)*uImage[i, j] + xImage2[i, j];
+            return false;
+        }
+
+        public static bool DeconvolveRandom2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, int maxIteration = 100, double epsilon = 1e-4)
+        {
+            var xImage2 = ToFloatImage(xImage);
+            var xImageExplore = new float[xImage.GetLength(0), xImage.GetLength(1)];
+            var xImageCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
+            var bEUpdate = new float[xImage.GetLength(0), xImage.GetLength(1)];
+            var bCUpdate = new float[xImage.GetLength(0), xImage.GetLength(1)];
+
+            for(int i = 0; i < xImage.GetLength(0);i++)
+                for(int j = 0; j < xImage.GetLength(1);j++)
+                    xImageExplore[i, j] = xImage2[i, j];
+
+            var PSFConvolution = CommonDeprecated.PSF.CalcPaddedFourierConvolution(psf, residuals.GetLength(0), residuals.GetLength(1));
+            var PSFCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0), residuals.GetLength(1));
+            var PSFSquared = Fourier2D.Multiply(PSFConvolution, PSFCorrelation);
+            var bMapCalculator = new PaddedConvolver(PSFCorrelation, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            var bMapUpdateCalculator = new PaddedConvolver(PSFSquared, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+
+            var yBlockSize = blockSize;
+            var xBlockSize = blockSize;
+
+            var bMapExplore = ToFloatImage(residuals);
+            bMapCalculator.ConvolveInPlace(bMapExplore);
+            var bMapCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
+
+
+            var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
+
+            var tau = 1; //theta, also number of processors.
+            var degreeOfSep = RandomCD.CountNonZero(psf);
+            var blockCount = xImage.Length / (yBlockSize * xBlockSize);
+            var beta = 1.0 + (degreeOfSep - 1.0) * (tau - 1.0) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling. Look at the original PCDM Paper for the explanation
+            //Theta-nice sampling: take theta number of random pixels 
+
+            var lipschitz = RandomBlockCD2.ApproximateLipschitz(psf, yBlockSize, xBlockSize);
+            lipschitz *= beta;
+            lambda = lambda / (yBlockSize * xBlockSize * beta);
+
+            var theta = tau / (float)blockCount;
+            var theta0 = theta;
+
+            var testRestart = 0.0;
+            var iter = 0;
+            while (iter < maxIteration)
+            {
+                bool containsNonZero = false;
+                var blockSamples = RandomCD.CreateSamples(blockCount, tau, random);
+                for (int i = 0; i < blockSamples.Length; i++)
+                {
+                    var yBlock = blockSamples[i] / (xImage.GetLength(1) / xBlockSize);
+                    var xBlock = blockSamples[i] % (xImage.GetLength(1) / xBlockSize);
+
+                    var xE = RandomBlockCD2.CopyFrom(xImageExplore, yBlock, xBlock, yBlockSize, xBlockSize);
+                    var xC = RandomBlockCD2.CopyFrom(xImageCorrection, yBlock, xBlock, yBlockSize, xBlockSize);
+                    var bE = RandomBlockCD2.CopyFrom(bMapExplore, yBlock, xBlock, yBlockSize, xBlockSize);
+                    var bC = RandomBlockCD2.CopyFrom(bMapCorrection, yBlock, xBlock, yBlockSize, xBlockSize);
+                    var stepSize = lipschitz * theta / theta0;
+
+                    var xNew = theta * theta * bC / stepSize + bE / stepSize + xE;
+
+                    //shrink
+                    for (int j = 0; j < xNew.Count; j++)
+                    {
+                        xNew[j] = Common.ShrinkElasticNet(xNew[j], lambda, alpha);
+                        containsNonZero |= (xNew[j] - xE[j]) != 0.0;
+                    }
+                    var xEUpdate = xNew - xE;
+
+                    RandomBlockCD2.AddInto(xImageExplore, xEUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
+                    RandomBlockCD2.AddInto(bEUpdate, xEUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
+
+                    var xCUpdate = -(1.0 - theta / theta0) / (theta * theta) * xEUpdate;
+                    RandomBlockCD2.AddInto(xImageCorrection, xCUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
+                    RandomBlockCD2.AddInto(bCUpdate, xCUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
+
+                    var eta = 1.0 / blockCount;
+                    testRestart = (1.0 - eta) * testRestart - eta * (xEUpdate) * (xNew - (theta * theta * xC + xE));
+                }
+                
+                if (containsNonZero)
+                {
+                    //FitsIO.Write(xImage2, "xImageBlock.fits");
+                    //FitsIO.Write(xDiff, "xDiff.fits");
+                    bMapUpdateCalculator.ConvolveInPlace(bEUpdate);
+                    bMapUpdateCalculator.ConvolveInPlace(bCUpdate);
+
+                    for (int i = 0; i < xImage2.GetLength(0); i++)
+                        for (int j = 0; j < xImage2.GetLength(1); j++)
+                        {
+                            bMapExplore[i, j] -= bEUpdate[i, j];
+                            bMapCorrection[i, j] -= bCUpdate[i, j];
+                            bEUpdate[i, j] = 0;
+                            bCUpdate[i, j] = 0;
+                        }
+
+                }
+                if (testRestart > 0)
+                {
+                    Console.Write("");
+                    break;
+                }
+                    
+                theta = (float)(Math.Sqrt((theta * theta * theta * theta) + 4 * (theta * theta)) - theta * theta) / 2.0f;
+                iter++;
+            }
+            FitsIO.Write(bMapExplore, "bMapExplore.fits");
+            FitsIO.Write(bMapCorrection, "bMapCorr.fits");
+            FitsIO.Write(xImageExplore, "xExplore.fits");
+            FitsIO.Write(xImageCorrection, "xCorr.fits");
+
+            var tmpTheta = theta < 1 ? ((theta * theta) / (1.0 - theta)) : theta0;
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                    xImage[i, j] = tmpTheta * xImageCorrection[i, j] + xImageExplore[i, j];
             return false;
         }
 

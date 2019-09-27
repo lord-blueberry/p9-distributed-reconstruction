@@ -47,7 +47,6 @@ namespace Single_Reference.Deconvolution
                 for (int j = 0; j < psf2.GetLength(1); j++)
                     psf2[i, j] *= (maxFull / maxCut);
             aMap = PSF.CalcAMap(psf, patch, patch);
-            FitsIO.Write(psf2, "psfSMyDebug" + psf2.GetLength(0) + ".fits");
 
         }
 
@@ -133,8 +132,10 @@ namespace Single_Reference.Deconvolution
                     var xLocal = x;
                     var currentA = aMap[yLocal, xLocal];
                     var old = xImage[yLocal, xLocal];
-                    var xTmp = old + bMap[y, x] / currentA;
+                    var xTmp = old  + bMap[y, x] / currentA;
                     xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                    //var xTmp = old* currentA + bMap[y, x];
+                    //xTmp = ShrinkElasticNetGradient(xTmp, currentA, lambda, alpha);
                     var xDiff = old - xTmp;
 
                     if (currentMax.PixelMaxDiff < Math.Abs(xDiff))

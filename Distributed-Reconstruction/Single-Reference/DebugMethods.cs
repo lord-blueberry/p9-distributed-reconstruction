@@ -304,8 +304,10 @@ namespace Single_Reference
             FitsIO.Write(psfCut, "psfCut.fits");
 
             var xImage = new double[gridSize, gridSize];
+
             var residualVis = visibilities;
             var random = new Random(123);
+            var fastCD = new FastGreedyCD(new Rectangle(0, 0, gridSize, gridSize), ToFloatImage(psfCut));
 
             /*
             var truth = new double[gridSize, gridSize];
@@ -314,7 +316,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 4; cycle++)
+            for (int cycle = 0; cycle < 8; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -329,15 +331,16 @@ namespace Single_Reference
                 
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                
                 //var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(2*2), 1.0, random, 100000);
                 //var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 1, 500);
-                var converged = PCDM.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 4, 2000);
+                //var converged = PCDM.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 4, 2000);
+                var converged = Approx.DeconvolveRandom2(xImage, dirtyImage, psfCut, 0.5, 0.8, random, 2, 100000);
+
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");
-                FitsIO.Write(xImage, "xImageBlockG2_" + cycle + ".fits");
+                FitsIO.Write(xImage, "xApprox_" + cycle + ".fits");
                 FitsIO.Write(b, "bMap_" + cycle + ".fits");
                 watchDeconv.Stop();
 
