@@ -137,14 +137,6 @@ namespace Single_Reference.Deconvolution
                     xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
                     var xDiff = old - xTmp;
 
-                    if(yLocal == 1905 & xLocal == 1618)
-                    {
-                        var xTmp2 = old + bMap[y, x] / currentA;
-                        var b = bMap[y, x];
-                        var diff = b * 2;
-                    }
-
-
                     if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
                     {
                         currentMax.Y = y;
