@@ -308,7 +308,8 @@ namespace Single_Reference
             var residualVis = visibilities;
             var random = new Random(123);
             var fastCD = new FastGreedyCD(new Rectangle(0, 0, gridSize, gridSize), ToFloatImage(psfCut));
-
+            var lambda = 0.5;
+            var alpha = 0.8;
             /*
             var truth = new double[gridSize, gridSize];
             truth[64, 64] = 1.0;
@@ -316,7 +317,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 8; cycle++)
+            for (int cycle = 0; cycle < 10; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -326,6 +327,9 @@ namespace Single_Reference
                 FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
                 watchForward.Stop();
 
+                var l2Penalty0 = FastGreedyCD.CalcDataPenalty(ToFloatImage(dirtyImage));
+                var elasticPenalty0 = fastCD.CalcRegularizationPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
+                var sum0 = l2Penalty0 + elasticPenalty0;
                 //DECONVOLVE
                 watchDeconv.Start();
                 
@@ -334,8 +338,8 @@ namespace Single_Reference
                 //var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(2*2), 1.0, random, 100000);
                 //var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 1, 500);
                 //var converged = PCDM.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 4, 2000);
-                var converged = Approx.DeconvolveRandom2(xImage, dirtyImage, psfCut, 0.5, 0.8, random, 2, 100000);
-
+                var converged = Approx.DeconvolveRandom2(xImage, dirtyImage, psfCut, lambda, alpha, random, 8, 10000);
+                var el2 = fastCD.CalcRegularizationPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
@@ -356,6 +360,15 @@ namespace Single_Reference
                 var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
                 FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
             }
+
+            var dirtyGridCheck = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
+            var dirtyCheck = FFT.Backward(dirtyGridCheck, c.VisibilitiesCount);
+            FFT.Shift(dirtyCheck);
+            FitsIO.Write(dirtyCheck, "dirty_Last.fits");
+            fastCD.ResetAMap(ToFloatImage(psf));
+            var l2Penalty = FastGreedyCD.CalcDataPenalty(ToFloatImage(dirtyCheck));
+            var elasticPenalty = fastCD.CalcRegularizationPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
+            var sum = l2Penalty + elasticPenalty;
         }
 
         public static void DebugILGPU()

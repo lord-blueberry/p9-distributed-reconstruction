@@ -245,7 +245,11 @@ namespace Single_Reference.Deconvolution
             double output = 0;
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
+                {
                     output += ElasticNetPenalty(xImage[i, j], alpha) * lambda * 2 * aMap[i, j];
+                    if (i == 110 & j == 128)
+                        Console.WriteLine();
+                }
 
             return output;
         }

@@ -55,7 +55,7 @@ namespace Single_Reference.Experiments
         private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon)
         {
             var info = new ReconstructionInfo();
-            var lambda = 12f;
+            var lambda = 0.4f;
             var alpha = 0.1f;
 
             var psfCut = PSF.Cut(input.fullPsf, cutFactor);
@@ -153,7 +153,7 @@ namespace Single_Reference.Experiments
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
-            for (int i = 1; i < 1; i++)
+            for (int i = 1; i < 8; i++)
             {
                 var uvw0 = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + i + ".fits"));
                 var flags0 = FitsIO.ReadFlags(Path.Combine(folder, "flags" + i + ".fits"), uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
@@ -201,7 +201,7 @@ namespace Single_Reference.Experiments
                 File.WriteAllText("1PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
             }
             objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
-            /*
+            
             ReconstructionInfo experimentInfo = null;
             var psfCuts = new int[] { 2, 4, 8, 16, 32, 64};
             foreach(var cut in psfCuts)
@@ -212,7 +212,7 @@ namespace Single_Reference.Experiments
                     experimentInfo = Reconstruct(input, cut, 16, cut+"dirty", cut+"x", writer, objectiveCutoff, 1e-5f);
                     File.WriteAllText(cut+"PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
-            }*/
+            }
         }
 
         public static void DebugConvergence()

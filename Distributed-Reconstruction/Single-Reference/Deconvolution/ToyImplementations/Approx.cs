@@ -9,6 +9,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
     {
         public static bool DeconvolveRandom(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, int maxIteration = 100, double epsilon = 1e-4)
         {
+            
             var xImage2 = ToFloatImage(xImage);
             var uImage = new float[xImage.GetLength(0), xImage.GetLength(1)];
             var gradientUpdate = new float[xImage.GetLength(0), xImage.GetLength(1)];
@@ -131,6 +132,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
         public static bool DeconvolveRandom2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, int maxIteration = 100, double epsilon = 1e-4)
         {
+            var fastCD = new FastGreedyCD(new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1)), ToFloatImage(psf));
             var xImage2 = ToFloatImage(xImage);
             var xImageExplore = new float[xImage.GetLength(0), xImage.GetLength(1)];
             var xImageCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
@@ -154,8 +156,6 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             bMapCalculator.ConvolveInPlace(bMapExplore);
             var bMapCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
 
-
-            var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
 
             var tau = 1; //theta, also number of processors.
             var degreeOfSep = RandomCD.CountNonZero(psf);
@@ -227,7 +227,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 }
                 if (testRestart > 0)
                 {
-                    Console.Write("");
+                    Console.Write("hello");
                     break;
                 }
                     
@@ -239,10 +239,62 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             FitsIO.Write(xImageExplore, "xExplore.fits");
             FitsIO.Write(xImageCorrection, "xCorr.fits");
 
-            var tmpTheta = theta < 1 ? ((theta * theta) / (1.0 - theta)) : theta0;
+            
+
+            
+            var tmpTheta = theta < 1.0f ? ((theta * theta) / (1.0f - theta)) : theta0;
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
-                    xImage[i, j] = tmpTheta * xImageCorrection[i, j] + xImageExplore[i, j];
+                    xImage2[i, j] = Math.Max(tmpTheta * xImageCorrection[i, j] + xImageExplore[i, j], 0.0f);
+            var residualsExplore = bMapExplore;
+            var residualsAcc = bMapCorrection;
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                {
+                    residualsExplore[i, j] = (float)(xImageExplore[i, j] - xImage[i, j]);
+                    residualsAcc[i, j] = (float)(xImage2[i, j] - xImage[i, j]);
+                }
+            var residualsCalculator = new PaddedConvolver(CommonDeprecated.PSF.CalcPaddedFourierConvolution(psf, residuals.GetLength(0), residuals.GetLength(1)), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            residualsCalculator.ConvolveInPlace(residualsExplore);
+            residualsCalculator.ConvolveInPlace(residualsAcc);
+
+            FitsIO.Write(residualsExplore, "residualsExploreConvolved.fits");
+            FitsIO.Write(residualsAcc, "residualsAccConvolved.fits");
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                {
+                    residualsExplore[i, j] = (float)(residuals[i, j] - residualsExplore[i, j]);
+                    residualsAcc[i, j] = (float)(residuals[i, j] - residualsAcc[i, j]);
+                }
+            FitsIO.Write(residualsExplore, "residualsExplore.fits");
+            FitsIO.Write(residualsAcc, "residualsAcc.fits");
+            FitsIO.Write(xImage2, "xAccelerated.fits");
+
+            var l2penaltyExplore = FastGreedyCD.CalcDataPenalty(residualsExplore);
+            var l2PenaltyAcc = FastGreedyCD.CalcDataPenalty(residualsAcc);
+            var elasticPenaltyExplore = fastCD.CalcRegularizationPenalty(xImageExplore, (float)lambda, (float)alpha);
+            var elasticPenaltyAcc = fastCD.CalcRegularizationPenalty(xImage2, (float)lambda, (float)alpha);
+
+
+            if(l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore)
+            {
+                //use accelerated result
+                for (int i = 0; i < xImage.GetLength(0); i++)
+                    for (int j = 0; j < xImage.GetLength(1); j++)
+                        xImage[i, j] = xImage2[i, j];
+            }
+            else
+            {
+                //use non-accelerated result
+                for (int i = 0; i < xImage.GetLength(0); i++)
+                    for (int j = 0; j < xImage.GetLength(1); j++)
+                        xImage[i, j] = xImageExplore[i, j];
+            }
+            //use non-accelerated result
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                    xImage[i, j] = xImage2[i, j];
+
             return false;
         }
 
