@@ -310,6 +310,8 @@ namespace Single_Reference
             var fastCD = new FastGreedyCD(new Rectangle(0, 0, gridSize, gridSize), ToFloatImage(psfCut));
             var lambda = 0.5;
             var alpha = 0.8;
+            var writer = new StreamWriter("ApproxInfo.txt", false);
+            var writer2 = new StreamWriter("TrueConvergenceInfo.txt", false);
             /*
             var truth = new double[gridSize, gridSize];
             truth[64, 64] = 1.0;
@@ -330,6 +332,8 @@ namespace Single_Reference
                 var l2Penalty0 = FastGreedyCD.CalcDataPenalty(ToFloatImage(dirtyImage));
                 var elasticPenalty0 = fastCD.CalcRegularizationPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
                 var sum0 = l2Penalty0 + elasticPenalty0;
+                writer2.WriteLine(cycle + ";" + l2Penalty0 + ";" + elasticPenalty0 + ";" + sum0);
+                writer2.Flush();
                 //DECONVOLVE
                 watchDeconv.Start();
                 
@@ -338,8 +342,7 @@ namespace Single_Reference
                 //var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(2*2), 1.0, random, 100000);
                 //var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 1, 500);
                 //var converged = PCDM.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 4, 2000);
-                var converged = Approx.DeconvolveRandom2(xImage, dirtyImage, psfCut, lambda, alpha, random, 8, 10000);
-                var el2 = fastCD.CalcRegularizationPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
+                var converged = Approx.DeconvolveRandom2(xImage, dirtyImage, psfCut, lambda, alpha, random, 8, writer, 50000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
@@ -361,6 +364,7 @@ namespace Single_Reference
                 FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
             }
 
+            writer.Close();
             var dirtyGridCheck = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
             var dirtyCheck = FFT.Backward(dirtyGridCheck, c.VisibilitiesCount);
             FFT.Shift(dirtyCheck);
@@ -369,6 +373,9 @@ namespace Single_Reference
             var l2Penalty = FastGreedyCD.CalcDataPenalty(ToFloatImage(dirtyCheck));
             var elasticPenalty = fastCD.CalcRegularizationPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
             var sum = l2Penalty + elasticPenalty;
+            writer2.WriteLine(l2Penalty + ";" + elasticPenalty + ";" + sum);
+            writer.Close();
+            writer2.Close();
         }
 
         public static void DebugILGPU()

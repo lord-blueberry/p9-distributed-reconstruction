@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using static Single_Reference.Common;
+using System.IO;
 
 namespace Single_Reference.Deconvolution.ToyImplementations
 {
@@ -130,9 +131,10 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return false;
         }
 
-        public static bool DeconvolveRandom2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, int maxIteration = 100, double epsilon = 1e-4)
+        public static bool DeconvolveRandom2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, StreamWriter writer, int maxIteration = 100, double epsilon = 1e-4)
         {
             var fastCD = new FastGreedyCD(new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1)), ToFloatImage(psf));
+            var lambdaOriginal = lambda;
             var xImage2 = ToFloatImage(xImage);
             var xImageExplore = new float[xImage.GetLength(0), xImage.GetLength(1)];
             var xImageCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
@@ -239,20 +241,24 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             FitsIO.Write(xImageExplore, "xExplore.fits");
             FitsIO.Write(xImageCorrection, "xCorr.fits");
 
-            
-
-            
+            var xImageAcc = xImage2;
             var tmpTheta = theta < 1.0f ? ((theta * theta) / (1.0f - theta)) : theta0;
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
-                    xImage2[i, j] = Math.Max(tmpTheta * xImageCorrection[i, j] + xImageExplore[i, j], 0.0f);
+                {
+                    xImageAcc[i, j] = Math.Max(-tmpTheta * xImageCorrection[i, j] + xImageExplore[i, j], 0);
+                    xImageCorrection[i, j] = -tmpTheta * xImageCorrection[i, j];
+                }
+                    
+            FitsIO.Write(xImageCorrection, "xCorrTheta.fits");
+
             var residualsExplore = bMapExplore;
             var residualsAcc = bMapCorrection;
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
                 {
                     residualsExplore[i, j] = (float)(xImageExplore[i, j] - xImage[i, j]);
-                    residualsAcc[i, j] = (float)(xImage2[i, j] - xImage[i, j]);
+                    residualsAcc[i, j] = (float)(xImageAcc[i, j] - xImage[i, j]);
                 }
             var residualsCalculator = new PaddedConvolver(CommonDeprecated.PSF.CalcPaddedFourierConvolution(psf, residuals.GetLength(0), residuals.GetLength(1)), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             residualsCalculator.ConvolveInPlace(residualsExplore);
@@ -271,17 +277,16 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             FitsIO.Write(xImage2, "xAccelerated.fits");
 
             var l2penaltyExplore = FastGreedyCD.CalcDataPenalty(residualsExplore);
+            var elasticPenaltyExplore = fastCD.CalcRegularizationPenalty(xImageExplore, (float)lambdaOriginal, (float)alpha);
             var l2PenaltyAcc = FastGreedyCD.CalcDataPenalty(residualsAcc);
-            var elasticPenaltyExplore = fastCD.CalcRegularizationPenalty(xImageExplore, (float)lambda, (float)alpha);
-            var elasticPenaltyAcc = fastCD.CalcRegularizationPenalty(xImage2, (float)lambda, (float)alpha);
+            var elasticPenaltyAcc = fastCD.CalcRegularizationPenalty(xImage2, (float)lambdaOriginal, (float)alpha);
 
-
-            if(l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore)
+            if (l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore)
             {
                 //use accelerated result
                 for (int i = 0; i < xImage.GetLength(0); i++)
                     for (int j = 0; j < xImage.GetLength(1); j++)
-                        xImage[i, j] = xImage2[i, j];
+                        xImage[i, j] = xImageAcc[i, j];
             }
             else
             {
@@ -290,11 +295,10 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     for (int j = 0; j < xImage.GetLength(1); j++)
                         xImage[i, j] = xImageExplore[i, j];
             }
-            //use non-accelerated result
-            for (int i = 0; i < xImage.GetLength(0); i++)
-                for (int j = 0; j < xImage.GetLength(1); j++)
-                    xImage[i, j] = xImage2[i, j];
 
+            var accelerated = l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore;
+            writer.WriteLine(accelerated + ";" + (l2penaltyExplore + elasticPenaltyExplore)  + ";" + (l2PenaltyAcc + elasticPenaltyAcc) +  ";\t" +l2penaltyExplore + ";" + elasticPenaltyExplore + ";\t" + l2PenaltyAcc + ";" + elasticPenaltyAcc);
+            writer.Flush();
             return false;
         }
 
