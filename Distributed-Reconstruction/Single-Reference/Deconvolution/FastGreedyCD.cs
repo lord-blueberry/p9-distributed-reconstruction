@@ -21,6 +21,7 @@ namespace Single_Reference.Deconvolution
         readonly Rectangle patch;
         float[,] psf2;
         float[,] aMap;
+        public float MaxLipschitz { get; private set; }
 
         public FastGreedyCD(Rectangle imageSize, float[,] psf) :
             this(imageSize, imageSize, psf, PSF.CalcPSFSquared(psf))
@@ -42,6 +43,7 @@ namespace Single_Reference.Deconvolution
             var psf2Local = PSF.CalcPSFSquared(psf);
             var maxFull = Residuals.GetMax(psf2Local);
             var maxCut = Residuals.GetMax(psf2);
+            MaxLipschitz = maxFull;
 
             for (int i = 0; i < psf2.GetLength(0); i++)
                 for (int j = 0; j < psf2.GetLength(1); j++)
@@ -132,10 +134,9 @@ namespace Single_Reference.Deconvolution
                     var xLocal = x;
                     var currentA = aMap[yLocal, xLocal];
                     var old = xImage[yLocal, xLocal];
-                    var xTmp = old  + bMap[y, x] / currentA;
-                    xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
-                    //var xTmp = old* currentA + bMap[y, x];
-                    //xTmp = ShrinkElasticNetGradient(xTmp, currentA, lambda, alpha);
+                    //var xTmp = old + bMap[y, x] / currentA;
+                    //xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                    var xTmp = ElasticNetProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
                     var xDiff = old - xTmp;
 
                     if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
@@ -170,8 +171,9 @@ namespace Single_Reference.Deconvolution
                     var xLocal = x;
                     var currentA = aMap[yLocal, xLocal];
                     var old = xImage[yLocal, xLocal];
-                    var xTmp = old + bMap[y, x] / currentA;
-                    xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                    //var xTmp = old + bMap[y, x] / currentA;
+                    //xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                    var xTmp = ElasticNetProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
                     var xDiff = old - xTmp;
 
                     if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
@@ -240,6 +242,27 @@ namespace Single_Reference.Deconvolution
             return output;
         }
 
+        public static double CalcDataPenalty2(float[,] residuals)
+        {
+            double output = 0;
+            for (int i = 0; i < residuals.GetLength(0); i++)
+                for (int j = 0; j < residuals.GetLength(1); j++)
+                    output += residuals[i, j] * residuals[i, j];
+            return 0.5 * output;
+        }
+
+        public static double CalcRegularizationPenalty2(float[,] xImage, float lambda, float alpha)
+        {
+            double output = 0;
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                {
+                    output += lambda * ElasticNetPenalty(xImage[i, j], alpha);
+                }
+
+            return output;
+        }
+
         public double CalcRegularizationPenalty(float[,] xImage, float lambda, float alpha)
         {
             double output = 0;
@@ -247,8 +270,6 @@ namespace Single_Reference.Deconvolution
                 for (int j = 0; j < xImage.GetLength(1); j++)
                 {
                     output += ElasticNetPenalty(xImage[i, j], alpha) * lambda * 2 * aMap[i, j];
-                    if (i == 110 & j == 128)
-                        Console.WriteLine();
                 }
 
             return output;

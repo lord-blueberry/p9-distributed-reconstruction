@@ -12,10 +12,11 @@ namespace Single_Reference
             
             //Deconvolution.ToyImplementations.RandomBlockCD2.RunToy();
             //DebugMethods.DebugSimulatedGreedy2();
-            DebugMethods.DebugSimulatedPCDM();
+            //DebugMethods.DebugSimulatedPCDM();
             
-            //DebugMethods.DebugILGPU();
+            DebugMethods.DebugILGPU();
 
+            Console.WriteLine("hello");
             //DebugMethods.DebugSimulatedMixed();
             //Deconvolution.NaiveGreedyCD.Run();
             //DebugMethods.DebugSimulatedWStack();

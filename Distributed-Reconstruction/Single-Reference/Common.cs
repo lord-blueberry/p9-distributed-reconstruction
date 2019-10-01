@@ -11,7 +11,9 @@ namespace Single_Reference
         public static double ShrinkElasticNet(double value, double lambda, double alpha) => Math.Max(value - lambda * alpha, 0.0) / (1 + lambda * (1 - alpha));
         public static float ShrinkElasticNet(float value, float lambda, float alpha) => Math.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
-        public static float ShrinkElasticNetGradient(float gradient, float lipschitz, float lambda, float alpha) => Math.Max(gradient - lambda * alpha, 0.0f) / (lipschitz + (1 + lambda * (1.0f - alpha)));
+        public static float ElasticNetProximalOperator(float x, float lipschitz, float lambda, float alpha) => 
+            Math.Max(x - (lambda * alpha), 0f) / (lipschitz + lambda * (1f - alpha));
+
         public static float ElasticNetPenalty(float value, float alpha) => 1.0f / 2.0f * (1 - alpha) * (value * value) + alpha * Math.Abs(value);
 
 

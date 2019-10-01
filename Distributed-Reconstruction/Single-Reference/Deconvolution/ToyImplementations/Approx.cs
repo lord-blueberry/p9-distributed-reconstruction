@@ -131,9 +131,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return false;
         }
 
-        public static bool DeconvolveRandom2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, StreamWriter writer, int maxIteration = 100, double epsilon = 1e-4)
+        public static bool DeconvolveRandom2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, StreamWriter writer, FastGreedyCD fastCD, int maxIteration = 100, double epsilon = 1e-4)
         {
-            var fastCD = new FastGreedyCD(new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1)), ToFloatImage(psf));
             var lambdaOriginal = lambda;
             var xImage2 = ToFloatImage(xImage);
             var xImageExplore = new float[xImage.GetLength(0), xImage.GetLength(1)];
@@ -174,6 +173,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
             var testRestart = 0.0;
             var iter = 0;
+            var test = 0.0;
             while (iter < maxIteration)
             {
                 bool containsNonZero = false;
@@ -187,13 +187,16 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     var xC = RandomBlockCD2.CopyFrom(xImageCorrection, yBlock, xBlock, yBlockSize, xBlockSize);
                     var bE = RandomBlockCD2.CopyFrom(bMapExplore, yBlock, xBlock, yBlockSize, xBlockSize);
                     var bC = RandomBlockCD2.CopyFrom(bMapCorrection, yBlock, xBlock, yBlockSize, xBlockSize);
+                    test = theta / theta0;
                     var stepSize = lipschitz * theta / theta0;
-
+                    // real:  var xNew = theta * theta * bC / stepSize + bE / stepSize + xE;
+                    //var xNew = theta * theta * bC / stepSize + bE / stepSize + (xE + xC * theta * theta);
                     var xNew = theta * theta * bC / stepSize + bE / stepSize + xE;
 
                     //shrink
                     for (int j = 0; j < xNew.Count; j++)
                     {
+                        //THIS IS WRONG: TODO: Actual proximal operator that does not cheekily decrease lambda with each iteration. As theta goes to zero, so does lambda
                         xNew[j] = Common.ShrinkElasticNet(xNew[j], lambda, alpha);
                         containsNonZero |= (xNew[j] - xE[j]) != 0.0;
                     }
@@ -246,8 +249,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
                 {
-                    xImageAcc[i, j] = Math.Max(-tmpTheta * xImageCorrection[i, j] + xImageExplore[i, j], 0);
-                    xImageCorrection[i, j] = -tmpTheta * xImageCorrection[i, j];
+                    xImageAcc[i, j] = Math.Max(tmpTheta * xImageCorrection[i, j] + xImageExplore[i, j], 0);
+                    xImageCorrection[i, j] = tmpTheta * xImageCorrection[i, j];
                 }
                     
             FitsIO.Write(xImageCorrection, "xCorrTheta.fits");
@@ -281,6 +284,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var l2PenaltyAcc = FastGreedyCD.CalcDataPenalty(residualsAcc);
             var elasticPenaltyAcc = fastCD.CalcRegularizationPenalty(xImage2, (float)lambdaOriginal, (float)alpha);
 
+            //if (l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore)
             if (l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore)
             {
                 //use accelerated result

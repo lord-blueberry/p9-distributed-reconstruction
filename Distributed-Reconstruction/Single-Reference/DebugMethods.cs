@@ -187,85 +187,6 @@ namespace Single_Reference
             File.WriteAllText("watches_single.txt", timetable);
         }
 
-        public static void DebugSimulatedGreedy2()
-        {
-            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
-            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
-            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
-            double norm = 2.0;
-            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
-
-            var visibilitiesCount = visibilities.Length;
-            int gridSize = 256;
-            int subgridsize = 8;
-            int kernelSize = 4;
-            int max_nr_timesteps = 1024;
-            double cellSize = 1.0 / 3600.0 * PI / 180.0;
-            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
-
-            var watchTotal = new Stopwatch();
-            var watchForward = new Stopwatch();
-            var watchBackwards = new Stopwatch();
-            var watchDeconv = new Stopwatch();
-
-            watchTotal.Start();
-            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-
-            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf = FFT.Backward(psfGrid, c.VisibilitiesCount);
-            FFT.Shift(psf);
-            
-            var psfCut = CutImg(psf);
-            FitsIO.Write(psf, "psf.fits");
-            FitsIO.Write(psfCut, "psfCut.fits");
-
-            var xImage = new double[gridSize, gridSize];
-            var residualVis = visibilities;
-            /*var truth = new double[gridSize, gridSize];
-            truth[30, 30] = 1.0;
-            truth[35, 36] = 1.5;
-            var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
-            visibilities = truthVis;
-            var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 5; cycle++)
-            {
-                //FORWARD
-                watchForward.Start();
-                var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
-                var dirtyImage = FFT.Backward(dirtyGrid, c.VisibilitiesCount);
-                FFT.Shift(dirtyImage);
-                FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
-                watchForward.Stop();
-
-                //DECONVOLVE
-                watchDeconv.Start();
-
-                var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
-                var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                var converged = GreedyCDReference.Deconvolve(xImage, b, psfCut, 0.5, 0.8, 1000);
-
-                if (converged)
-                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
-                else
-                    Console.WriteLine("-------------------------------not converged----------------------");
-                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
-                FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
-                watchDeconv.Stop();
-
-                //BACKWARDS
-                watchBackwards.Start();
-                FFT.Shift(xImage);
-                var xGrid = FFT.Forward(xImage);
-                FFT.Shift(xImage);
-                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
-                residualVis = IDG.Substract(visibilities, modelVis, flags);
-                watchBackwards.Stop();
-
-                var imgRec = IDG.ToImage(c, metadata, modelVis, uvw, frequencies);
-                FitsIO.Write(imgRec, "modelDirty" + cycle + ".fits");
-            }
-        }
-
         public static void DebugSimulatedPCDM()
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
@@ -308,10 +229,11 @@ namespace Single_Reference
             var residualVis = visibilities;
             var random = new Random(123);
             var fastCD = new FastGreedyCD(new Rectangle(0, 0, gridSize, gridSize), ToFloatImage(psfCut));
+            fastCD.ResetAMap(ToFloatImage(psf));
             var lambda = 0.5;
             var alpha = 0.8;
             var writer = new StreamWriter("ApproxInfo.txt", false);
-            var writer2 = new StreamWriter("TrueConvergenceInfo.txt", false);
+            var writer2 = new StreamWriter("TrueConvergenceInfoApprox.txt", false);
             /*
             var truth = new double[gridSize, gridSize];
             truth[64, 64] = 1.0;
@@ -341,8 +263,8 @@ namespace Single_Reference
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
                 //var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(2*2), 1.0, random, 100000);
                 //var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 1, 500);
-                //var converged = PCDM.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 4, 2000);
-                var converged = Approx.DeconvolveRandom2(xImage, dirtyImage, psfCut, lambda, alpha, random, 8, writer, 50000);
+                //var converged = PCDM.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 4, 2000, 1e-6);
+                var converged = Approx.DeconvolveRandom2(xImage, dirtyImage, psfCut, lambda, alpha, random, 64, writer, fastCD, 5000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
@@ -369,7 +291,7 @@ namespace Single_Reference
             var dirtyCheck = FFT.Backward(dirtyGridCheck, c.VisibilitiesCount);
             FFT.Shift(dirtyCheck);
             FitsIO.Write(dirtyCheck, "dirty_Last.fits");
-            fastCD.ResetAMap(ToFloatImage(psf));
+            
             var l2Penalty = FastGreedyCD.CalcDataPenalty(ToFloatImage(dirtyCheck));
             var elasticPenalty = fastCD.CalcRegularizationPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
             var sum = l2Penalty + elasticPenalty;
@@ -415,6 +337,7 @@ namespace Single_Reference
             var imageSection = new Rectangle(0, 128, gridSize, gridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize) , new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
+            fastCD.ResetAMap(ToFloatImage(psf));
             var gpuCD = new GPUGreedyCD(totalSize, psfCut, 50);
 
             var xImage = new float[gridSize, gridSize];
@@ -426,7 +349,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 1; cycle++)
+            for (int cycle = 0; cycle < 7; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -439,13 +362,14 @@ namespace Single_Reference
                 //DECONVOLVE
                 watchDeconv.Start();
                 bMapCalculator.ConvolveInPlace(dirtyImage);
-                var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f, 0.8f, 100, 1e-4f);
+                FitsIO.Write(dirtyImage, "bMap_" + cycle + ".fits");
+                var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f*fastCD.MaxLipschitz, 0.8f, 1000, 1e-4f);
 
                 if (result.Converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");
-                FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
+                FitsIO.Write(xImage, "xImageILGPU_" + cycle + ".fits");
                 FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
                 watchDeconv.Stop();
 
