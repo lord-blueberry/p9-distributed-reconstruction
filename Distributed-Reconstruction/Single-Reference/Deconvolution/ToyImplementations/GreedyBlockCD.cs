@@ -53,7 +53,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 bool containsNonZero = false;
                 for (int i = 0; i < optimized.Count; i++)
                 {
-                    optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);
+                    optimized[i] = CommonDeprecated.ShrinkElasticNet(optimized[i], lambda, alpha);
                     containsNonZero |= (optimized[i] - xOld[i]) != 0.0;
                 }
 
@@ -170,7 +170,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                         for(int x = xIdx; x < xIdx + xBlockSize; x++)
                         {
                             var opt = bMap[y, x] / lipschitz;
-                            var shrink = ShrinkElasticNet(xImage[y, x] + opt, lambda, alpha);
+                            var shrink = CommonDeprecated.ShrinkElasticNet(xImage[y, x] + opt, lambda, alpha);
                             sum += Math.Abs(shrink - xImage[y, x]);
                         }
                     if(maxSum < sum)

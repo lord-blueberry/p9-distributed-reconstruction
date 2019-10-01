@@ -51,7 +51,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 bool containsNonZero = false;
                 for (int i = 0; i < optimized.Count; i++)
                 {
-                    optimized[i] = Common.ShrinkElasticNet(optimized[i], lambda, alpha);
+                    optimized[i] = CommonDeprecated.ShrinkElasticNet(optimized[i], lambda, alpha);
                     containsNonZero  |=  (optimized[i] - xOld[i]) != 0.0;
                 }
 

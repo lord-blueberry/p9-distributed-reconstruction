@@ -91,7 +91,7 @@ namespace Single_Reference.Deconvolution
                         var currentA = aMap[y, x];
                         var old = xImage[yLocal, xLocal];
                         var xTmp = old + b[y, x] / currentA;
-                        xTmp = Common.ShrinkElasticNet(xTmp, lambda, alpha);
+                        xTmp = CommonDeprecated.ShrinkElasticNet(xTmp, lambda, alpha);
                         var xDiff = old - xTmp;
 
                         if (Math.Abs(xDiff) > xMax)

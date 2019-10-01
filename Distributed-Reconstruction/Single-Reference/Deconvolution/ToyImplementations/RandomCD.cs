@@ -65,7 +65,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     var xDiffPixel = bMap[yPixel, xPixel] / (aMap[yPixel, xPixel]);
 
                     var old = xImage[yPixel, xPixel];
-                    var xDiffShrink = Common.ShrinkElasticNet(old + xDiffPixel, lambda, alpha);
+                    var xDiffShrink = CommonDeprecated.ShrinkElasticNet(old + xDiffPixel, lambda, alpha);
                     xDiff[yPixel, xPixel] = xDiffShrink;
                     pixelAcces[yPixel, xPixel] += 1;
                 }

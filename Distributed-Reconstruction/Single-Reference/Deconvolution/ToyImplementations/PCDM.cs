@@ -60,7 +60,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     //shrink
                     for (int j = 0; j < optimized.Count; j++)
                     {
-                        optimized[j] = Common.ShrinkElasticNet(optimized[j], lambda, alpha);
+                        optimized[j] = CommonDeprecated.ShrinkElasticNet(optimized[j], lambda, alpha);
                         containsNonZero |= (optimized[j] - xOld[j]) != 0.0;
                     }
 
@@ -171,7 +171,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     //shrink
                     for (int j = 0; j < optimized.Count; j++)
                     {
-                        optimized[j] = Common.ShrinkElasticNet(optimized[j], lambda, alpha);
+                        optimized[j] = CommonDeprecated.ShrinkElasticNet(optimized[j], lambda, alpha);
                         containsNonZero |= (optimized[j] - xOld[j]) != 0.0;
                     }
 
@@ -252,7 +252,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                         for (int x = xIdx; x < xIdx + xBlockSize; x++)
                         {
                             var opt = bMap[y, x] / lipschitz;
-                            var shrink = ShrinkElasticNet(xImage[y, x] + opt, lambda, alpha);
+                            var shrink = CommonDeprecated.ShrinkElasticNet(xImage[y, x] + opt, lambda, alpha);
                             sum += Math.Abs(shrink - xImage[y, x]);
                         }
                     tmp.Add(new Tuple<int, int, double>(i, j, sum));

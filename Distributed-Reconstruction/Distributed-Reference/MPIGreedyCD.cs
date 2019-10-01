@@ -98,8 +98,9 @@ namespace Distributed_Reference
                 {
                     var currentA = aMap[y, x];
                     var old = xImage[y, x];
-                    var xTmp = old + bMap[y, x] / currentA;
-                    xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                    //var xTmp = old + bMap[y, x] / currentA;
+                    //xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                    var xTmp = ElasticNet.ProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
                     var xDiff = xTmp - old;
 
                     if (currentMax.MaxDiff < Math.Abs(xDiff))
