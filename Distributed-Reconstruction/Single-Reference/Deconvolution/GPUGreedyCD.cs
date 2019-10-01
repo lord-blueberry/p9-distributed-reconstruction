@@ -17,7 +17,7 @@ namespace Single_Reference.Deconvolution
 {
     public class GPUGreedyCD : Deconvolution.IDeconvolver, IDisposable
     {
-        private static float GPUShrinkElasticNet(float value, float lambda, float alpha) => XMath.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
+        private static float GPUProximalOperator(float x, float lipschitz, float lambda, float alpha) => XMath.Max(x - lambda * alpha, 0.0f) / (lipschitz + lambda * (1 - alpha));
 
         #region GPU operations and GPU allocated data 
         private MemoryBuffer2D<float> xImageGPU;
@@ -301,11 +301,12 @@ namespace Single_Reference.Deconvolution
             if (index.InBounds(xImage.Extent))
             {
                 var xOld = xImage[index];
-                var xCandidate = bMap[index] / aMap[index];
+                var gradient = bMap[index];
+                var lipschitz = aMap[index];
                 var lambda = lambdaAlpha[0];
                 var alpha = lambdaAlpha[1];
 
-                var xNew = GPUShrinkElasticNet(xOld + xCandidate, lambda, alpha);
+                var xNew = GPUProximalOperator(xOld * lipschitz + gradient, lipschitz, lambda, alpha);
                 var xAbsDiff = XMath.Abs(xNew - xOld);
                 var xIndex = index.X;
                 var yIndex = index.Y;
