@@ -6,14 +6,13 @@ namespace Single_Reference
     {
         static void Main()
         {
-            //Experiments.PSFSize.Run();
-
+            Experiments.PSFSize.Run();
             //Experiments.PSFSize.DebugConvergence();
             
             //Deconvolution.ToyImplementations.RandomBlockCD2.RunToy();
             //DebugMethods.DebugSimulatedGreedy2();
-            DebugMethods.DebugSimulatedPCDM();
-            
+
+            //DebugMethods.DebugSimulatedPCDM();
             //DebugMethods.DebugILGPU();
 
             //DebugMethods.DebugSimulatedMixed();

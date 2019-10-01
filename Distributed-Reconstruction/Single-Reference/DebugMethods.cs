@@ -230,7 +230,7 @@ namespace Single_Reference
             var random = new Random(123);
             var fastCD = new FastGreedyCD(new Rectangle(0, 0, gridSize, gridSize), ToFloatImage(psfCut));
             fastCD.ResetAMap(ToFloatImage(psf));
-            var lambda = 0.5;
+            var lambda = 0.5 * fastCD.MaxLipschitz;
             var alpha = 0.8;
             var writer = new StreamWriter("ApproxInfo.txt", false);
             var writer2 = new StreamWriter("TrueConvergenceInfoApprox.txt", false);
@@ -241,7 +241,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 10; cycle++)
+            for (int cycle = 0; cycle < 14; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -251,8 +251,8 @@ namespace Single_Reference
                 FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
                 watchForward.Stop();
 
-                var l2Penalty0 = FastGreedyCD.CalcDataPenalty(ToFloatImage(dirtyImage));
-                var elasticPenalty0 = fastCD.CalcRegularizationPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
+                var l2Penalty0 = Residuals.CalculatePenalty(ToFloatImage(dirtyImage));
+                var elasticPenalty0 = ElasticNet.CalculatePenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
                 var sum0 = l2Penalty0 + elasticPenalty0;
                 writer2.WriteLine(cycle + ";" + l2Penalty0 + ";" + elasticPenalty0 + ";" + sum0);
                 writer2.Flush();
@@ -261,10 +261,8 @@ namespace Single_Reference
                 
                 var PsfCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psfCut, c.GridSize, c.GridSize);
                 var b = CommonDeprecated.Residuals.CalculateBMap(dirtyImage, PsfCorrelation, psfCut.GetLength(0), psfCut.GetLength(1));
-                //var converged = RandomBlockCD2.Deconvolve2(xImage, dirtyImage, psfCut, 0.5/(2*2), 1.0, random, 100000);
-                //var converged = GreedyBlockCD.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 1, 500);
-                //var converged = PCDM.Deconvolve2(xImage, dirtyImage, psfCut, 0.5, 0.8, 4, 2000, 1e-6);
-                var converged = Approx.DeconvolveRandom2(xImage, dirtyImage, psfCut, lambda, alpha, random, 64, writer, fastCD, 5000);
+                
+                var converged = Approx.DeconvolveRandom2(xImage, dirtyImage, psfCut, lambda, alpha, random, 16, writer, 10000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
@@ -291,9 +289,9 @@ namespace Single_Reference
             var dirtyCheck = FFT.Backward(dirtyGridCheck, c.VisibilitiesCount);
             FFT.Shift(dirtyCheck);
             FitsIO.Write(dirtyCheck, "dirty_Last.fits");
-            
-            var l2Penalty = FastGreedyCD.CalcDataPenalty(ToFloatImage(dirtyCheck));
-            var elasticPenalty = fastCD.CalcRegularizationPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
+
+            var l2Penalty = Residuals.CalculatePenalty(ToFloatImage(dirtyCheck));
+            var elasticPenalty = ElasticNet.CalculatePenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
             var sum = l2Penalty + elasticPenalty;
             writer2.WriteLine(l2Penalty + ";" + elasticPenalty + ";" + sum);
             writer.Close();

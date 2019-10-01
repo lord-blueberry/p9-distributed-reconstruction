@@ -16,7 +16,7 @@ namespace Single_Reference
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static float ProximalOperator(float x, float lipschitz, float lambda, float alpha) =>
-            Math.Max(x - (lambda * alpha), 0f) / (lipschitz + lambda * (1f - alpha));
+                Math.Max(x - (lambda * alpha), 0f) / (lipschitz + lambda * (1f - alpha));
 
             public static double CalculatePenalty(float[,] image, float lambda, float alpha)
             {

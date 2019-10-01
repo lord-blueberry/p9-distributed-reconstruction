@@ -37,8 +37,8 @@ namespace Distributed_Reference
             PaddedConvolver bMapCalculator = null;
             if (comm.Rank == 0)
             {
-                var PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psfCut, totalSize);
-                bMapCalculator = new PaddedConvolver(PsfCorrelation, new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
+                var PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psf, totalSize);
+                bMapCalculator = new PaddedConvolver(PsfCorrelation, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             }
 
             var subPatchDeconv = SplitIntoSubpatches(patchSize);

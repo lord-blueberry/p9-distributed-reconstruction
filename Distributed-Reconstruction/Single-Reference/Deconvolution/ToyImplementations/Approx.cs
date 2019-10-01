@@ -8,130 +8,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 {
     class Approx
     {
-        public static bool DeconvolveRandom(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, int maxIteration = 100, double epsilon = 1e-4)
-        {
-            
-            var xImage2 = ToFloatImage(xImage);
-            var uImage = new float[xImage.GetLength(0), xImage.GetLength(1)];
-            var gradientUpdate = new float[xImage.GetLength(0), xImage.GetLength(1)];
-
-            var PSFConvolution = CommonDeprecated.PSF.CalcPaddedFourierConvolution(psf, residuals.GetLength(0), residuals.GetLength(1));
-            var PSFCorrelation = CommonDeprecated.PSF.CalculateFourierCorrelation(psf, residuals.GetLength(0), residuals.GetLength(1));
-            var PSFSquared = Fourier2D.Multiply(PSFConvolution, PSFCorrelation);
-            var bMapCalculator = new PaddedConvolver(PSFCorrelation, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
-            var resUpdateCalculator = new PaddedConvolver(PSFConvolution, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
-            var bMapUpdateCalculator = new PaddedConvolver(PSFSquared, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
-
-            var yBlockSize = blockSize;
-            var xBlockSize = blockSize;
-
-            var bMap = ToFloatImage(residuals);
-            bMapCalculator.ConvolveInPlace(bMap);
-
-            
-            var startL2 = NaiveGreedyCD.CalcDataObjective(residuals);
-
-            var tau = 1; //theta, also number of processors.
-            var degreeOfSep = RandomCD.CountNonZero(psf);
-            var blockCount = xImage.Length / (yBlockSize * xBlockSize);
-            var beta = 1.0 + (degreeOfSep - 1.0) * (tau - 1.0) / (Math.Max(1.0, (blockCount - 1))); //arises from E.S.O of theta-nice sampling. Look at the original PCDM Paper for the explanation
-            //Theta-nice sampling: take theta number of random pixels 
-
-            var lipschitz = RandomBlockCD2.ApproximateLipschitz(psf, yBlockSize, xBlockSize);
-            lipschitz *= beta;
-            lambda = lambda / (yBlockSize * xBlockSize * beta);
-
-            var omega = tau / (float)blockCount;
-
-            var iter = 0;
-            while (iter < maxIteration)
-            {
-                bool containsNonZero = false;
-                var blockSamples = RandomCD.CreateSamples(blockCount, tau, random);
-                for (int i = 0; i < blockSamples.Length; i++)
-                {
-                    var yBlock = blockSamples[i] / (xImage.GetLength(1) / xBlockSize);
-                    var xBlock = blockSamples[i] % (xImage.GetLength(1) / xBlockSize);
-
-                    var block = RandomBlockCD2.CopyFrom(bMap, yBlock, xBlock, yBlockSize, xBlockSize);
-
-                    var update = block / (lipschitz * omega * blockCount/(double)(tau));
-
-                    var xOld = RandomBlockCD2.CopyFrom(xImage2, yBlock, xBlock, yBlockSize, xBlockSize);
-                    var xNew = xOld + update;
-
-                    //shrink
-                    for (int j = 0; j < xNew.Count; j++)
-                    {
-                        xNew[j] = CommonDeprecated.ShrinkElasticNet(xNew[j], lambda, alpha);
-                        containsNonZero |= (xNew[j] - xOld[j]) != 0.0;
-                    }
-
-                    var xUpdate = xNew - xOld;
-                    RandomBlockCD2.AddInto(xImage2, xUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
-
-                    var uUpdate = -(1.0 - blockCount / tau * omega) / (omega * omega) * xUpdate;
-                    RandomBlockCD2.AddInto(uImage, uUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
-                    
-                    RandomBlockCD2.AddInto(gradientUpdate, xUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
-                    RandomBlockCD2.AddInto(gradientUpdate, omega*omega*uUpdate, yBlock, xBlock, yBlockSize, xBlockSize);
-                }
-                omega = (float)(Math.Sqrt((omega * omega * omega * omega) + 4 * (omega * omega)) - omega * omega) / 2.0f;
-
-
-                if (containsNonZero)
-                {
-                    //FitsIO.Write(xImage2, "xImageBlock.fits");
-                    //FitsIO.Write(xDiff, "xDiff.fits");
-
-                    //update b-map
-                    bMapUpdateCalculator.ConvolveInPlace(gradientUpdate);
-                    //FitsIO.Write(xDiff, "bMapUpdate.fits");
-                    for (int i = 0; i < gradientUpdate.GetLength(0); i++)
-                        for (int j = 0; j < gradientUpdate.GetLength(1); j++)
-                        {
-                            bMap[i, j] -= gradientUpdate[i, j];
-                            gradientUpdate[i, j] = 0;
-                        }
-                }
-                iter++;
-            }
-
-            var elasticNet = 0.0;
-            for (int i = 0; i < xImage.GetLength(0); i++)
-                for (int j = 0; j < xImage.GetLength(1); j++)
-                {
-                    gradientUpdate[i, j] = xImage2[i, j] - (float)xImage[i, j];
-                    xImage[i, j] = xImage2[i, j];
-
-                    elasticNet += lambda * 2 * lipschitz * GreedyBlockCD.ElasticNetPenalty(xImage2[i, j], (float)alpha);
-                }
-
-
-            resUpdateCalculator.ConvolveInPlace(gradientUpdate);
-            //FitsIO.Write(xDiff, "residualsUpdate.fits");
-            for (int i = 0; i < gradientUpdate.GetLength(0); i++)
-                for (int j = 0; j < gradientUpdate.GetLength(1); j++)
-                {
-                    residuals[i, j] -= gradientUpdate[i, j];
-                    gradientUpdate[i, j] = 0;
-                }
-            var l2Penalty = NaiveGreedyCD.CalcDataObjective(residuals);
-            Console.WriteLine("-------------------------");
-            Console.WriteLine((l2Penalty + elasticNet));
-            var io = System.IO.File.AppendText("penalty" + yBlockSize + ".txt");
-            io.WriteLine("l2: " + l2Penalty + "\telastic: " + elasticNet + "\t " + (l2Penalty + elasticNet));
-            io.Close();
-            Console.WriteLine("-------------------------");
-
-
-            for (int i = 0; i < xImage.GetLength(0); i++)
-                for (int j = 0; j < xImage.GetLength(1); j++)
-                    xImage[i, j] = (omega*omega)*uImage[i, j] + xImage2[i, j];
-            return false;
-        }
-
-        public static bool DeconvolveRandom2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, StreamWriter writer, FastGreedyCD fastCD, int maxIteration = 100, double epsilon = 1e-4)
+        public static bool DeconvolveRandom2(double[,] xImage, double[,] residuals, double[,] psf, double lambda, double alpha, Random random, int blockSize, StreamWriter writer, int maxIteration = 100, double epsilon = 1e-4)
         {
             var lambdaOriginal = lambda;
             var xImage2 = ToFloatImage(xImage);
@@ -166,14 +43,11 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
             var lipschitz = RandomBlockCD2.ApproximateLipschitz(psf, yBlockSize, xBlockSize);
             lipschitz *= beta;
-            lambda = lambda / (yBlockSize * xBlockSize * beta);
-
             var theta = tau / (float)blockCount;
             var theta0 = theta;
 
             var testRestart = 0.0;
             var iter = 0;
-            var test = 0.0;
             while (iter < maxIteration)
             {
                 bool containsNonZero = false;
@@ -187,17 +61,15 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     var xC = RandomBlockCD2.CopyFrom(xImageCorrection, yBlock, xBlock, yBlockSize, xBlockSize);
                     var bE = RandomBlockCD2.CopyFrom(bMapExplore, yBlock, xBlock, yBlockSize, xBlockSize);
                     var bC = RandomBlockCD2.CopyFrom(bMapCorrection, yBlock, xBlock, yBlockSize, xBlockSize);
-                    test = theta / theta0;
+
                     var stepSize = lipschitz * theta / theta0;
-                    // real:  var xNew = theta * theta * bC / stepSize + bE / stepSize + xE;
-                    //var xNew = theta * theta * bC / stepSize + bE / stepSize + (xE + xC * theta * theta);
-                    var xNew = theta * theta * bC / stepSize + bE / stepSize + xE;
+                    var xNew = theta * theta * bC + bE + xE * stepSize;
 
                     //shrink
                     for (int j = 0; j < xNew.Count; j++)
                     {
                         //THIS IS WRONG: TODO: Actual proximal operator that does not cheekily decrease lambda with each iteration. As theta goes to zero, so does lambda
-                        xNew[j] = CommonDeprecated.ShrinkElasticNet(xNew[j], lambda, alpha);
+                        xNew[j] = ElasticNet.ProximalOperator((float)xNew[j], (float)stepSize, (float)lambda, (float)alpha);
                         containsNonZero |= (xNew[j] - xE[j]) != 0.0;
                     }
                     var xEUpdate = xNew - xE;
@@ -279,10 +151,10 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             FitsIO.Write(residualsAcc, "residualsAcc.fits");
             FitsIO.Write(xImage2, "xAccelerated.fits");
 
-            var l2penaltyExplore = FastGreedyCD.CalcDataPenalty(residualsExplore);
-            var elasticPenaltyExplore = fastCD.CalcRegularizationPenalty(xImageExplore, (float)lambdaOriginal, (float)alpha);
-            var l2PenaltyAcc = FastGreedyCD.CalcDataPenalty(residualsAcc);
-            var elasticPenaltyAcc = fastCD.CalcRegularizationPenalty(xImage2, (float)lambdaOriginal, (float)alpha);
+            var l2penaltyExplore = Residuals.CalculatePenalty(residualsExplore);
+            var elasticPenaltyExplore = ElasticNet.CalculatePenalty(xImageExplore, (float)lambdaOriginal, (float)alpha);
+            var l2PenaltyAcc = Residuals.CalculatePenalty(residualsAcc);
+            var elasticPenaltyAcc = ElasticNet.CalculatePenalty(xImage2, (float)lambdaOriginal, (float)alpha);
 
             //if (l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore)
             if (l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore)
