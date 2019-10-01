@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Single_Reference.IDGSequential;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace Single_Reference
 {
@@ -11,11 +12,28 @@ namespace Single_Reference
         public static double ShrinkElasticNet(double value, double lambda, double alpha) => Math.Max(value - lambda * alpha, 0.0) / (1 + lambda * (1 - alpha));
         public static float ShrinkElasticNet(float value, float lambda, float alpha) => Math.Max(value - lambda * alpha, 0.0f) / (1 + lambda * (1 - alpha));
 
-        public static float ElasticNetProximalOperator(float x, float lipschitz, float lambda, float alpha) => 
-            Math.Max(x - (lambda * alpha), 0f) / (lipschitz + lambda * (1f - alpha));
+        
 
         public static float ElasticNetPenalty(float value, float alpha) => 1.0f / 2.0f * (1 - alpha) * (value * value) + alpha * Math.Abs(value);
 
+        public static class ElasticNet
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static float ProximalOperator(float x, float lipschitz, float lambda, float alpha) =>
+            Math.Max(x - (lambda * alpha), 0f) / (lipschitz + lambda * (1f - alpha));
+
+            public static double CalculatePenalty(float[,] image, float lambda, float alpha)
+            {
+                double output = 0;
+                for (int i = 0; i < image.GetLength(0); i++)
+                    for (int j = 0; j < image.GetLength(1); j++)
+                    {
+                        output += lambda * ElasticNetPenalty(image[i, j], alpha);
+                    }
+
+                return output;
+            }
+        }
 
         public static class PSF
         {
@@ -217,6 +235,15 @@ namespace Single_Reference
                     for (int x = 0; x < image.GetLength(1); x++)
                         max = Math.Max(max, image[y, x]);
                 return max;
+            }
+
+            public static double CalculatePenalty(float[,] residuals)
+            {
+                double output = 0;
+                for (int i = 0; i < residuals.GetLength(0); i++)
+                    for (int j = 0; j < residuals.GetLength(1); j++)
+                        output += residuals[i, j] * residuals[i, j];
+                return 0.5 * output;
             }
         }
 

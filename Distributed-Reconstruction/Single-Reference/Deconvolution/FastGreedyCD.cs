@@ -136,7 +136,7 @@ namespace Single_Reference.Deconvolution
                     var old = xImage[yLocal, xLocal];
                     //var xTmp = old + bMap[y, x] / currentA;
                     //xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
-                    var xTmp = ElasticNetProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
+                    var xTmp = ElasticNet.ProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
                     var xDiff = old - xTmp;
 
                     if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
@@ -173,7 +173,7 @@ namespace Single_Reference.Deconvolution
                     var old = xImage[yLocal, xLocal];
                     //var xTmp = old + bMap[y, x] / currentA;
                     //xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
-                    var xTmp = ElasticNetProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
+                    var xTmp = ElasticNet.ProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
                     var xDiff = old - xTmp;
 
                     if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
@@ -233,35 +233,7 @@ namespace Single_Reference.Deconvolution
             });
         }
 
-        public static double CalcDataPenalty(float[,] residuals)
-        {
-            double output = 0;
-            for (int i = 0; i < residuals.GetLength(0); i++)
-                for (int j = 0; j < residuals.GetLength(1); j++)
-                    output += residuals[i, j] * residuals[i, j];
-            return output;
-        }
-
-        public static double CalcDataPenalty2(float[,] residuals)
-        {
-            double output = 0;
-            for (int i = 0; i < residuals.GetLength(0); i++)
-                for (int j = 0; j < residuals.GetLength(1); j++)
-                    output += residuals[i, j] * residuals[i, j];
-            return 0.5 * output;
-        }
-
-        public static double CalcRegularizationPenalty2(float[,] xImage, float lambda, float alpha)
-        {
-            double output = 0;
-            for (int i = 0; i < xImage.GetLength(0); i++)
-                for (int j = 0; j < xImage.GetLength(1); j++)
-                {
-                    output += lambda * ElasticNetPenalty(xImage[i, j], alpha);
-                }
-
-            return output;
-        }
+        #region todelete
 
         public double CalcRegularizationPenalty(float[,] xImage, float lambda, float alpha)
         {
@@ -274,6 +246,17 @@ namespace Single_Reference.Deconvolution
 
             return output;
         }
+
+        public static double CalcDataPenalty(float[,] residuals)
+        {
+            double output = 0;
+            for (int i = 0; i < residuals.GetLength(0); i++)
+                for (int j = 0; j < residuals.GetLength(1); j++)
+                    output += residuals[i, j] * residuals[i, j];
+            return output;
+        }
+
+        #endregion
 
         private struct Pixel
         {

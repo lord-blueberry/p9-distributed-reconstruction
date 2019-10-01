@@ -55,9 +55,6 @@ namespace Single_Reference.Experiments
         private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon)
         {
             var info = new ReconstructionInfo();
-            var lambda = 0.4f;
-            var alpha = 0.1f;
-
             var psfCut = PSF.Cut(input.fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
@@ -65,6 +62,9 @@ namespace Single_Reference.Experiments
             var fastCD = new FastGreedyCD(totalSize, psfCut);
             fastCD.ResetAMap(input.fullPsf);
             FitsIO.Write(psfCut, cutFactor + "psf.fits");
+
+            var lambda = 0.4f * fastCD.MaxLipschitz;
+            var alpha = 0.1f;
 
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
@@ -78,10 +78,13 @@ namespace Single_Reference.Experiments
                 FitsIO.Write(dirtyImage, dirtyPrefix + cycle + ".fits");
 
                 //calc data and reg penalty
-                var dataPenalty = FastGreedyCD.CalcDataPenalty(dirtyImage);
-                var regPenalty = fastCD.CalcRegularizationPenalty(xImage, lambda, alpha);
+                var dataPenalty = Residuals.CalculatePenalty(dirtyImage);
+                var regPenalty = ElasticNet.CalculatePenalty(xImage, lambda, alpha);
                 info.lastDataPenalty = dataPenalty;
                 info.lastRegPenalty = regPenalty;
+
+                bMapCalculator.ConvolveInPlace(dirtyImage);
+                FitsIO.Write(dirtyImage, dirtyPrefix + "bmap_" + cycle + ".fits");
                 var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
@@ -93,14 +96,11 @@ namespace Single_Reference.Experiments
                 var minimumReached = (lastResult != null && lastResult.IterationCount < 20 && lastResult.Converged);
                 if (!objectiveReached & !minimumReached)
                 {
-                    bMapCalculator.ConvolveInPlace(dirtyImage);
-
                     info.totalDeconv.Start();
                     lastResult = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 10000, epsilon);
                     info.totalDeconv.Stop();
 
                     FitsIO.Write(xImage, xImagePrefix + cycle + ".fits");
-
                     writer.Write(lastResult.Converged + ";" + lastResult.IterationCount + ";" + lastResult.ElapsedTime.TotalSeconds + "\n");
                     writer.Flush();
 
@@ -118,27 +118,6 @@ namespace Single_Reference.Experiments
                 }
 
             }
-
-            /*
-            Console.WriteLine("final evaluation");
-            FFT.Shift(xImage);
-            var xGrid2 = FFT.Forward(xImage);
-            FFT.Shift(xImage);
-            var modelVis2 = IDG.DeGrid(input.c, input.metadata, xGrid2, input.uvw, input.frequencies);
-            residualVis = IDG.Substract(input.visibilities, modelVis2, input.flags);
-            var dirtyGrid2 = IDG.Grid(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
-            var dirtyImage2 = FFT.BackwardFloat(dirtyGrid2, input.c.VisibilitiesCount);
-            FFT.Shift(dirtyImage2);
-            var dataPenalty2 = FastGreedyCD.CalcDataPenalty(dirtyImage2);
-            var regPenalty2 = fastCD.CalcRegularizationPenalty(xImage, lambda, alpha);
-            var regPenaltyFull2 = input.fullCD.CalcRegularizationPenalty(xImage, lambda, alpha);
-            info.lastDataPenalty = dataPenalty2;
-            info.lastRegPenalty = regPenalty2;
-            info.lastRegPenaltyFull = regPenaltyFull2;
-            var currentSideLobe2 = Residuals.GetMax(dirtyImage2) * maxSidelobe;
-
-            writer.Write("9999;0;" + currentSideLobe2 + ";" + dataPenalty2 + ";" + regPenalty2 + ";" + regPenaltyFull2 + ";false;0;0");
-            writer.Flush();*/
 
             return info;
         }
