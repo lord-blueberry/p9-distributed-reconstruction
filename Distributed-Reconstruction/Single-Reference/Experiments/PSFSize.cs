@@ -52,7 +52,109 @@ namespace Single_Reference.Experiments
             }
         }
 
-        private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon, bool startWithFullPSF)
+        private static ReconstructionInfo ReconstructGradientApprox(InputData input, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon)
+        {
+            var info = new ReconstructionInfo();
+            var psfCut = PSF.Cut(input.fullPsf, cutFactor);
+            var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
+            var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
+            var psfBMap = psfCut;
+            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
+            var fastCD = new FastGreedyCD(totalSize, psfCut);
+            FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
+
+            var lambda = 0.4f * fastCD.MaxLipschitz;
+            var lambdaTrue = 0.4f * Common.PSF.CalcMaxLipschitz(input.fullPsf);
+            var alpha = 0.1f;
+
+            var xImage = new float[input.c.GridSize, input.c.GridSize];
+            var residualVis = input.visibilities;
+            DeconvolutionResult lastResult = null;
+            var minimumReached = false;
+            for (int cycle = 0; cycle < maxMajor; cycle++)
+            {
+                Console.WriteLine("cycle " + cycle);
+                var dirtyGrid = IDG.Grid(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
+                var dirtyImage = FFT.BackwardFloat(dirtyGrid, input.c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, folder + dirtyPrefix + cycle + ".fits");
+
+                //calc data and reg penalty
+                var dataPenalty = Residuals.CalcPenalty(dirtyImage);
+                var regPenalty = ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
+                var regPenaltyCurrent = ElasticNet.CalcPenalty(xImage, lambda, alpha);
+                info.lastDataPenalty = dataPenalty;
+                info.lastRegPenalty = regPenalty;
+
+                var bMap = bMapCalculator.Convolve(dirtyImage);
+                FitsIO.Write(bMap, folder + dirtyPrefix + "bmap_" + cycle + ".fits");
+                var currentSideLobe = Residuals.GetMax(bMap) * maxSidelobe;
+                var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
+
+                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
+                writer.Flush();
+
+                //check wether we can minimize the objective further with the current psf
+                var objectiveReached = (dataPenalty + regPenalty) < objectiveCutoff;
+                minimumReached = (lastResult != null && lastResult.IterationCount < 1000 && lastResult.Converged && currentLambda == lambda);
+                if (!objectiveReached & !minimumReached)
+                {
+                    info.totalDeconv.Start();
+                    lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 10000, epsilon);
+                    info.totalDeconv.Stop();
+
+                    FitsIO.Write(xImage, xImagePrefix + cycle + ".fits");
+                    writer.Write(lastResult.Converged + ";" + lastResult.IterationCount + ";" + lastResult.ElapsedTime.TotalSeconds + "\n");
+                    writer.Flush();
+
+                    FFT.Shift(xImage);
+                    var xGrid = FFT.Forward(xImage);
+                    FFT.Shift(xImage);
+                    var modelVis = IDG.DeGrid(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
+                    residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
+                }
+                else
+                {
+                    writer.Write(false + ";0;0\n");
+                    writer.Flush();
+                    if(!objectiveReached & minimumReached)
+                    {
+                        //do one last run, starting with the bMap of Full gradients
+                        fastCD.ResetAMap(input.fullPsf);
+                        bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(input.fullPsf, totalSize), new Rectangle(0, 0, input.fullPsf.GetLength(0), input.fullPsf.GetLength(1)));
+                        bMap = bMapCalculator.Convolve(dirtyImage);
+                        FitsIO.Write(bMap, folder + dirtyPrefix + "bmap_" + cycle + "_full.fits");
+                        currentSideLobe = Residuals.GetMax(bMap) * maxSidelobe;
+                        currentLambda = Math.Max(currentSideLobe / alpha, lambdaTrue);
+
+                        info.totalDeconv.Start();
+                        lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 10000, epsilon);
+                        info.totalDeconv.Stop();
+
+                        FFT.Shift(xImage);
+                        var xGrid = FFT.Forward(xImage);
+                        FFT.Shift(xImage);
+                        var modelVis = IDG.DeGrid(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
+                        residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
+                        dirtyGrid = IDG.Grid(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
+                        dirtyImage = FFT.BackwardFloat(dirtyGrid, input.c.VisibilitiesCount);
+
+                        dataPenalty = Residuals.CalcPenalty(dirtyImage);
+                        regPenalty = ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
+                        regPenaltyCurrent = ElasticNet.CalcPenalty(xImage, lambda, alpha);
+                        info.lastDataPenalty = dataPenalty;
+                        info.lastRegPenalty = regPenalty;
+                    }
+
+                    break;
+                }
+
+            }
+
+            return info;
+        }
+
+        private static ReconstructionInfo ReconstructSimple(InputData input, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon, bool startWithFullPSF)
         {
             var info = new ReconstructionInfo();
             var psfCut = PSF.Cut(input.fullPsf, cutFactor);
@@ -63,7 +165,7 @@ namespace Single_Reference.Experiments
             var fastCD = new FastGreedyCD(totalSize, psfCut);
             if(!startWithFullPSF)
                 fastCD.ResetAMap(input.fullPsf);
-            FitsIO.Write(psfCut, cutFactor + "psf.fits");
+            FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
             var lambda = 0.4f * fastCD.MaxLipschitz;
             var alpha = 0.1f;
@@ -78,7 +180,7 @@ namespace Single_Reference.Experiments
                 var dirtyGrid = IDG.Grid(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
                 var dirtyImage = FFT.BackwardFloat(dirtyGrid, input.c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
-                FitsIO.Write(dirtyImage, dirtyPrefix + cycle + ".fits");
+                FitsIO.Write(dirtyImage, folder + dirtyPrefix + cycle + ".fits");
 
                 //calc data and reg penalty
                 var dataPenalty = Residuals.CalcPenalty(dirtyImage);
@@ -88,7 +190,7 @@ namespace Single_Reference.Experiments
                 info.lastRegPenalty = regPenalty;
 
                 bMapCalculator.ConvolveInPlace(dirtyImage);
-                FitsIO.Write(dirtyImage, dirtyPrefix + "bmap_" + cycle + ".fits");
+                FitsIO.Write(dirtyImage, folder + dirtyPrefix + "bmap_" + cycle + ".fits");
                 var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
@@ -172,32 +274,62 @@ namespace Single_Reference.Experiments
             FitsIO.Write(psf, "psfFull.fits");
 
             var input = new InputData(c, metadata, frequencies, visibilities, uvw, flags, psf);
+            //---------------End file reading----------------------------------------------------------
 
-            //reconstruct with full psf
+            //reconstruct with full psf and find reference objective value
+            var fileHeader = "cycle;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
-            var recalculateFullPSF = true;
-            
-            if(recalculateFullPSF)
+            var recalculateFullPSF = false;
+            if (recalculateFullPSF)
             {
                 ReconstructionInfo referenceInfo = null;
                 using (var writer = new StreamWriter("1Psf.txt", false))
                 {
-                    writer.WriteLine("cycle;dataPenalty;regPenalty;converged;iterCount;ElapsedTime");
-                    referenceInfo = Reconstruct(input, 1, 10, "dirtyReference", "xReference", writer, 0.0, 1e-5f);
+                    writer.WriteLine(fileHeader);
+                    referenceInfo = ReconstructSimple(input, "", 1, 10, "dirtyReference", "xReference", writer, 0.0, 1e-5f, false);
                     File.WriteAllText("1PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
                 }
                 objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
             }
 
+            //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] {2, 4, 8, 16, 32, 64};
+            var psfCuts = new int[] {/*2, 4, 8, 16,*/ 32, /*64*/};
+            var outFolder = "cutPsf";
+            Directory.CreateDirectory(folder);
             foreach(var cut in psfCuts)
             {
                 using (var writer = new StreamWriter(cut + "Psf.txt", false))
                 {
-                    writer.WriteLine("cycle;currentLambda;dataPenalty;regPenalty;converged;iterCount;ElapsedTime");
-                    experimentInfo = Reconstruct(input, cut, 16, cut+"dirty", cut+"x", writer, objectiveCutoff, 1e-5f);
+                    writer.WriteLine(fileHeader);
+                    experimentInfo = ReconstructSimple(input, outFolder + @"\", cut, 16, cut+"dirty", cut+"x", writer, objectiveCutoff, 1e-5f, false);
                     File.WriteAllText(cut+"PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
+                }
+            }
+            
+            //Tryout with cutting the PSF, but starting from the true bMap
+            outFolder = "changeLipschitz";
+            Directory.CreateDirectory(folder);
+            foreach (var cut in psfCuts)
+            {
+                using (var writer = new StreamWriter(cut + "Psf.txt", false))
+                {
+                    writer.WriteLine(fileHeader);
+                    experimentInfo = ReconstructSimple(input, outFolder + @"\", cut, 16, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f, false);
+                    File.WriteAllText(cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
+                }
+            }
+
+            //combined, final solution. Cut the psf in half, optimize until convergence, and then do one more major cycle with the second method
+            outFolder = "properSolution";
+            Directory.CreateDirectory(folder);
+            foreach (var cut in psfCuts)
+            {
+                using (var writer = new StreamWriter(cut + "Psf.txt", false))
+                {
+                    writer.WriteLine(fileHeader);
+                    experimentInfo = ReconstructGradientApprox(input, outFolder + @"\", cut, 16, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f);
+                    File.WriteAllText(cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
         }

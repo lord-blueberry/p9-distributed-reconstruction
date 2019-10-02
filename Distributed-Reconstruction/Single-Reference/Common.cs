@@ -33,15 +33,6 @@ namespace Single_Reference
 
         public static class PSF
         {
-            private static float CalcMaxLipschitz(float[,] psf)
-            {
-                var squaredSum = 0.0f;
-                for (int i = 0; i < psf.GetLength(0); i++)
-                    for (int j = 0; j < psf.GetLength(1); j++)
-                        squaredSum += psf[i, j] * psf[i, j];
-                return squaredSum;
-            }
-
             private static float[,] CalcPSFScan(float[,] psf)
             {
                 var scan = new float[psf.GetLength(0), psf.GetLength(1)];
@@ -86,6 +77,15 @@ namespace Single_Reference
                     correction += psfScan[psfScan.GetLength(0) - yOverShoot - 1, xUnderShootIdx];
 
                 return psfScan[psfScan.GetLength(0) - 1 - yOverShoot, psfScan.GetLength(1) - 1 - xOverShoot] - correction;
+            }
+
+            public static float CalcMaxLipschitz(float[,] psf)
+            {
+                var squaredSum = 0.0f;
+                for (int i = 0; i < psf.GetLength(0); i++)
+                    for (int j = 0; j < psf.GetLength(1); j++)
+                        squaredSum += psf[i, j] * psf[i, j];
+                return squaredSum;
             }
 
             public static float[,] CalcAMap(float[,] psf, Rectangle totalSize, Rectangle imageSection)
