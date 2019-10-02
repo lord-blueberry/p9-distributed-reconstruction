@@ -16,8 +16,8 @@ namespace Single_Reference.Experiments
 {
     class PSFSize
     {
-        public const double REFERENCE_L2_PENALTY = 5.59695057707117;
-        public const double REFERENCE_ELASTIC_PENALTY = 17.7968081988002;
+        public const double REFERENCE_L2_PENALTY = 5.64324894802577;
+        public const double REFERENCE_ELASTIC_PENALTY = 29.3063615047876;
         private class InputData
         {
             public GriddingConstants c;
@@ -52,19 +52,22 @@ namespace Single_Reference.Experiments
             }
         }
 
-        private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon)
+        private static ReconstructionInfo Reconstruct(InputData input, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon, bool startWithFullPSF)
         {
             var info = new ReconstructionInfo();
             var psfCut = PSF.Cut(input.fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
-            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(input.fullPsf, totalSize), new Rectangle(0, 0, input.fullPsf.GetLength(0), input.fullPsf.GetLength(1)));
+            var psfBMap = startWithFullPSF ? input.fullPsf : psfCut;
+            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
-            fastCD.ResetAMap(input.fullPsf);
+            if(!startWithFullPSF)
+                fastCD.ResetAMap(input.fullPsf);
             FitsIO.Write(psfCut, cutFactor + "psf.fits");
 
             var lambda = 0.4f * fastCD.MaxLipschitz;
             var alpha = 0.1f;
+            var lambdaTrue = 55.20486f;
 
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
@@ -78,8 +81,9 @@ namespace Single_Reference.Experiments
                 FitsIO.Write(dirtyImage, dirtyPrefix + cycle + ".fits");
 
                 //calc data and reg penalty
-                var dataPenalty = Residuals.CalculatePenalty(dirtyImage);
-                var regPenalty = ElasticNet.CalculatePenalty(xImage, lambda, alpha);
+                var dataPenalty = Residuals.CalcPenalty(dirtyImage);
+                var regPenalty = ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
+                var regPenaltyCurrent = ElasticNet.CalcPenalty(xImage, lambda, alpha);
                 info.lastDataPenalty = dataPenalty;
                 info.lastRegPenalty = regPenalty;
 
@@ -88,7 +92,7 @@ namespace Single_Reference.Experiments
                 var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
-                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + ";");
+                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
                 writer.Flush();
 
                 //check wether we can minimize the objective further with the current psf
@@ -171,18 +175,22 @@ namespace Single_Reference.Experiments
 
             //reconstruct with full psf
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
+            var recalculateFullPSF = true;
             
-            ReconstructionInfo referenceInfo = null;
-            using (var writer = new StreamWriter("1Psf.txt", false))
+            if(recalculateFullPSF)
             {
-                writer.WriteLine("cycle;dataPenalty;regPenalty;converged;iterCount;ElapsedTime");
-                referenceInfo = Reconstruct(input, 1, 10, "dirtyReference", "xReference", writer, 0.0, 1e-5f);
-                File.WriteAllText("1PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
+                ReconstructionInfo referenceInfo = null;
+                using (var writer = new StreamWriter("1Psf.txt", false))
+                {
+                    writer.WriteLine("cycle;dataPenalty;regPenalty;converged;iterCount;ElapsedTime");
+                    referenceInfo = Reconstruct(input, 1, 10, "dirtyReference", "xReference", writer, 0.0, 1e-5f);
+                    File.WriteAllText("1PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
+                }
+                objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
             }
-            objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
-            
+
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 2, 4, 8, 16, 32, 64};
+            var psfCuts = new int[] {2, 4, 8, 16, 32, 64};
             foreach(var cut in psfCuts)
             {
                 using (var writer = new StreamWriter(cut + "Psf.txt", false))
@@ -231,20 +239,23 @@ namespace Single_Reference.Experiments
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
-            var xImage = ToFloatImage(FitsIO.ReadImageDouble("32x7.fits"));
-            var psf = ToFloatImage(FitsIO.ReadImageDouble("psfFull.fits"));
+            var xImage = FitsIO.ReadImage("32x5-noAcorr.fits");
+            var psf = FitsIO.ReadImage("psfFull.fits");
 
 
             var input = new InputData(c, metadata, frequencies, visibilities, uvw, flags, psf);
-            var lambda = 0.5f;
-            var alpha = 0.02f;
+
             var cutFactor = 32;
             var psfCut = PSF.Cut(input.fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
-            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psf, totalSize), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            var psfBMap = psf;
+            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
             fastCD.ResetAMap(psf);
+            var lambda = (0.4f) * fastCD.MaxLipschitz;
+            var lambda2 = 55.20486f;
+            var alpha = 0.1f;
 
 
             FFT.Shift(xImage);
@@ -262,16 +273,17 @@ namespace Single_Reference.Experiments
                 FitsIO.Write(dirtyImage, "debugDirty" + cycle + ".fits");
 
                 //calc data and reg penalty
-                var dataPenalty = FastGreedyCD.CalcDataPenalty(dirtyImage);
-                var regPenalty = fastCD.CalcRegularizationPenalty(xImage, lambda, alpha);
-                var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
-                var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
+                var dataPenalty = Residuals.CalcPenalty(dirtyImage);
+                var regPenalty = ElasticNet.CalcPenalty(xImage, lambda2, alpha);
+                var regPenalty_corr = ElasticNet.CalcPenalty(xImage, lambda, alpha);
 
                 //check wether we can minimize the objective further with the current psf
                 var objectiveReached = (dataPenalty + regPenalty) < (REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY);
                 var minimumReached = (lastResult != null && lastResult.IterationCount < 20 && lastResult.Converged);
                 if (!objectiveReached)
                 {
+                    var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
+                    var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
                     bMapCalculator.ConvolveInPlace(dirtyImage);
                     FitsIO.Write(dirtyImage, "bMapDebug" + cycle + ".fits");
                     lastResult = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 10000, 1e-5f);
@@ -292,6 +304,53 @@ namespace Single_Reference.Experiments
 
             }
             FitsIO.Write(xImage, "xImageDebug.fits");
+        }
+
+        public static void DebugConvergence2()
+        {
+            var xImage = FitsIO.ReadImage("32x5-noAcorr.fits");
+            var psf = FitsIO.ReadImage("psfFull.fits");
+            var dirty = FitsIO.ReadImage("debugDirty0-noAcorr.fits");
+
+            int gridSize = 2048;
+            int subgridsize = 16;
+            int kernelSize = 4;
+            //cell = image / grid
+            int max_nr_timesteps = 512;
+            double scaleArcSec = 2.5 / 3600.0 * PI / 180.0;
+            var visCount = 13922040;
+            var c = new GriddingConstants(visCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
+
+            var cutFactor = 32;
+            var psfCut = PSF.Cut(psf, cutFactor);
+            var maxSidelobe = PSF.CalcMaxSidelobe(psf, cutFactor);
+            var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
+            var psfBMap = psfCut;
+            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
+            var fastCD = new FastGreedyCD(totalSize, psfCut);
+            //fastCD.ResetAMap(psf);
+            var lambda = (0.4f + maxSidelobe) * fastCD.MaxLipschitz;
+            var lambda2 = 55.20486f;
+            var alpha = 0.1f;
+
+            var dataPenalty = Residuals.CalcPenalty(dirty);
+            var regPenalty = ElasticNet.CalcPenalty(xImage, lambda2, alpha);
+            var regPenalty_corr = ElasticNet.CalcPenalty(xImage, lambda, alpha);
+
+            bMapCalculator.ConvolveInPlace(dirty);
+            FitsIO.Write(dirty, "bMapDebug" + 0 + ".fits");
+            var currentSideLobe = Residuals.GetMax(dirty) * maxSidelobe;
+            var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
+
+            var lastResult = fastCD.Deconvolve(xImage, dirty, currentLambda, alpha, 10000, 1e-5f);
+
+            FitsIO.Write(xImage, "xDebug" + 0 + ".fits");
+            var xImageLast = FitsIO.ReadImage("32x5-noAcorr.fits");
+            var xDiff = new float[xImage.GetLength(0), xImage.GetLength(1)];
+            for (int i = 0; i < xDiff.GetLength(0); i++)
+                for (int j = 0; j < xDiff.GetLength(1); j++)
+                    xDiff[i, j] = xImage[i, j] - xImageLast[i, j];
+            FitsIO.Write(xDiff, "xDiffebug" + 0 + ".fits");
         }
     }
 }

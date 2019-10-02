@@ -151,10 +151,10 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             FitsIO.Write(residualsAcc, "residualsAcc.fits");
             FitsIO.Write(xImage2, "xAccelerated.fits");
 
-            var l2penaltyExplore = Residuals.CalculatePenalty(residualsExplore);
-            var elasticPenaltyExplore = ElasticNet.CalculatePenalty(xImageExplore, (float)lambdaOriginal, (float)alpha);
-            var l2PenaltyAcc = Residuals.CalculatePenalty(residualsAcc);
-            var elasticPenaltyAcc = ElasticNet.CalculatePenalty(xImage2, (float)lambdaOriginal, (float)alpha);
+            var l2penaltyExplore = Residuals.CalcPenalty(residualsExplore);
+            var elasticPenaltyExplore = ElasticNet.CalcPenalty(xImageExplore, (float)lambdaOriginal, (float)alpha);
+            var l2PenaltyAcc = Residuals.CalcPenalty(residualsAcc);
+            var elasticPenaltyAcc = ElasticNet.CalcPenalty(xImage2, (float)lambdaOriginal, (float)alpha);
 
             //if (l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore)
             if (l2PenaltyAcc + elasticPenaltyAcc < l2penaltyExplore + elasticPenaltyExplore)

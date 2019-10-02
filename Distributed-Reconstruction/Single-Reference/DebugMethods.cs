@@ -251,8 +251,8 @@ namespace Single_Reference
                 FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
                 watchForward.Stop();
 
-                var l2Penalty0 = Residuals.CalculatePenalty(ToFloatImage(dirtyImage));
-                var elasticPenalty0 = ElasticNet.CalculatePenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
+                var l2Penalty0 = Residuals.CalcPenalty(ToFloatImage(dirtyImage));
+                var elasticPenalty0 = ElasticNet.CalcPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
                 var sum0 = l2Penalty0 + elasticPenalty0;
                 writer2.WriteLine(cycle + ";" + l2Penalty0 + ";" + elasticPenalty0 + ";" + sum0);
                 writer2.Flush();
@@ -290,8 +290,8 @@ namespace Single_Reference
             FFT.Shift(dirtyCheck);
             FitsIO.Write(dirtyCheck, "dirty_Last.fits");
 
-            var l2Penalty = Residuals.CalculatePenalty(ToFloatImage(dirtyCheck));
-            var elasticPenalty = ElasticNet.CalculatePenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
+            var l2Penalty = Residuals.CalcPenalty(ToFloatImage(dirtyCheck));
+            var elasticPenalty = ElasticNet.CalcPenalty(ToFloatImage(xImage), (float)lambda, (float)alpha);
             var sum = l2Penalty + elasticPenalty;
             writer2.WriteLine(l2Penalty + ";" + elasticPenalty + ";" + sum);
             writer.Close();

@@ -34,6 +34,7 @@ namespace Single_Reference.Deconvolution
             this.patch = patchSize;
             psf2 = psfSquared;
             aMap = PSF.CalcAMap(psf, imageSize, patchSize);
+            MaxLipschitz = Residuals.GetMax(psfSquared);
             //FitsIO.Write(aMap, "aMapDebug" + psf.GetLength(0) + ".fits");
             //FitsIO.Write(psfSquared, "psfSquaredDebug" + psf.GetLength(0) + ".fits");
         }

@@ -18,7 +18,7 @@ namespace Single_Reference
             public static float ProximalOperator(float x, float lipschitz, float lambda, float alpha) =>
                 Math.Max(x - (lambda * alpha), 0f) / (lipschitz + lambda * (1f - alpha));
 
-            public static double CalculatePenalty(float[,] image, float lambda, float alpha)
+            public static double CalcPenalty(float[,] image, float lambda, float alpha)
             {
                 double output = 0;
                 for (int i = 0; i < image.GetLength(0); i++)
@@ -33,6 +33,15 @@ namespace Single_Reference
 
         public static class PSF
         {
+            private static float CalcMaxLipschitz(float[,] psf)
+            {
+                var squaredSum = 0.0f;
+                for (int i = 0; i < psf.GetLength(0); i++)
+                    for (int j = 0; j < psf.GetLength(1); j++)
+                        squaredSum += psf[i, j] * psf[i, j];
+                return squaredSum;
+            }
+
             private static float[,] CalcPSFScan(float[,] psf)
             {
                 var scan = new float[psf.GetLength(0), psf.GetLength(1)];
@@ -233,7 +242,7 @@ namespace Single_Reference
                 return max;
             }
 
-            public static double CalculatePenalty(float[,] residuals)
+            public static double CalcPenalty(float[,] residuals)
             {
                 double output = 0;
                 for (int i = 0; i < residuals.GetLength(0); i++)
