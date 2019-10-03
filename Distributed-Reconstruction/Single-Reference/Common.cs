@@ -76,7 +76,6 @@ namespace Single_Reference
                         scan[i, j] = current + iBefore + jBefore - ijBefore;
                     }
 
-                var maxScan = scan[scan.GetLength(0) - 1, scan.GetLength(1) - 1];
                 var aMap = new float[imageSection.YExtent(), imageSection.XExtent()];
                 for (int y = imageSection.Y; y < imageSection.YEnd; y++)
                     for (int x = imageSection.X; x < imageSection.XEnd; x++)

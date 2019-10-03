@@ -17,7 +17,7 @@ namespace Distributed_Reference
     class DistributedParallelReconstruction
     {
         public const int PSF_CUTFACTOR = 16;
-        public static float[,] Reconstruct(Intracommunicator comm, DistributedData.LocalDataset local, GriddingConstants c, int maxCycle)
+        public static float[,] Reconstruct(Intracommunicator comm, DistributedData.LocalDataset local, GriddingConstants c, int maxCycle, float lambda, float alpha)
         {
 
             var watchTotal = new Stopwatch();
@@ -33,27 +33,37 @@ namespace Distributed_Reference
             //calculate psf and prepare for correlation in the Fourier space
             var psf = ToFloatImage(CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies));
             var psfCut = PSF.Cut(psf, PSF_CUTFACTOR);
+            var psfUsed = psfCut;
+            var psfSquared = PSF.CalcPSFSquared(psfUsed);
             var maxSidelobe = PSF.CalcMaxSidelobe(psf, PSF_CUTFACTOR);
             PaddedConvolver bMapCalculator = null;
             if (comm.Rank == 0)
             {
-                var PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psf, totalSize);
-                bMapCalculator = new PaddedConvolver(PsfCorrelation, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+                var PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psfUsed, totalSize);
+                bMapCalculator = new PaddedConvolver(PsfCorrelation, new Rectangle(0, 0, psfUsed.GetLength(0), psfUsed.GetLength(1)));
             }
 
             var subPatchDeconv = SplitIntoSubpatches(patchSize);
             var residualVis = local.Visibilities;
+            var bMapPatch = new float[32, 32];
+            var xImagePatch = new float[1, 1];
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
                 var residuals = new float[1, 1];
                 bMapCalculator.ConvolveInPlace(residuals);
+                //split bMap
 
-                for (int subIter = 0; subIter < 10; subIter++) {
+                
+                ISubpatchDeconvolver subpatchDeconvolver = new FastGreedyCD(totalSize,patchSize, psfUsed, psfSquared);
+                for (int subCycle = 0; subCycle < 10; subCycle++)
+                {
                     for (int subPatchIter = 0; subPatchIter < 4; subPatchIter++)
                     {
-                        var xImg = new float[1, 1];
-                        //deconvolve
-                        //var localDiff = deconvolve()
+                        
+                        var subPatch = GetSubPatch(subPatchIter);
+                        subpatchDeconvolver.Deconvolve(subPatch, xImagePatch, bMapPatch, lambda, alpha, 200);
+
+
                         //var globalDiffexchange local diff
                         //subPatchDeconv[subPatchIter].Deconvolve(xImg, residuals, 0.5f, 0.8f, 100);
                         //exchange residuals
@@ -64,9 +74,14 @@ namespace Distributed_Reference
             return null;
         }
 
-        private static ISubpatchDeconvolver[] SplitIntoSubpatches(Rectangle patchSize) 
+        private static ISubpatchDeconvolver SplitIntoSubpatches(Rectangle patchSize) 
         {
             return null;
+        }
+
+        private static Rectangle GetSubPatch(int id)
+        {
+            return new Rectangle(0, 0, 0, 0);
         }
 
     }
