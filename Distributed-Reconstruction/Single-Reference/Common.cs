@@ -33,23 +33,7 @@ namespace Single_Reference
 
         public static class PSF
         {
-            private static float[,] CalcPSFScan(float[,] psf)
-            {
-                var scan = new float[psf.GetLength(0), psf.GetLength(1)];
-                for (int i = 0; i < psf.GetLength(0); i++)
-                    for (int j = 0; j < psf.GetLength(1); j++)
-                    {
-                        var iBefore = i > 0 ? scan[i - 1, j] : 0.0f;
-                        var jBefore = j > 0 ? scan[i, j - 1] : 0.0f;
-                        var ijBefore = i > 0 & j > 0 ? scan[i - 1, j - 1] : 0.0f;
-                        var current = psf[i, j] * psf[i, j];
-                        scan[i, j] = current + iBefore + jBefore - ijBefore;
-                    }
-
-                return scan;
-            }
-
-            private static float QueryScan(float[,] psfScan, int yPixel, int xPixel, int yLength, int xLength)
+            private static double QueryScan(double[,] psfScan, int yPixel, int xPixel, int yLength, int xLength)
             {
                 var yOverShoot = (yPixel + (psfScan.GetLength(0) - psfScan.GetLength(0) / 2)) - yLength;
                 var xOverShoot = (xPixel + (psfScan.GetLength(1) - psfScan.GetLength(1) / 2)) - xLength;
@@ -70,7 +54,7 @@ namespace Single_Reference
                            - psfScan[yUnderShootIdx, psfScan.GetLength(1) - 1]
                            + psfScan[yUnderShootIdx, xUnderShootIdx];
 
-                var correction = 0.0f;
+                var correction = 0.0;
                 if (yUnderShoot > 0)
                     correction += psfScan[yUnderShootIdx, psfScan.GetLength(1) - xOverShoot - 1];
                 if (xUnderShoot > 0)
@@ -78,30 +62,40 @@ namespace Single_Reference
 
                 return psfScan[psfScan.GetLength(0) - 1 - yOverShoot, psfScan.GetLength(1) - 1 - xOverShoot] - correction;
             }
-
-            public static float CalcMaxLipschitz(float[,] psf)
-            {
-                var squaredSum = 0.0f;
-                for (int i = 0; i < psf.GetLength(0); i++)
-                    for (int j = 0; j < psf.GetLength(1); j++)
-                        squaredSum += psf[i, j] * psf[i, j];
-                return squaredSum;
-            }
-
             public static float[,] CalcAMap(float[,] psf, Rectangle totalSize, Rectangle imageSection)
             {
-                //TODO: change this?
-                var scan = CalcPSFScan(psf);
+                //scan algorithm. This uses double precision. With more realistic psf sizes, single precision became inaccurate
+                var scan = new double[psf.GetLength(0), psf.GetLength(1)];
+                for (int i = 0; i < psf.GetLength(0); i++)
+                    for (int j = 0; j < psf.GetLength(1); j++)
+                    {
+                        var iBefore = i > 0 ? scan[i - 1, j] : 0.0f;
+                        var jBefore = j > 0 ? scan[i, j - 1] : 0.0f;
+                        var ijBefore = i > 0 & j > 0 ? scan[i - 1, j - 1] : 0.0f;
+                        var current = psf[i, j] * psf[i, j];
+                        scan[i, j] = current + iBefore + jBefore - ijBefore;
+                    }
+
+                var maxScan = scan[scan.GetLength(0) - 1, scan.GetLength(1) - 1];
                 var aMap = new float[imageSection.YExtent(), imageSection.XExtent()];
                 for (int y = imageSection.Y; y < imageSection.YEnd; y++)
                     for (int x = imageSection.X; x < imageSection.XEnd; x++)
                     {
                         var yLocal = y - imageSection.Y;
                         var xLocal = x - imageSection.X;
-                        aMap[yLocal, xLocal] = QueryScan(scan, y, x, totalSize.YEnd, totalSize.XEnd);
+                        aMap[yLocal, xLocal] = (float)QueryScan(scan, y, x, totalSize.YEnd, totalSize.XEnd);
                     }
 
                 return aMap;
+            }
+
+            public static double CalcMaxLipschitz(float[,] psf)
+            {
+                var squaredSum = 0.0;
+                for (int i = 0; i < psf.GetLength(0); i++)
+                    for (int j = 0; j < psf.GetLength(1); j++)
+                        squaredSum += psf[i, j] * psf[i, j];
+                return squaredSum;
             }
 
             /// <summary>
