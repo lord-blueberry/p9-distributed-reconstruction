@@ -4,12 +4,12 @@ using System.Text;
 
 namespace Single_Reference.Deconvolution
 {
-    public class Approx : IDeconvolver
+    public class ApproxFast : IDeconvolver
     {
         private int blockSize;
         private int threadCount;
 
-        public Approx(int blockSize, int threadCount)
+        public ApproxFast(int blockSize, int threadCount)
         {
 
         }

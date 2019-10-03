@@ -229,7 +229,7 @@ namespace Single_Reference
             var residualVis = visibilities;
             var random = new Random(123);
             var fastCD = new FastGreedyCD(new Rectangle(0, 0, gridSize, gridSize), ToFloatImage(psfCut));
-            fastCD.ResetAMap(ToFloatImage(psf));
+            //fastCD.ResetAMap(ToFloatImage(psf));
             var lambda = 0.5 * fastCD.MaxLipschitz;
             var alpha = 0.8;
             var writer = new StreamWriter("ApproxInfo.txt", false);
@@ -241,7 +241,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 14; cycle++)
+            for (int cycle = 0; cycle < 10; cycle++)
             {
                 //FORWARD
                 watchForward.Start();

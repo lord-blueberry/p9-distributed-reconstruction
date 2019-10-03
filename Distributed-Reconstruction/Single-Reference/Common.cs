@@ -197,7 +197,6 @@ namespace Single_Reference
                 return output;
             }
 
-
             public static float[,] Cut(float[,] psf, int factor = 2)
             {
                 var output = new float[psf.GetLength(0) / factor, psf.GetLength(1) / factor];
@@ -310,6 +309,16 @@ namespace Single_Reference
                     output[i, j] = (float)image[i,j];
 
             return output;
+        }
+
+        public static int CountNonZero(float[,] psf)
+        {
+            var count = 0;
+            for (int y = 0; y < psf.GetLength(0); y++)
+                for (int x = 0; x < psf.GetLength(1); x++)
+                    if (psf[y, x] != 0.0)
+                        count++;
+            return count;
         }
 
         private static float[,] Pad(float[,] image, int yPadding, int xPadding)

@@ -68,7 +68,6 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     //shrink
                     for (int j = 0; j < xNew.Count; j++)
                     {
-                        //THIS IS WRONG: TODO: Actual proximal operator that does not cheekily decrease lambda with each iteration. As theta goes to zero, so does lambda
                         xNew[j] = ElasticNet.ProximalOperator((float)xNew[j], (float)stepSize, (float)lambda, (float)alpha);
                         containsNonZero |= (xNew[j] - xE[j]) != 0.0;
                     }
