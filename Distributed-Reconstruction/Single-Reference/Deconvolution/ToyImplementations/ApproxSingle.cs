@@ -175,10 +175,18 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var objectiveExplore = Residuals.CalcPenalty(residualsExplore) + ElasticNet.CalcPenalty(xExplore, lambda, alpha);
             var objectiveAcc = Residuals.CalcPenalty(residualsAccelerated) + ElasticNet.CalcPenalty(xCorrection, lambda, alpha);
 
-
-            for (int i = 0; i < xImage.GetLength(0); i++)
-                for (int j = 0; j < xImage.GetLength(1); j++)
+            if(objectiveAcc < objectiveExplore)
+            {
+                for (int i = 0; i < xImage.GetLength(0); i++)
+                    for (int j = 0; j < xImage.GetLength(1); j++)
+                        xImage[i, j] = xCorrection[i, j];
+            }
+            else
+            {
+                for (int i = 0; i < xImage.GetLength(0); i++)
+                    for (int j = 0; j < xImage.GetLength(1); j++)
                         xImage[i, j] = xExplore[i, j];
+            }
 
             return objectiveAcc < objectiveExplore;
         }
@@ -203,7 +211,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             while (iter < maxIteration & !converged)
             {
                 var xDiffMax = 0.0f;
-                for(int inner= 0; inner < 1; inner++)
+                for(int inner= 0; inner < 100; inner++)
                 {
                     var stepSize = lipschitz * theta / theta0;
                     var theta2 = theta * theta;
@@ -236,7 +244,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                             var yBlock = blockSample.Item1;
                             var xBlock = blockSample.Item2;
                             UpdateBMaps(i, blocks, yBlock, xBlock, psf2, gExplore, gCorrection, correctionFactor);
-
+                            FitsIO.Write(gExplore, "gExplore2.fits");
+                            FitsIO.Write(gCorrection, "gCorr2.fits");
                             var currentDiff = 0.0f;
                             //update reconstructed image
                             var yOffset = yBlock * yBlockSize;
@@ -351,8 +360,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                             correctionUpdate += update * correctionFactor; 
                         }
                     
-                    gExplore[globalY, globalX] += exploreUpdate;
-                    gCorrection[globalY, globalX] += correctionUpdate;
+                    gExplore[globalY, globalX] -= exploreUpdate;
+                    gCorrection[globalY, globalX] -= correctionUpdate;
                 }
         }
 

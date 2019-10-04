@@ -363,7 +363,7 @@ namespace Single_Reference
                 //bMapCalculator.ConvolveInPlace(dirtyImage);
                 //FitsIO.Write(dirtyImage, "bMap_" + cycle + ".fits");
                 //var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f * fastCD.MaxLipschitz, 0.8f, 1000, 1e-4f);
-                var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, 1, 1);
+                var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 8, 1, 1);
 
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
