@@ -32,6 +32,7 @@ namespace Distributed_Reference
 
             //calculate psf and prepare for correlation in the Fourier space
             var psf = ToFloatImage(CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies));
+            //TODO: Debug above
             var psfCut = PSF.Cut(psf, PSF_CUTFACTOR);
             var psfUsed = psfCut;
             var psfSquared = PSF.CalcPSFSquared(psfUsed);
@@ -39,9 +40,13 @@ namespace Distributed_Reference
             PaddedConvolver bMapCalculator = null;
             if (comm.Rank == 0)
             {
-                var PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psfUsed, totalSize);
-                bMapCalculator = new PaddedConvolver(PsfCorrelation, new Rectangle(0, 0, psfUsed.GetLength(0), psfUsed.GetLength(1)));
+                var correlationKernel = PSF.CalcPaddedFourierCorrelation(psfUsed, totalSize);
+                bMapCalculator = new PaddedConvolver(correlationKernel, new Rectangle(0, 0, psfUsed.GetLength(0), psfUsed.GetLength(1)));
             }
+
+
+            var psfSquaredKernel = Common.Fourier2D.Multiply(PSF.CalcPaddedFourierConvolution(psfUsed, patchSize), PSF.CalcPaddedFourierCorrelation(psfUsed, patchSize));
+            var bMapCalculatorPatch = new PaddedConvolver(psfSquaredKernel, new Rectangle(0, 0, psfUsed.GetLength(0), psfUsed.GetLength(1)));
 
             var subPatchDeconv = SplitIntoSubpatches(patchSize);
             var residualVis = local.Visibilities;
@@ -60,9 +65,23 @@ namespace Distributed_Reference
                     for (int subPatchIter = 0; subPatchIter < 4; subPatchIter++)
                     {
                         
-                        var subPatch = GetSubPatch(subPatchIter);
+                        var subPatch = GetSubPatch(comm.Rank, subPatchIter);
                         subpatchDeconvolver.Deconvolve(subPatch, xImagePatch, bMapPatch, lambda, alpha, 200);
 
+                        //exchange residuals
+                        float[][,] gatherX = null;
+                        comm.Gather(xImagePatch, 0, ref gatherX);
+                        for (int i = 0; i < gatherX.Length; i++)
+                            if (i != comm.Rank)
+                            {
+                                var xOther = gatherX[i];
+                                bMapCalculatorPatch.ConvolveInPlace(xOther);
+                                var upatePatch = GetSubPatch(i, subPatchIter);
+                                var bUpdatePatch = new float[32,32];
+                            }
+                            
+                        
+                        
 
                         //var globalDiffexchange local diff
                         //subPatchDeconv[subPatchIter].Deconvolve(xImg, residuals, 0.5f, 0.8f, 100);
@@ -79,7 +98,7 @@ namespace Distributed_Reference
             return null;
         }
 
-        private static Rectangle GetSubPatch(int id)
+        private static Rectangle GetSubPatch(int rank, int subPatchId)
         {
             return new Rectangle(0, 0, 0, 0);
         }
