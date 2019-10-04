@@ -8,6 +8,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 {
     class ApproxSingle
     {
+        const float ACTIVE_SET_CUTOFF = 1e-8f;
         int yBlockSize;
         int xBlockSize;
         int degreeOfSeperability;
@@ -133,6 +134,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var gExplore = Residuals.CalcBMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var gCorrection = new float[residuals.GetLength(0), residuals.GetLength(1)];
             var psf2 = PSF.CalcPSFSquared(psf);
+            FitsIO.Write(gExplore, "gExplore.fits");
+            FitsIO.Write(psf2, "psfsquared.fits");
 
             yBlockSize = blockSize;
             xBlockSize = blockSize;
@@ -140,8 +143,9 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             tau = 1; //number of processors
             var maxLipschitz = (float)PSF.CalcMaxLipschitz(psf);
             var activeSet = GetActiveSet(xExplore, gExplore, lambda, alpha, maxLipschitz);
+            
             var theta = DeconvolveRandomActiveSet(xExplore, xCorrection, gExplore, gCorrection, psf2, ref activeSet, maxLipschitz, lambda, alpha, random, maxIteration, epsilon);
-
+            FitsIO.Write(xExplore, "explore.fits");
             //decide which version should be taken#
             var CONVKernel = PSF.CalcPaddedFourierConvolution(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
             var residualsCalculator = new PaddedConvolver(CONVKernel, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
@@ -171,14 +175,12 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var objectiveExplore = Residuals.CalcPenalty(residualsExplore) + ElasticNet.CalcPenalty(xExplore, lambda, alpha);
             var objectiveAcc = Residuals.CalcPenalty(residualsAccelerated) + ElasticNet.CalcPenalty(xCorrection, lambda, alpha);
 
+
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
-                    if (objectiveAcc < objectiveExplore)
-                        xImage[i, j] = xCorrection[i, j];
-                    else
                         xImage[i, j] = xExplore[i, j];
 
-            return false;
+            return objectiveAcc < objectiveExplore;
         }
 
         public float DeconvolveRandomActiveSet(float[,] xExplore, float[,] xCorrection, float[,]gExplore, float[,] gCorrection, float[,] psf2, ref List<Tuple<int,int>> activeSet, float maxLipschitz, float lambda, float alpha, Random random, int maxIteration, float epsilon)
@@ -197,10 +199,11 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var blocks = new float[tau, yBlockSize, xBlockSize];
             var containsNonZero = new bool[tau];
             var converged = false;
+            Console.WriteLine("Starting Active Set iterations with " + activeSet.Count + " blocks");
             while (iter < maxIteration & !converged)
             {
                 var xDiffMax = 0.0f;
-                for(int inner= 0; inner < (blockCount/tau); inner++)
+                for(int inner= 0; inner < 1; inner++)
                 {
                     var stepSize = lipschitz * theta / theta0;
                     var theta2 = theta * theta;
@@ -210,16 +213,15 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     for (int i = 0; i < samples.Length; i++)
                     {
                         var blockSample = activeSet[samples[i]];
-                        var yBlock = blockSample.Item1;
-                        var xBlock = blockSample.Item2;
-
+                        var yOffset = blockSample.Item1 * yBlockSize;
+                        var xOffset = blockSample.Item2 * xBlockSize;
                         containsNonZero[i] = false;
-                        for (int y = yBlock * yBlockSize; y < (yBlock * yBlockSize + yBlockSize); y++)
-                            for (int x = xBlock * xBlockSize; x < (xBlock * xBlockSize + xBlockSize); x++)
+                        for (int y = yOffset; y < (yOffset + yBlockSize); y++)
+                            for (int x = xOffset; x < (xOffset + xBlockSize); x++)
                             {
                                 var update = theta2 * gCorrection[y, x] + gExplore[y, x] + xExplore[y, x] * stepSize;
                                 update = ElasticNet.ProximalOperator(update, stepSize, lambda, alpha) - xExplore[y, x];
-                                blocks[i, y, x] = update;
+                                blocks[i, y - yOffset, x - xOffset] = update;
                                 if (update != 0.0)
                                     containsNonZero[i] = true;
                             }
@@ -239,8 +241,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                             //update reconstructed image
                             var yOffset = yBlock * yBlockSize;
                             var xOffset = xBlock * xBlockSize;
-                            for (int y = 0; y < xExplore.GetLength(0); y++)
-                                for (int x = 0; x < xExplore.GetLength(1); x++)
+                            for (int y = 0; y < blocks.GetLength(1); y++)
+                                for (int x = 0; x < blocks.GetLength(2); x++)
                                 {
                                     var update = blocks[i, y, x];
                                     var oldExplore = xExplore[yOffset + y, xOffset + x];
@@ -283,7 +285,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 {
                     converged = true;
                 }
-
+                Console.WriteLine("Done Active Set iteration");
                 iter++;
             }
 
@@ -295,8 +297,8 @@ namespace Single_Reference.Deconvolution.ToyImplementations
         private List<Tuple<int, int>> GetActiveSet(float[,] xExplore, float[,] gExplore, float lambda, float alpha, float lipschitz)
         {
             var output = new List<Tuple<int, int>>();
-            for (int i = 0; i < xExplore.GetLength(0)/yBlockSize; i++)
-                for (int j = 0; j < xExplore.GetLength(1)/xBlockSize; i++)
+            for (int i = 0; i < xExplore.GetLength(0) / yBlockSize; i++)
+                for (int j = 0; j < xExplore.GetLength(1) / xBlockSize; j++)
                 {
                     var yPixel = i * yBlockSize;
                     var xPixel = j * xBlockSize;
@@ -306,14 +308,14 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                         {
                             var tmp = gExplore[y, x] + xExplore[y, x] * lipschitz;
                             tmp = ElasticNet.ProximalOperator(tmp, lipschitz, lambda, alpha);
-                            if (tmp != xExplore[y, x])
+                            if (ACTIVE_SET_CUTOFF < Math.Abs(tmp - xExplore[y, x]))
                                 nonZero = true;
                         }
 
                     if(nonZero)
                         output.Add(new Tuple<int, int>(i, j));
                 }
-
+            //can write max change for convergence purposes
             return output;
         }
 

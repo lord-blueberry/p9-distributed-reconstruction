@@ -298,6 +298,91 @@ namespace Single_Reference
             writer2.Close();
         }
 
+        public static void DebugSimulatedApprox()
+        {
+            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
+            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
+            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
+            double norm = 2.0;
+            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+            var visibilitiesCount = visibilities.Length;
+            int gridSize = 256;
+            int subgridsize = 8;
+            int kernelSize = 4;
+            int max_nr_timesteps = 1024;
+            double cellSize = 1.0 / 3600.0 * PI / 180.0;
+            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+
+            var watchTotal = new Stopwatch();
+            var watchForward = new Stopwatch();
+            var watchBackwards = new Stopwatch();
+            var watchDeconv = new Stopwatch();
+
+            watchTotal.Start();
+            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
+
+            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
+            var psf = FFT.Backward(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+
+            var psfCutDouble = CutImg(psf);
+            var psfCut = ToFloatImage(psfCutDouble);
+            FitsIO.Write(psfCut, "psfCut.fits");
+
+            var random = new Random(123);
+            var totalSize = new Rectangle(0, 0, gridSize, gridSize);
+            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
+            var fastCD = new FastGreedyCD(totalSize, psfCut);
+            fastCD.ResetAMap(ToFloatImage(psf));
+            var lambda = 0.5f * fastCD.MaxLipschitz;
+            var alpha = 0.8f;
+            var approx = new ApproxSingle();
+
+            var xImage = new float[gridSize, gridSize];
+            var residualVis = visibilities;
+
+            /*var truth = new double[gridSize, gridSize];
+            truth[30, 30] = 1.0;
+            truth[35, 36] = 1.5;
+            var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
+            visibilities = truthVis;
+            var residualVis = truthVis;*/
+            for (int cycle = 0; cycle < 4; cycle++)
+            {
+                //FORWARD
+                watchForward.Start();
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
+                var dirtyImage = FFT.BackwardFloat(dirtyGrid, c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, "dirty_" + cycle + ".fits");
+                watchForward.Stop();
+
+                //DECONVOLVE
+                watchDeconv.Start();
+                //bMapCalculator.ConvolveInPlace(dirtyImage);
+                //FitsIO.Write(dirtyImage, "bMap_" + cycle + ".fits");
+                //var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f * fastCD.MaxLipschitz, 0.8f, 1000, 1e-4f);
+                var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, 1, 1);
+
+                if (converged)
+                    Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
+                else
+                    Console.WriteLine("-------------------------------not converged----------------------");
+                FitsIO.Write(xImage, "xImageApprox_" + cycle + ".fits");
+                watchDeconv.Stop();
+
+                //BACKWARDS
+                watchBackwards.Start();
+                FFT.Shift(xImage);
+                var xGrid = FFT.Forward(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
+                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                watchBackwards.Stop();
+            }
+        }
+
         public static void DebugILGPU()
         {
             var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
