@@ -18,6 +18,8 @@ namespace Single_Reference.Experiments
     {
         public const double REFERENCE_L2_PENALTY = 5.64324894802577;
         public const double REFERENCE_ELASTIC_PENALTY = 29.3063615047876;
+        //34,94961045281337‬
+
         private class InputData
         {
             public GriddingConstants c;
@@ -96,14 +98,14 @@ namespace Single_Reference.Experiments
 
                 //check wether we can minimize the objective further with the current psf
                 var objectiveReached = (dataPenalty + regPenalty) < objectiveCutoff;
-                minimumReached = (lastResult != null && lastResult.IterationCount < 1000 && lastResult.Converged && currentLambda == lambda);
+                minimumReached = (lastResult != null && lastResult.Converged && currentLambda == lambda);
                 if (!objectiveReached & !minimumReached)
                 {
                     info.totalDeconv.Start();
                     lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 10000, epsilon);
                     info.totalDeconv.Stop();
 
-                    FitsIO.Write(xImage, xImagePrefix + cycle + ".fits");
+                    FitsIO.Write(xImage, folder + xImagePrefix + cycle + ".fits");
                     writer.Write(lastResult.Converged + ";" + lastResult.IterationCount + ";" + lastResult.ElapsedTime.TotalSeconds + "\n");
                     writer.Flush();
 
@@ -115,10 +117,10 @@ namespace Single_Reference.Experiments
                 }
                 else
                 {
-                    writer.Write(false + ";0;0\n");
-                    writer.Flush();
                     if(!objectiveReached & minimumReached)
                     {
+                        writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
+                        writer.Flush();
                         //do one last run, starting with the bMap of Full gradients
                         fastCD.ResetAMap(input.fullPsf);
                         bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(input.fullPsf, totalSize), new Rectangle(0, 0, input.fullPsf.GetLength(0), input.fullPsf.GetLength(1)));
@@ -130,6 +132,10 @@ namespace Single_Reference.Experiments
                         info.totalDeconv.Start();
                         lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 10000, epsilon);
                         info.totalDeconv.Stop();
+
+                        FitsIO.Write(xImage, folder + xImagePrefix + cycle + ".fits");
+                        writer.Write(lastResult.Converged + ";" + lastResult.IterationCount + ";" + lastResult.ElapsedTime.TotalSeconds + "\n");
+                        writer.Flush();
 
                         FFT.Shift(xImage);
                         var xGrid = FFT.Forward(xImage);
@@ -144,7 +150,11 @@ namespace Single_Reference.Experiments
                         regPenaltyCurrent = ElasticNet.CalcPenalty(xImage, lambda, alpha);
                         info.lastDataPenalty = dataPenalty;
                         info.lastRegPenalty = regPenalty;
+                        writer.Write((cycle+1) + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
+                        writer.Flush();
                     }
+                    writer.Write(false + ";0;0\n");
+                    writer.Flush();
 
                     break;
                 }
@@ -279,7 +289,7 @@ namespace Single_Reference.Experiments
             //---------------End file reading----------------------------------------------------------
 
             //reconstruct with full psf and find reference objective value
-            var fileHeader = "cycle;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
+            var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
             var recalculateFullPSF = false;
             if (recalculateFullPSF)
@@ -293,11 +303,12 @@ namespace Single_Reference.Experiments
                 }
                 objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
             }
-
+            
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
             var psfCuts = new int[] {/*2, 4, 8, 16,*/ 32, /*64*/};
             var outFolder = "cutPsf";
+            /*
             Directory.CreateDirectory(outFolder);
             outFolder += @"\";
             foreach (var cut in psfCuts)
@@ -322,7 +333,7 @@ namespace Single_Reference.Experiments
                     experimentInfo = ReconstructSimple(input, outFolder, cut, 16, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f, true);
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
-            }
+            }*/
 
             //combined, final solution. Cut the psf in half, optimize until convergence, and then do one more major cycle with the second method
             outFolder = "properSolution";

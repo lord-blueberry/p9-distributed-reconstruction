@@ -80,20 +80,30 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 }
 
                 //update bMaps
-                var correctionFactor = -(1.0 - theta / theta0) / (theta * theta);
+                var correctionFactor = -(1.0f - theta / theta0) / (theta * theta);
                 for (int i = 0; i < blockSamples.Length; i++)
                     if(containsNonZero[i])
                     {
-                        for (int y = 0; y < yBlockSize; y++)
-                            for (int x = 0; x < xBlockSize; x++)
-                            {
-                                //xCorrectionUpdate[y, x] = 
-                            }
                         var yBlock = blockSamples[i] / (xImage.GetLength(1) / xBlockSize);
                         var xBlock = blockSamples[i] % (xImage.GetLength(1) / xBlockSize);
-                        
+                        UpdateBMaps(i, blocks, yBlock, xBlock, psf2, bMapExplore, bMapCorrection, correctionFactor);
 
-                        //testRestart = (1.0 - eta) * testRestart - eta * (xEUpdate) * (xNew - (theta * theta * xC + xE));
+                        //update reconstructed image
+                        var yOffset = yBlock * yBlockSize;
+                        var xOffset = xBlock * xBlockSize;
+                        for(int y = 0; y < xImageExplore.GetLength(0); y++)
+                            for(int x = 0; x < xImageExplore.GetLength(1);x++)
+                            {
+                                var update = blocks[i, y, x];
+                                var oldExplore = xImageExplore[yOffset + y, xOffset + x];
+                                var oldCorrection = xImageCorrection[yOffset + y, xOffset + x];
+                                var newValue = oldExplore + update;
+                                testRestart = (1.0 - eta) * testRestart - eta * (update) * (newValue - (theta * theta * oldCorrection + oldExplore));
+
+                                xImageExplore[yOffset + y, xOffset + x] += update;
+                                xImageCorrection[yOffset + y, xOffset + x] += update * correctionFactor;
+                            }
+                        
                     }
 
                 if (testRestart > 0)
@@ -109,7 +119,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return false;
         }
 
-        public static void UpdateBMaps(int blockId, float[,,] blocks, int yB, int xB, float[,] psf2, float[,] bE, float[,] bC, float corrFactor)
+        public static void UpdateBMaps(int blockId, float[,,] blocks, int yB, int xB, float[,] psf2, float[,] bE, float[,] bC, float correctionFactor)
         {
             var yPsf2Half = psf2.GetLength(0) / 2;
             var xPsf2Half = psf2.GetLength(1) / 2;
@@ -118,7 +128,6 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
             var yMin = Math.Max(yPixelIdx - yPsf2Half, 0);
             var xMin = Math.Max(xPixelIdx - xPsf2Half, 0);
-            //TODO: debug index madness
             var yMax = Math.Min(yPixelIdx + blocks.GetLength(1) - yPsf2Half + psf2.GetLength(0), bE.GetLength(0));
             var xMax = Math.Min(xPixelIdx + blocks.GetLength(2) - xPsf2Half + psf2.GetLength(1), bE.GetLength(1));
             for (int globalY = yMin; globalY < yMax; globalY++)
@@ -131,26 +140,39 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     var xPsfMin = Math.Max(globalX + xPsf2Half - xPixelIdx - blocks.GetLength(2) + 1, 0);
                     var yPsfMax = Math.Min(globalY + yPsf2Half - yPixelIdx + 1, psf2.GetLength(0));
                     var xPsfMax = Math.Min(globalX + xPsf2Half - xPixelIdx + 1, psf2.GetLength(1));
-                    var xPsfIdx = globalX + xPsf2Half - yPixelIdx;
                     for (int psfY = yPsfMin; psfY < yPsfMax; psfY++)
                         for (int psfX = xPsfMin; psfX < xPsfMax; psfX++)
                         {
-                            var blockY = -1 * (psfY - yPsf2Half - globalY) ;
-                            var blockX = -1 * (psfX - xPsf2Half - globalX);
+                            var blockY = -1 * (psfY - yPsf2Half - globalY + yPixelIdx) ;
+                            var blockX = -1 * (psfX - xPsf2Half - globalX + xPixelIdx);
 
-                            var b = blocks[blockId, blockY, blockX];
-                            var p = psf2[psfY, psfX];
                             var update = blocks[blockId, blockY, blockX] * psf2[psfY, psfX];
                             exploreUpdate += update;
-                            correctionUpdate += update * corrFactor; 
+                            correctionUpdate += update * correctionFactor; 
                         }
                     
                     bE[globalY, globalX] += exploreUpdate;
                     bC[globalY, globalX] += correctionUpdate;
                 }
+        }
+
+        public static void DebugCray()
+        {
+            var bMap = new float[16, 16];
+            var bMap2 = new float[16, 16];
+            var psf2 = new float[8, 8];
+            psf2[4, 4] = 1.0f; psf2[4, 5] = 0.5f; psf2[4, 6] = 0.5f;
+            var blocks = new float[1, 2, 2];
+            blocks[0, 0, 0] = 1.0f;
+            blocks[0, 0, 1] = 2.0f;
+            blocks[0, 1, 0] = 2.0f;
+            blocks[0, 1, 1] = 3.0f;
 
 
 
+            UpdateBMaps(0, blocks, 7, 7, psf2, bMap, bMap2, 3.0f);
+
+            FitsIO.Write(bMap, "bMapCray.fits");
         }
 
     }
