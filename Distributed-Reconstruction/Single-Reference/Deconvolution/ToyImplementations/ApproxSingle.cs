@@ -20,6 +20,38 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             
         }
 
+        public void ISTAStep(float[,] xImage, float[,] residuals, float[,] psf, float lambda, float alpha)
+        {
+            var xOld = Copy(xImage);
+            var corrKernel = PSF.CalcPaddedFourierCorrelation(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
+            var gradients = Residuals.CalcBMap(residuals, corrKernel, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1))); 
+
+            var lipschitz = (float)PSF.CalcMaxLipschitz(psf) * xImage.Length;
+            for(int i = 0; i < xImage.GetLength(0); i++)
+                for(int j = 0; j < xImage.GetLength(1);j++)
+                {
+                    var tmp = gradients[i, j] + xImage[i, j] * lipschitz;
+                    tmp = ElasticNet.ProximalOperator(tmp, lipschitz, lambda, alpha);
+                    xImage[i, j] = tmp;
+                }
+
+            //update residuals
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                {
+                    xOld[i, j] = xImage[i, j] - xOld[i, j];
+                }
+
+            var convKernel = PSF.CalcPaddedFourierConvolution(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
+            var residualsCalculator = new PaddedConvolver(convKernel, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            residualsCalculator.ConvolveInPlace(xOld);
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                {
+                    residuals[i, j] -= xOld[i, j];
+                }
+        }
+
         public bool DeconvolveRandom(float[,] xImage, float[,] residuals, float[,] psf, float lambda, float alpha, Random random, int blockSize, int threadCount, int maxIteration = 100, double epsilon = 1e-4)
         {
             var xExplore = xImage;
@@ -145,7 +177,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var activeSet = GetActiveSet(xExplore, gExplore, lambda, alpha, maxLipschitz);
             
             var theta = DeconvolveRandomActiveSet(xExplore, xCorrection, gExplore, gCorrection, psf2, ref activeSet, maxLipschitz, lambda, alpha, random, maxIteration, epsilon);
-            FitsIO.Write(xExplore, "explore.fits");
+            
             //decide which version should be taken#
             var CONVKernel = PSF.CalcPaddedFourierConvolution(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
             var residualsCalculator = new PaddedConvolver(CONVKernel, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
@@ -300,8 +332,6 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
             return theta;
         }
-
-
 
         private List<Tuple<int, int>> GetActiveSet(float[,] xExplore, float[,] gExplore, float lambda, float alpha, float lipschitz)
         {

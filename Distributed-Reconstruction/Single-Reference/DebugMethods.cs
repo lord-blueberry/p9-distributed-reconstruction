@@ -323,18 +323,16 @@ namespace Single_Reference
             var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
 
             var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf = FFT.Backward(psfGrid, c.VisibilitiesCount);
+            var psf = FFT.BackwardFloat(psfGrid, c.VisibilitiesCount);
             FFT.Shift(psf);
-
-            var psfCutDouble = CutImg(psf);
-            var psfCut = ToFloatImage(psfCutDouble);
+            var psfCut = PSF.Cut(psf);
             FitsIO.Write(psfCut, "psfCut.fits");
 
             var random = new Random(123);
             var totalSize = new Rectangle(0, 0, gridSize, gridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
-            fastCD.ResetAMap(ToFloatImage(psf));
+            //fastCD.ResetAMap(psf);
             var lambda = 0.5f * fastCD.MaxLipschitz;
             var alpha = 0.8f;
             var approx = new ApproxSingle();
@@ -360,6 +358,9 @@ namespace Single_Reference
 
                 //DECONVOLVE
                 watchDeconv.Start();
+                //approx.ISTAStep(xImage, dirtyImage, psf, lambda, alpha);
+                FitsIO.Write(xImage, "xIsta.fits");
+                FitsIO.Write(dirtyImage, "dirtyFista.fits");
                 //bMapCalculator.ConvolveInPlace(dirtyImage);
                 //FitsIO.Write(dirtyImage, "bMap_" + cycle + ".fits");
                 //var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f * fastCD.MaxLipschitz, 0.8f, 1000, 1e-4f);
