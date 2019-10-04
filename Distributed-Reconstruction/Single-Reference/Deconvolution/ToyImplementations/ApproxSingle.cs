@@ -122,9 +122,9 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             return false;
         }
 
-        public bool DeconvolveActiveSet(float[,] xImage, float[,] residuals, float[,] psf, float lambda, float alpha, Random random, int blockSize, int threadCount, int maxIteration = 100, double epsilon = 1e-4)
+        public bool DeconvolveActiveSet(float[,] xImage, float[,] residuals, float[,] psf, float lambda, float alpha, Random random, int blockSize, int threadCount, int maxIteration = 100, float epsilon = 1e-4f)
         {
-            var xExplore = xImage;
+            var xExplore = Copy(xImage);
             var xCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
 
             var PSFCorr = PSF.CalcPaddedFourierCorrelation(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
@@ -132,24 +132,62 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             //calculate gradients for each pixel
             var gExplore = Residuals.CalcBMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var gCorrection = new float[residuals.GetLength(0), residuals.GetLength(1)];
-
             var psf2 = PSF.CalcPSFSquared(psf);
 
             yBlockSize = blockSize;
             xBlockSize = blockSize;
             degreeOfSeperability = CountNonZero(psf);
             tau = 1; //number of processors
+            var maxLipschitz = (float)PSF.CalcMaxLipschitz(psf);
+            var activeSet = GetActiveSet(xExplore, gExplore, lambda, alpha, maxLipschitz);
+            var theta = DeconvolveRandomActiveSet(xExplore, xCorrection, gExplore, gCorrection, psf2, ref activeSet, maxLipschitz, lambda, alpha, random, maxIteration, epsilon);
+
+            //decide which version should be taken#
+            var CONVKernel = PSF.CalcPaddedFourierConvolution(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
+            var residualsCalculator = new PaddedConvolver(CONVKernel, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            var theta0 = tau / (float)activeSet.Count;
+            var tmpTheta = theta < 1.0f ? ((theta * theta) / (1.0f - theta)) : theta0;
+
+            //calculate residuals
+            var residualsExplore = Copy(xExplore);
+            var residualsAccelerated = Copy(xExplore);
+            for(int i = 0; i < xImage.GetLength(0);i++)
+                for(int j = 0; j < xImage.GetLength(1);j++)
+                {
+                    residualsExplore[i, j] -= xImage[i, j];
+                    residualsAccelerated[i, j] += tmpTheta * xCorrection[i,j] - xImage[i, j];
+                    xCorrection[i, j] = tmpTheta * xCorrection[i, j] + xExplore[i,j];
+                }
+
+            residualsCalculator.ConvolveInPlace(residualsExplore);
+            residualsCalculator.ConvolveInPlace(residualsAccelerated);
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                {
+                    residualsExplore[i, j] -= residuals[i, j];
+                    residualsAccelerated[i, j] -= residuals[i, j];
+                }
+
+            var objectiveExplore = Residuals.CalcPenalty(residualsExplore) + ElasticNet.CalcPenalty(xExplore, lambda, alpha);
+            var objectiveAcc = Residuals.CalcPenalty(residualsAccelerated) + ElasticNet.CalcPenalty(xCorrection, lambda, alpha);
+
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                    if (objectiveAcc < objectiveExplore)
+                        xImage[i, j] = xCorrection[i, j];
+                    else
+                        xImage[i, j] = xExplore[i, j];
 
             return false;
         }
 
-        public bool DeconvolveRandomActiveSet(float[,] xExplore, float[,] xCorrection, float[,]gExplore, float[,] gCorrection, float[,] psf2, ref List<Tuple<int,int>> activeSet, int yBlockSize, int xBlockSize, float maxLipschitz, float lambda, float alpha, Random random, int threadCount, int maxIteration = 100, double epsilon = 1e-4)
+        public float DeconvolveRandomActiveSet(float[,] xExplore, float[,] xCorrection, float[,]gExplore, float[,] gCorrection, float[,] psf2, ref List<Tuple<int,int>> activeSet, float maxLipschitz, float lambda, float alpha, Random random, int maxIteration, float epsilon)
         {
             var blockCount = activeSet.Count;
             var beta = CalcESO(tau, degreeOfSeperability, blockCount);
-
             var lipschitz = maxLipschitz * yBlockSize * xBlockSize;
             lipschitz *= (float)beta;
+
             var theta = tau / (float)blockCount;
             var theta0 = theta;
             float eta = 1.0f / blockCount;
@@ -166,13 +204,14 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 {
                     var stepSize = lipschitz * theta / theta0;
                     var theta2 = theta * theta;
-                    var blockSamples = RandomCD.CreateSamples(blockCount, tau, random);
+                    var samples = CreateSamples(blockCount, tau, random);
 
                     //minimize blocks
-                    for (int i = 0; i < blockSamples.Length; i++)
+                    for (int i = 0; i < samples.Length; i++)
                     {
-                        var yBlock = blockSamples[i] / (xExplore.GetLength(1) / xBlockSize);
-                        var xBlock = blockSamples[i] % (xExplore.GetLength(1) / xBlockSize);
+                        var blockSample = activeSet[samples[i]];
+                        var yBlock = blockSample.Item1;
+                        var xBlock = blockSample.Item2;
 
                         containsNonZero[i] = false;
                         for (int y = yBlock * yBlockSize; y < (yBlock * yBlockSize + yBlockSize); y++)
@@ -188,11 +227,12 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
                     //update bMaps
                     var correctionFactor = -(1.0f - theta / theta0) / (theta * theta);
-                    for (int i = 0; i < blockSamples.Length; i++)
+                    for (int i = 0; i < samples.Length; i++)
                         if (containsNonZero[i])
                         {
-                            var yBlock = blockSamples[i] / (xExplore.GetLength(1) / xBlockSize);
-                            var xBlock = blockSamples[i] % (xExplore.GetLength(1) / xBlockSize);
+                            var blockSample = activeSet[samples[i]];
+                            var yBlock = blockSample.Item1;
+                            var xBlock = blockSample.Item2;
                             UpdateBMaps(i, blocks, yBlock, xBlock, psf2, gExplore, gCorrection, correctionFactor);
 
                             var currentDiff = 0.0f;
@@ -247,7 +287,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 iter++;
             }
 
-            return converged;
+            return theta;
         }
 
 

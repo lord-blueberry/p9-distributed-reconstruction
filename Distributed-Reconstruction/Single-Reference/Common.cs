@@ -244,7 +244,7 @@ namespace Single_Reference
             }
         }
 
-        public static class Fourier2D 
+        public static class Fourier2D
         {
             public static Complex[,] Multiply(Complex[,] vis0, Complex[,] vis1)
             {
@@ -280,7 +280,7 @@ namespace Single_Reference
             {
                 for (int i = 0; i < vis0.GetLength(0); i++)
                     for (int j = 0; j < vis0.GetLength(1); j++)
-                        vis0[i, j] -=  vis1[i, j];
+                        vis0[i, j] -= vis1[i, j];
             }
         }
 
@@ -306,7 +306,7 @@ namespace Single_Reference
             var output = new float[image.GetLength(0), image.GetLength(1)];
             for (int i = 0; i < image.GetLength(0); i++)
                 for (int j = 0; j < image.GetLength(1); j++)
-                    output[i, j] = (float)image[i,j];
+                    output[i, j] = (float)image[i, j];
 
             return output;
         }
@@ -321,6 +321,14 @@ namespace Single_Reference
             return count;
         }
 
+        public static T[,] Copy<T>(T[,] image)
+        {
+            var output = new T[image.GetLength(0), image.GetLength(1)];
+            for (int i = 0; i < image.GetLength(0); i++)
+                for (int j = 0; j < image.GetLength(1); j++)
+                    output[i, j] = image[i, j];
+            return output;
+        }
         private static float[,] Pad(float[,] image, int yPadding, int xPadding)
         {
             var yPsfHalf = yPadding / 2;
