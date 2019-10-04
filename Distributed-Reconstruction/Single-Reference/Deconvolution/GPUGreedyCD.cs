@@ -190,10 +190,7 @@ namespace Single_Reference.Deconvolution
         /// <param name="lambda"></param>
         /// <param name="alpha"></param>
         private void AllocateGPU(float[,] xImage, float[,] bMap, float lambda, float alpha)
-        {
-            //TODO:windowing
-            
-
+        {         
             var zeroIndex = new Index2(0, 0);
             var size = new Index2(xImage.GetLength(1), xImage.GetLength(0));
             xImageGPU = accelerator.Allocate<float>(size);

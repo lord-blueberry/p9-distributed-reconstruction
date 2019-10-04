@@ -15,8 +15,8 @@ namespace Single_Reference
             //DebugMethods.DebugSimulatedGreedy2();
 
             //DebugMethods.DebugSimulatedPCDM();
-            DebugMethods.DebugSimulatedApprox();
-            //DebugMethods.DebugILGPU();
+            //DebugMethods.DebugSimulatedApprox();
+            DebugMethods.DebugILGPU();
 
             //DebugMethods.DebugSimulatedMixed();
             //Deconvolution.NaiveGreedyCD.Run();

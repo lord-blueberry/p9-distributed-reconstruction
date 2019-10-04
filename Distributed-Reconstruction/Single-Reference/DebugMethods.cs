@@ -421,8 +421,10 @@ namespace Single_Reference
             var imageSection = new Rectangle(0, 128, gridSize, gridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize) , new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
-            fastCD.ResetAMap(ToFloatImage(psf));
-            var gpuCD = new GPUGreedyCD(totalSize, psfCut, 50);
+            //fastCD.ResetAMap(ToFloatImage(psf));
+            var gpuCD = new GPUGreedyCD(totalSize, psfCut, 100);
+            var lambda = 0.5f * fastCD.MaxLipschitz;
+            var alpha = 0.8f;
 
             var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;
@@ -433,7 +435,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 7; cycle++)
+            for (int cycle = 0; cycle < 4; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -447,13 +449,14 @@ namespace Single_Reference
                 watchDeconv.Start();
                 bMapCalculator.ConvolveInPlace(dirtyImage);
                 FitsIO.Write(dirtyImage, "bMap_" + cycle + ".fits");
-                var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f*fastCD.MaxLipschitz, 0.8f, 1000, 1e-4f);
+                //var result = fastCD.Deconvolve(xImage, dirtyImage, lambda, alpha, 1000, 1e-4f);
+                var result = gpuCD.Deconvolve(xImage, dirtyImage, lambda, alpha, 1000, 1e-4f);
 
                 if (result.Converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");
-                FitsIO.Write(xImage, "xImageILGPU_" + cycle + ".fits");
+                FitsIO.Write(xImage, "xImageGreedy" + cycle + ".fits");
                 FitsIO.Write(dirtyImage, "residualDebug_" + cycle + ".fits");
                 watchDeconv.Stop();
 
