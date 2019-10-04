@@ -9,18 +9,18 @@ using static System.Math;
 using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
 using static Single_Reference.Common;
-
+using static Single_Reference.Experiments.DataLoading;
 
 
 namespace Single_Reference.Experiments
 {
-    class PSFSize
+    static class PSFSize
     {
         public const double REFERENCE_L2_PENALTY = 5.64324894802577;
         public const double REFERENCE_ELASTIC_PENALTY = 29.3063615047876;
         //34,94961045281337‬
 
-        private class InputData
+        public class InputData
         {
             public GriddingConstants c;
             public List<List<SubgridHack>> metadata;
@@ -42,7 +42,7 @@ namespace Single_Reference.Experiments
             }
 
         }
-        private class ReconstructionInfo
+        public class ReconstructionInfo
         {
             public Stopwatch totalDeconv;
             public double lastDataPenalty;
@@ -54,11 +54,11 @@ namespace Single_Reference.Experiments
             }
         }
 
-        private static ReconstructionInfo ReconstructGradientApprox(InputData input, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon)
+        private static ReconstructionInfo ReconstructGradientApprox(Data input, float[,] fullPsf, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon)
         {
             var info = new ReconstructionInfo();
-            var psfCut = PSF.Cut(input.fullPsf, cutFactor);
-            var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
+            var psfCut = PSF.Cut(fullPsf, cutFactor);
+            var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var psfBMap = psfCut;
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
@@ -66,7 +66,7 @@ namespace Single_Reference.Experiments
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
             var lambda = 0.4f * fastCD.MaxLipschitz;
-            var lambdaTrue = (float)(0.4f * PSF.CalcMaxLipschitz(input.fullPsf));
+            var lambdaTrue = (float)(0.4f * PSF.CalcMaxLipschitz(fullPsf));
             var alpha = 0.1f;
 
             var xImage = new float[input.c.GridSize, input.c.GridSize];
@@ -122,8 +122,8 @@ namespace Single_Reference.Experiments
                         writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
                         writer.Flush();
                         //do one last run, starting with the bMap of Full gradients
-                        fastCD.ResetAMap(input.fullPsf);
-                        bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(input.fullPsf, totalSize), new Rectangle(0, 0, input.fullPsf.GetLength(0), input.fullPsf.GetLength(1)));
+                        fastCD.ResetAMap(fullPsf);
+                        bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1)));
                         bMap = bMapCalculator.Convolve(dirtyImage);
                         FitsIO.Write(bMap, folder + dirtyPrefix + "bmap_" + cycle + "_full.fits");
                         currentSideLobe = Residuals.GetMax(bMap) * maxSidelobe;
@@ -164,21 +164,21 @@ namespace Single_Reference.Experiments
             return info;
         }
 
-        private static ReconstructionInfo ReconstructSimple(InputData input, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon, bool startWithFullPSF)
+        private static ReconstructionInfo ReconstructSimple(Data input, float[,] fullPsf, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon, bool startWithFullPSF)
         {
             var info = new ReconstructionInfo();
-            var psfCut = PSF.Cut(input.fullPsf, cutFactor);
-            var maxSidelobe = PSF.CalcMaxSidelobe(input.fullPsf, cutFactor);
+            var psfCut = PSF.Cut(fullPsf, cutFactor);
+            var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
-            var psfBMap = startWithFullPSF ? input.fullPsf : psfCut;
+            var psfBMap = startWithFullPSF ? fullPsf : psfCut;
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
             if(startWithFullPSF)
-                fastCD.ResetAMap(input.fullPsf);
+                fastCD.ResetAMap(fullPsf);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
             var lambda = 0.4f * fastCD.MaxLipschitz;
-            var lambdaTrue =(float)( 0.4f * Common.PSF.CalcMaxLipschitz(input.fullPsf));
+            var lambdaTrue =(float)( 0.4f * PSF.CalcMaxLipschitz(fullPsf));
             var alpha = 0.1f;
 
             var xImage = new float[input.c.GridSize, input.c.GridSize];
@@ -242,51 +242,15 @@ namespace Single_Reference.Experiments
         {
             var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
 
-            var frequencies = FitsIO.ReadFrequencies(Path.Combine(folder, "freq.fits"));
-            var uvw = FitsIO.ReadUVW(Path.Combine(folder, "uvw0.fits"));
-            var flags = FitsIO.ReadFlags(Path.Combine(folder, "flags0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
-            double norm = 2.0;
-            var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis0.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+            var data = DataLoading.LMC.LoadWithStandardParams(folder);
+            Console.WriteLine("gridding psf");
+            var psfGrid = IDG.GridPSF(data.c, data.metadata, data.uvw, data.flags, data.frequencies);
+            var psf = FFT.BackwardFloat(psfGrid, data.c.VisibilitiesCount);
 
-            for (int i = 1; i < 8; i++)
-            {
-                var uvw0 = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + i + ".fits"));
-                var flags0 = FitsIO.ReadFlags(Path.Combine(folder, "flags" + i + ".fits"), uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
-                var visibilities0 = FitsIO.ReadVisibilities(Path.Combine(folder, "vis" + i + ".fits"), uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length, norm);
-                uvw = FitsIO.Stitch(uvw, uvw0);
-                flags = FitsIO.Stitch(flags, flags0);
-                visibilities = FitsIO.Stitch(visibilities, visibilities0);
-            }
-
-            var visCount2 = 0;
-            for (int i = 0; i < flags.GetLength(0); i++)
-                for (int j = 0; j < flags.GetLength(1); j++)
-                    for (int k = 0; k < flags.GetLength(2); k++)
-                        if (!flags[i, j, k])
-                            visCount2++;
-            var visibilitiesCount = visCount2;
-
-            int gridSize = 2048;
-            int subgridsize = 16;
-            int kernelSize = 4;
-            //cell = image / grid
-            int max_nr_timesteps = 512;
-            double scaleArcSec = 2.5 / 3600.0 * PI / 180.0;
-
-            Console.WriteLine("Gridding PSF");
-
-            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
-            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-            var psfGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf = FFT.BackwardFloat(psfGrid, c.VisibilitiesCount);
-            
             FFT.Shift(psf);
+            Directory.CreateDirectory("PSFSizeExperiment");
+            Directory.SetCurrentDirectory("PSFSizeExperiment");
             FitsIO.Write(psf, "psfFull.fits");
-            var psf2 = Common.PSF.CalcPSFSquared(psf);
-            FitsIO.Write(psf2, "psfSquared.fits");
-
-            var input = new InputData(c, metadata, frequencies, visibilities, uvw, flags, psf);
-            //---------------End file reading----------------------------------------------------------
 
             //reconstruct with full psf and find reference objective value
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
@@ -298,7 +262,7 @@ namespace Single_Reference.Experiments
                 using (var writer = new StreamWriter("1Psf.txt", false))
                 {
                     writer.WriteLine(fileHeader);
-                    referenceInfo = ReconstructSimple(input, "", 1, 10, "dirtyReference", "xReference", writer, 0.0, 1e-5f, false);
+                    referenceInfo = ReconstructSimple(data, psf, "", 1, 10, "dirtyReference", "xReference", writer, 0.0, 1e-5f, false);
                     File.WriteAllText("1PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
                 }
                 objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
@@ -308,7 +272,7 @@ namespace Single_Reference.Experiments
             ReconstructionInfo experimentInfo = null;
             var psfCuts = new int[] {/*2, 4, 8, 16,*/ 32, /*64*/};
             var outFolder = "cutPsf";
-            /*
+            
             Directory.CreateDirectory(outFolder);
             outFolder += @"\";
             foreach (var cut in psfCuts)
@@ -316,7 +280,7 @@ namespace Single_Reference.Experiments
                 using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
                 {
                     writer.WriteLine(fileHeader);
-                    experimentInfo = ReconstructSimple(input, outFolder, cut, 16, cut+"dirty", cut+"x", writer, objectiveCutoff, 1e-5f, false);
+                    experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 16, cut+"dirty", cut+"x", writer, objectiveCutoff, 1e-5f, false);
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
@@ -330,10 +294,10 @@ namespace Single_Reference.Experiments
                 using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
                 {
                     writer.WriteLine(fileHeader);
-                    experimentInfo = ReconstructSimple(input, outFolder, cut, 16, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f, true);
+                    experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 16, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f, true);
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
-            }*/
+            }
 
             //combined, final solution. Cut the psf in half, optimize until convergence, and then do one more major cycle with the second method
             outFolder = "properSolution";
@@ -344,7 +308,7 @@ namespace Single_Reference.Experiments
                 using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
                 {
                     writer.WriteLine(fileHeader);
-                    experimentInfo = ReconstructGradientApprox(input, outFolder, cut, 16, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f);
+                    experimentInfo = ReconstructGradientApprox(data, psf, outFolder, cut, 16, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f);
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
