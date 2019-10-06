@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.IO;
 using Single_Reference.Deconvolution;
+using Single_Reference.IDGSequential;
 using static Single_Reference.Common;
 using static Single_Reference.Experiments.PSFSize;
-using Single_Reference.IDGSequential;
+
+
 
 
 namespace Single_Reference.Experiments
@@ -22,7 +25,7 @@ namespace Single_Reference.Experiments
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
             if (startWithFullPSF)
-                fastCD.ResetAMap(input.fullPsf);
+                fastCD.ResetAMap(input.fullPsf, cutFactor);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
             var lambda = 0.4f * fastCD.MaxLipschitz;
@@ -84,6 +87,51 @@ namespace Single_Reference.Experiments
             }
 
             return info;
+        }
+
+        public static void Run()
+        {
+            var folder = @"C:\dev\GitHub\p9-data\small\fits\simulation_point\";
+            var data = DataLoading.SimulatedPoints.Load(folder);
+            var gridSizes = new int[] { 512, 1024, 2048, 4096 };
+            foreach(var gridSize in gridSizes)
+            {
+                var visibilitiesCount = data.visibilitiesCount;
+                int subgridsize = 8;
+                int kernelSize = 4;
+                int max_nr_timesteps = 1024;
+                double cellSize = (1.0 * 256 / gridSize) / 3600.0 * Math.PI / 180.0;
+                var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+                var metadata = Partitioner.CreatePartition(c, data.uvw, data.frequencies);
+                var psfGrid = IDG.GridPSF(data.c, data.metadata, data.uvw, data.flags, data.frequencies);
+                var psf = FFT.BackwardFloat(psfGrid, data.c.VisibilitiesCount);
+                FFT.Shift(psf);
+
+                var residualVis = data.visibilities;
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, data.uvw, data.frequencies);
+                var dirtyImage = FFT.BackwardFloat(dirtyGrid, data.c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+
+                var totalSize = new Rectangle(0, 0, gridSize, gridSize);
+                var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psf, totalSize), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+                var bMapCPU = bMapCalculator.Convolve(dirtyImage);
+                var bMapGPU = bMapCalculator.Convolve(dirtyImage);
+                var fastCD = new FastGreedyCD(totalSize, psf);
+                var gpuCD = new GPUGreedyCD(totalSize, psf, 1000);
+                var lambda = 0.5f * fastCD.MaxLipschitz;
+                var alpha = 0.5f;
+
+                var xCPU = new float[gridSize, gridSize];
+                var cpuResult = fastCD.Deconvolve(xCPU, bMapCPU, lambda, alpha, 10000, 1e-8f);
+                FitsIO.Write(xCPU, "cpuResult" + gridSize + ".fits");
+
+                var xGPU = new float[gridSize, gridSize];
+                var gpuResult = gpuCD.Deconvolve(xGPU, bMapGPU, lambda, alpha, 10000, 1e-8f);
+                FitsIO.Write(xCPU, "gpuResult" + gridSize + ".fits");
+
+
+            }
+            
         }
     }
 }

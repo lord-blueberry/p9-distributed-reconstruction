@@ -74,5 +74,34 @@ namespace Single_Reference.Experiments
                 return d;
             }
         }
+
+        public static class SimulatedPoints
+        {
+            public static Data Load(string folder)
+            {
+                var frequencies = FitsIO.ReadFrequencies(Path.Combine(folder, "freq.fits"));
+                var uvw = FitsIO.ReadUVW(Path.Combine(folder, "uvw.fits"));
+                var flags = FitsIO.ReadFlags(Path.Combine(folder, "flags.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+                double norm = 2.0;
+                var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
+
+                var visCount2 = 0;
+                for (int i = 0; i < flags.GetLength(0); i++)
+                    for (int j = 0; j < flags.GetLength(1); j++)
+                        for (int k = 0; k < flags.GetLength(2); k++)
+                            if (!flags[i, j, k])
+                                visCount2++;
+                var visibilitiesCount = visCount2;
+
+                var d = new Data();
+                d.frequencies = frequencies;
+                d.visibilities = visibilities;
+                d.uvw = uvw;
+                d.flags = flags;
+                d.visibilitiesCount = visibilitiesCount;
+
+                return d;
+            }
+        }
     }
 }

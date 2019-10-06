@@ -39,17 +39,19 @@ namespace Single_Reference.Deconvolution
             //FitsIO.Write(psfSquared, "psfSquaredDebug" + psf.GetLength(0) + ".fits");
         }
 
-        public void ResetAMap(float[,] psf)
+        public void ResetAMap(float[,] psf, int cutFactor)
         {
             var psf2Local = PSF.CalcPSFSquared(psf);
             var maxFull = Residuals.GetMax(psf2Local);
-            var maxCut = Residuals.GetMax(psf2);
             MaxLipschitz = maxFull;
+            aMap = PSF.CalcAMap(psf, patch, patch);
+            //psf2 = PSF.Cut(psf2Local, cutFactor);
 
+            var maxCut = Residuals.GetMax(psf2);
             for (int i = 0; i < psf2.GetLength(0); i++)
                 for (int j = 0; j < psf2.GetLength(1); j++)
                     psf2[i, j] *= (maxFull / maxCut);
-            aMap = PSF.CalcAMap(psf, patch, patch);
+
 
         }
 
@@ -91,7 +93,7 @@ namespace Single_Reference.Deconvolution
             while (!converged & iter < iterations)
             {
                 var maxPixel = GetAbsMax(subpatch, reconstruction, bMap, lambda, alpha);
-                converged = maxPixel.PixelMaxDiff < epsilon ;
+                converged = maxPixel.PixelMaxDiff < epsilon;
                 if (!converged)
                 {
                     var yLocal = maxPixel.Y - patch.Y;

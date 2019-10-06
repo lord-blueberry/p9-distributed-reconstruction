@@ -421,7 +421,7 @@ namespace Single_Reference
             var imageSection = new Rectangle(0, 128, gridSize, gridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize) , new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
-            //fastCD.ResetAMap(ToFloatImage(psf));
+            fastCD.ResetAMap(ToFloatImage(psf), 2);
             var gpuCD = new GPUGreedyCD(totalSize, psfCut, 100);
             var lambda = 0.5f * fastCD.MaxLipschitz;
             var alpha = 0.8f;
