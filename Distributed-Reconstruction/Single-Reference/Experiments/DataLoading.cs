@@ -81,7 +81,7 @@ namespace Single_Reference.Experiments
             {
                 var frequencies = FitsIO.ReadFrequencies(Path.Combine(folder, "freq.fits"));
                 var uvw = FitsIO.ReadUVW(Path.Combine(folder, "uvw.fits"));
-                var flags = FitsIO.ReadFlags(Path.Combine(folder, "flags.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
+                var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
                 double norm = 2.0;
                 var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 

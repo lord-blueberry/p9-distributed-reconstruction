@@ -226,7 +226,7 @@ namespace Single_Reference.Experiments
         {
             var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
 
-            var data = DataLoading.LMC.Load(folder);
+            var data = LMC.Load(folder);
             int gridSize = 4096;
             int subgridsize = 16;
             int kernelSize = 4;
