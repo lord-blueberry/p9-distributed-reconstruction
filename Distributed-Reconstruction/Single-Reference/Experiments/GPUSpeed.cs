@@ -93,7 +93,7 @@ namespace Single_Reference.Experiments
         {
             var folder = @"C:\dev\GitHub\p9-data\small\fits\simulation_point\";
             var data = DataLoading.SimulatedPoints.Load(folder);
-            var gridSizes = new int[] { 512, 1024, 2048, 4096};
+            var gridSizes = new int[] { 256, 512, 1024, 2048, 4096};
             Directory.CreateDirectory("GPUSpeedup");
             var writer = new StreamWriter("GPUSpeedup/GPUSpeedup.txt", false);
             foreach (var gridSize in gridSizes)

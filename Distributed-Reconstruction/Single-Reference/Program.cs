@@ -7,7 +7,7 @@ namespace Single_Reference
         static void Main()
         {
             //Experiments.GPUSpeed.Run();
-            Experiments.PSFSize.Run();
+            //Experiments.PSFSize.Run();
 
 
             //Experiments.PSFSize.DebugConvergence();
@@ -16,7 +16,7 @@ namespace Single_Reference
 
             //DebugMethods.DebugSimulatedPCDM();
             //DebugMethods.DebugSimulatedApprox();
-            //DebugMethods.DebugILGPU();
+            DebugMethods.DebugILGPU();
 
             //DebugMethods.DebugSimulatedMixed();
             //Deconvolution.NaiveGreedyCD.Run();

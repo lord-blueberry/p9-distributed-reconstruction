@@ -18,6 +18,7 @@ namespace Single_Reference.Experiments
     {
         public const double REFERENCE_L2_PENALTY = 22.5471483068389;
         public const double REFERENCE_ELASTIC_PENALTY = 115.805654636546;
+        //138,3528029433849‬
         //34,94961045281337‬
 
         public class InputData
