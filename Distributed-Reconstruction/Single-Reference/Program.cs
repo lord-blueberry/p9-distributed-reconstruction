@@ -16,12 +16,13 @@ namespace Single_Reference
 
             //DebugMethods.DebugSimulatedPCDM();
             //DebugMethods.DebugSimulatedApprox();
-            DebugMethods.DebugILGPU();
+            //DebugMethods.DebugILGPU();
 
             //DebugMethods.DebugSimulatedMixed();
             //Deconvolution.NaiveGreedyCD.Run();
             //DebugMethods.DebugSimulatedWStack();
             //DebugMethods.MeerKATFull();
+            DebugMethods.DebugdWStack();
         }
 
     }

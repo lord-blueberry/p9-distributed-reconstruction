@@ -78,6 +78,7 @@ namespace Single_Reference.Experiments
             DeconvolutionResult lastResult = null;
             var minimumReached = false;
             var firstTimeConverged = false;
+            var lastLambda = 0.0f;
             for (int cycle = 0; cycle < maxMajor; cycle++)
             {
                 Console.WriteLine("cycle " + cycle);
@@ -103,12 +104,14 @@ namespace Single_Reference.Experiments
 
                 //check wether we can minimize the objective further with the current psf
                 var objectiveReached = (dataPenalty + regPenalty) < objectiveCutoff;
-                minimumReached = (lastResult != null && lastResult.Converged && lastResult.IterationCount < 10000 && currentLambda == lambda);
-                if (minimumReached & cycle > 1)
+                minimumReached = (lastResult != null && lastResult.Converged && lastResult.IterationCount < 20 && currentLambda == lambda);
+                if (lambda == lastLambda)
                     firstTimeConverged = true;
 
-                if (!objectiveReached)
+                if (!objectiveReached & !minimumReached)
                 {
+                    writer.Write(firstTimeConverged + ";");
+                    writer.Flush();
                     info.totalDeconv.Start();
                     if (!firstTimeConverged)
                     {
@@ -143,6 +146,8 @@ namespace Single_Reference.Experiments
 
                     break;
                 }
+
+                lastLambda = currentLambda;
 
             }
 
@@ -180,14 +185,14 @@ namespace Single_Reference.Experiments
                 //calc data and reg penalty
                 var dataPenalty = Residuals.CalcPenalty(dirtyImage);
                 var regPenalty = ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
-                var regPenaltyCurrent = ElasticNet.CalcPenalty(xImage, lambda, alpha);
+                var regPenaltyCurrent = ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
                 info.lastDataPenalty = dataPenalty;
                 info.lastRegPenalty = regPenalty;
 
                 bMapCalculator.ConvolveInPlace(dirtyImage);
                 //FitsIO.Write(dirtyImage, folder + dirtyPrefix + "bmap_" + cycle + ".fits");
                 var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
-                var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
+                var currentLambda = Math.Max(currentSideLobe / alpha, lambdaTrue);
 
                 writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
                 writer.Flush();
@@ -265,7 +270,7 @@ namespace Single_Reference.Experiments
             
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 32, 64 };
+            var psfCuts = new int[] { 32, /*64*/ };
             var outFolder = "cutPsf";
             /*Directory.CreateDirectory(outFolder);
             outFolder += @"\";
@@ -278,7 +283,7 @@ namespace Single_Reference.Experiments
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
-            
+
             //Tryout with cutting the PSF, but starting from the true bMap
             outFolder = "cutPsf2";
             Directory.CreateDirectory(outFolder);

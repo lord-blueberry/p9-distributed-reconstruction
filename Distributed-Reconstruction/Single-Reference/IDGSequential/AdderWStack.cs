@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Numerics;
+using System.Threading.Tasks;
 
 namespace Single_Reference.IDGSequential
 {
@@ -9,8 +10,16 @@ namespace Single_Reference.IDGSequential
     {
         public static Complex[,,] AddHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgrids)
         {
-            if (c.SubgridsPrecomputed == null)
-                throw new InvalidOperationException("AdderWStack should be called when GriddingConstants.WStep > 0");
+
+            var phasorPrecomputed = new Complex[c.SubgridSize, c.SubgridSize];
+            Parallel.For(0, phasorPrecomputed.GetLength(0), (y) =>
+            {
+                for (int x = 0; x < phasorPrecomputed.GetLength(1); x++)
+                {
+                    double phase = Math.PI * (x + y - c.SubgridSize) / c.SubgridSize;
+                    phasorPrecomputed[y, x] = new Complex(Math.Cos(phase), Math.Sin(phase));
+                }
+            });
 
             var grid = new Complex[c.WLayerCount, c.GridSize, c.GridSize];
             for (int baseline = 0; baseline < subgrids.Count; baseline++)
@@ -53,7 +62,7 @@ namespace Single_Reference.IDGSequential
                             int xDst = subgridX + x;
                             int yDst = subgridY + y;
 
-                            var phasor = c.SubgridsPrecomputed[y_, x_];
+                            var phasor = phasorPrecomputed[y_, x_];
                             var value = phasor * data[ySrc, xSrc];
                             value = negativeW ? Complex.Conjugate(value) : value;
                             grid[subgridW, yDst, xDst] += value;
@@ -69,8 +78,17 @@ namespace Single_Reference.IDGSequential
 
         public static List<List<Complex[,]>> SplitHack(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,] grid)
         {
-            var subgrids = new List<List<Complex[,]>>(metadata.Count);
+            var phasorPrecomputed = new Complex[c.SubgridSize, c.SubgridSize];
+            Parallel.For(0, phasorPrecomputed.GetLength(0), (y) =>
+            {
+                for (int x = 0; x < phasorPrecomputed.GetLength(1); x++)
+                {
+                    double phase = -Math.PI * (x + y - c.SubgridSize) / c.SubgridSize;
+                    phasorPrecomputed[y, x] = new Complex(Math.Cos(phase), Math.Sin(phase));
+                }
+            });
 
+            var subgrids = new List<List<Complex[,]>>(metadata.Count);
             for (int baseline = 0; baseline < metadata.Count; baseline++)
             {
                 var blMeta = metadata[baseline];
@@ -103,7 +121,7 @@ namespace Single_Reference.IDGSequential
                             if (subgridX >= 1 && subgridX < c.GridSize - c.SubgridSize &&
                                 subgridY >= 1 && subgridY < c.GridSize - c.SubgridSize)
                             {
-                                var phasor = c.SubgridsPrecomputed[y, x];
+                                var phasor = phasorPrecomputed[y, x];
 
                                 var value = grid[ySrc, xSrc];
                                 value = negativeW ? Complex.Conjugate(value) : value;

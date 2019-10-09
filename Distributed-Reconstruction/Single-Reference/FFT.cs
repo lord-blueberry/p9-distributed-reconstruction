@@ -201,7 +201,7 @@ namespace Single_Reference
         }
 
         #region w-stacking methods
-        public static double[,,] GridIFFT(Complex[,,] grid, long visibilityCount)
+        public static double[,,] WStackIFFT(Complex[,,] grid, long visibilityCount)
         {
             var output = new double[grid.GetLength(0), grid.GetLength(1), grid.GetLength(2)];
             using (var imageSpace = new AlignedArrayComplex(16, grid.GetLength(1), grid.GetLength(2)))
@@ -224,6 +224,37 @@ namespace Single_Reference
                         for (int x = 0; x < grid.GetLength(2); x++)
                         {
                             output[k, y, x] += imageSpace[y, x].Real / visibilityCount;
+                        }
+                    }
+                }
+            }
+
+            return output;
+        }
+
+        public static float[,] WStackIFFTFloat(Complex[,,] grid, long visibilityCount)
+        {
+            var output = new float[grid.GetLength(1), grid.GetLength(2)];
+            using (var imageSpace = new AlignedArrayComplex(16, grid.GetLength(1), grid.GetLength(2)))
+            using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
+            {
+                for (int k = 0; k < grid.GetLength(0); k++)
+                {
+                    for (int y = 0; y < grid.GetLength(1); y++)
+                    {
+                        for (int x = 0; x < grid.GetLength(2); x++)
+                        {
+                            fourierSpace[y, x] = grid[k, y, x];
+                        }
+                    }
+
+                    DFT.IFFT(fourierSpace, imageSpace);
+
+                    for (int y = 0; y < grid.GetLength(1); y++)
+                    {
+                        for (int x = 0; x < grid.GetLength(2); x++)
+                        {
+                            output[y, x] += (float)(imageSpace[y, x].Real / visibilityCount);
                         }
                     }
                 }
