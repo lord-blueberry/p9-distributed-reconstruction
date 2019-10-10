@@ -497,6 +497,16 @@ namespace Single_Reference
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
+            for (int i = 1; i < 8; i++)
+            {
+                var uvw0 = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw" + i + ".fits");
+                var flags0 = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags" + i + ".fits", uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
+                var visibilities0 = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis" + i + ".fits", uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length, norm);
+                uvw = FitsIO.Stitch(uvw, uvw0);
+                flags = FitsIO.Stitch(flags, flags0);
+                visibilities = FitsIO.Stitch(visibilities, visibilities0);
+            }
+
             var maxW = 0.0;
             for (int i = 0; i < uvw.GetLength(0); i++)
                 for (int j = 0; j < uvw.GetLength(1); j++)
@@ -510,11 +520,11 @@ namespace Single_Reference
                         if (!flags[i, j, k])
                             visCount2++;
             var visibilitiesCount = visCount2;
-            int gridSize = 2048;
-            int subgridsize = 8;
-            int kernelSize = 4;
+            int gridSize = 4096;
+            int subgridsize = 16;
+            int kernelSize = 8;
             int max_nr_timesteps = 1024;
-            double cellSize = 3.2 / 3600.0 * PI / 180.0;
+            double cellSize = 1.6 / 3600.0 * PI / 180.0;
             int wLayerCount = 32;
             double wStep = maxW / (wLayerCount);
             var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
@@ -544,7 +554,7 @@ namespace Single_Reference
 
             var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;
-            for (int cycle = 0; cycle < 4; cycle++)
+            for (int cycle = 0; cycle < 8; cycle++)
             {
                 var dirtyGrid = IDG.GridW(c, metadata, residualVis, uvw, frequencies);
                 var dirty = FFT.WStackIFFTFloat(dirtyGrid, c.VisibilitiesCount);
@@ -553,7 +563,7 @@ namespace Single_Reference
                 FitsIO.Write(dirty, "dirty_" + cycle + ".fits");
                 bMapCalculator.ConvolveInPlace(dirty);
                 FitsIO.Write(dirty, "bMap_" + cycle + ".fits");
-                var result = fastCD.Deconvolve(xImage, dirty, lambda, alpha, 5000, 1e-4f);
+                var result = fastCD.Deconvolve(xImage, dirty, lambda, alpha, 10000, 1e-4f);
 
                 FitsIO.Write(xImage, "xImageGreedy" + cycle + ".fits");
 
