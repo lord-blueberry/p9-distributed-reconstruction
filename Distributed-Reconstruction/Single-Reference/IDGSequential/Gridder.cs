@@ -17,10 +17,18 @@ namespace Single_Reference.IDGSequential
             var wavenumbers = MathFunctions.FrequencyToWavenumber(frequencies);
             var imagesize = c.ScaleArcSec * c.GridSize;
             var output = new List<List<Complex[,]>>(metadata.Count);
+
             for (int baseline = 0; baseline < metadata.Count; baseline++)
             {
                 var blMeta = metadata[baseline];
                 var blSubgrids = new List<Complex[,]>(blMeta.Count);
+                output.Add(blSubgrids);
+            }
+
+            Parallel.For(0, metadata.Count, baseline =>
+            {
+                var blMeta = metadata[baseline];
+                var blSubgrids = output[baseline];
                 for (int subgrid = 0; subgrid < blMeta.Count; subgrid++)
                 {
                     var meta = blMeta[subgrid];
@@ -45,7 +53,7 @@ namespace Single_Reference.IDGSequential
                             var n = ComputeN(l, m);
 
                             int sampleEnd = meta.timeSampleStart + meta.timeSampleCount;
-                            for(int time = meta.timeSampleStart; time < sampleEnd; time++)
+                            for (int time = meta.timeSampleStart; time < sampleEnd; time++)
                             {
                                 var u = uvw[baseline, time, 0];
                                 var v = uvw[baseline, time, 1];
@@ -72,10 +80,8 @@ namespace Single_Reference.IDGSequential
                         }
                     }
                     blSubgrids.Add(subgridOutput);
-
                 }
-                output.Add(blSubgrids);
-            }
+            });
 
             return output;
         }
@@ -88,7 +94,7 @@ namespace Single_Reference.IDGSequential
             var imagesize = c.ScaleArcSec * c.GridSize;
 
             var outputVis = new Complex[uvw.GetLength(0), uvw.GetLength(1), wavenumbers.Length];
-            for (int baseline = 0; baseline < metadata.Count; baseline++)
+            Parallel.For(0, metadata.Count, baseline =>
             {
                 var blMeta = metadata[baseline];
                 var blSubgrids = subgridData[baseline];
@@ -146,9 +152,9 @@ namespace Single_Reference.IDGSequential
                             outputVis[baseline, time, channel] = visibility * scale;
                         }
                     }
-                        
+
                 }
-            }
+            });
 
             return outputVis;
         }
