@@ -242,7 +242,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             yBlockSize = blockSize;
             xBlockSize = blockSize;
             degreeOfSeperability = CountNonZero(psf);
-            tau = 1; //number of processors
+            tau = threadCount; //number of processors
             var maxLipschitz = (float)PSF.CalcMaxLipschitz(psf);
             var activeSet = GetActiveSet(xExplore, gExplore, lambda, alpha, maxLipschitz);
             
@@ -313,7 +313,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             while (iter < maxIteration & !converged)
             {
                 var xDiffMax = 0.0f;
-                for(int inner= 0; inner < activeSet.Count; inner++)
+                for(int inner= 0; inner < Math.Min(activeSet.Count/tau, 10000/tau); inner++)
                 {
                     var stepSize = lipschitz * theta / theta0;
                     var theta2 = theta * theta;
@@ -395,7 +395,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
                 if(xDiffMax < epsilon)
                 {
-                    converged = true;
+                    //converged = true;
                 }
                 Console.WriteLine("Done Active Set iteration");
                 iter++;
