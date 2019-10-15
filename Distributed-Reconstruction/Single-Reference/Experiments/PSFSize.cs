@@ -16,10 +16,9 @@ namespace Single_Reference.Experiments
 {
     static class PSFSize
     {
-        public const double REFERENCE_L2_PENALTY = 22.5471483068389;
-        public const double REFERENCE_ELASTIC_PENALTY = 115.805654636546;
-        //138,3528029433849‬
-        //34,94961045281337‬
+        public const double REFERENCE_L2_PENALTY = 7.21195378695326;
+        public const double REFERENCE_ELASTIC_PENALTY = 44.1032910858257;
+        //51,31524487277896
 
         public class InputData
         {
@@ -185,21 +184,21 @@ namespace Single_Reference.Experiments
                 //calc data and reg penalty
                 var dataPenalty = Residuals.CalcPenalty(dirtyImage);
                 var regPenalty = ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
-                var regPenaltyCurrent = ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
+                var regPenaltyCurrent = ElasticNet.CalcPenalty(xImage, lambda, alpha);
                 info.lastDataPenalty = dataPenalty;
                 info.lastRegPenalty = regPenalty;
 
                 bMapCalculator.ConvolveInPlace(dirtyImage);
                 //FitsIO.Write(dirtyImage, folder + dirtyPrefix + "bmap_" + cycle + ".fits");
                 var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
-                var currentLambda = Math.Max(currentSideLobe / alpha, lambdaTrue);
+                var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
                 writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
                 writer.Flush();
 
                 //check wether we can minimize the objective further with the current psf
                 var objectiveReached = (dataPenalty + regPenalty) < objectiveCutoff;
-                var minimumReached = (lastResult != null && lastResult.IterationCount < 20 && lastResult.Converged);
+                var minimumReached = (lastResult != null && lastResult.IterationCount < 100 && lastResult.Converged);
                 if (!objectiveReached & !minimumReached)
                 {
                     info.totalDeconv.Start();
@@ -231,68 +230,44 @@ namespace Single_Reference.Experiments
         public static void Run()
         {
             var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
-
-            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\freq.fits");
-            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw0.fits");
-            var flags = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length);
-            double norm = 2.0;
-            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis0.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
-
-            for (int i = 1; i < 8; i++)
-            {
-                var uvw0 = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\uvw" + i + ".fits");
-                var flags0 = FitsIO.ReadFlags(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\flags" + i + ".fits", uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length);
-                var visibilities0 = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\vis" + i + ".fits", uvw0.GetLength(0), uvw0.GetLength(1), frequencies.Length, norm);
-                uvw = FitsIO.Stitch(uvw, uvw0);
-                flags = FitsIO.Stitch(flags, flags0);
-                visibilities = FitsIO.Stitch(visibilities, visibilities0);
-            }
+            var data = LMC.Load(folder);
 
             var maxW = 0.0;
-            for (int i = 0; i < uvw.GetLength(0); i++)
-                for (int j = 0; j < uvw.GetLength(1); j++)
-                    maxW = Math.Max(maxW, Math.Abs(uvw[i, j, 2]));
-            maxW = Partitioner.MetersToLambda(maxW, frequencies[frequencies.Length - 1]);
+            for (int i = 0; i < data.uvw.GetLength(0); i++)
+                for (int j = 0; j < data.uvw.GetLength(1); j++)
+                    maxW = Math.Max(maxW, Math.Abs(data.uvw[i, j, 2]));
+            maxW = Partitioner.MetersToLambda(maxW, data.frequencies[data.frequencies.Length - 1]);
 
             var visCount2 = 0;
-            for (int i = 0; i < flags.GetLength(0); i++)
-                for (int j = 0; j < flags.GetLength(1); j++)
-                    for (int k = 0; k < flags.GetLength(2); k++)
-                        if (!flags[i, j, k])
+            for (int i = 0; i < data.flags.GetLength(0); i++)
+                for (int j = 0; j < data.flags.GetLength(1); j++)
+                    for (int k = 0; k < data.flags.GetLength(2); k++)
+                        if (!data.flags[i, j, k])
                             visCount2++;
             var visibilitiesCount = visCount2;
-            int gridSize = 4096;
-            int subgridsize = 24;
-            int kernelSize = 12;
+            int gridSize = 2048;
+            int subgridsize = 32;
+            int kernelSize = 16;
             int max_nr_timesteps = 1024;
-            double cellSize = 1.6 / 3600.0 * PI / 180.0;
+            double cellSize = 2.0 / 3600.0 * PI / 180.0;
             int wLayerCount = 32;
             double wStep = maxW / (wLayerCount);
-            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
-            var c2 = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0);
-            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-            var data = new DataLoading.Data();
-            data.frequencies = frequencies;
-            data.flags = flags;
-            data.c = c;
-            data.visibilities = visibilities;
+            data.c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
+            data.metadata = Partitioner.CreatePartition(data.c, data.uvw, data.frequencies);
             data.visibilitiesCount = visibilitiesCount;
-            data.metadata = metadata;
-            data.uvw = uvw;
-            
 
-            var psfVis = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
-            for (int i = 0; i < visibilities.GetLength(0); i++)
-                for (int j = 0; j < visibilities.GetLength(1); j++)
-                    for (int k = 0; k < visibilities.GetLength(2); k++)
-                        if (!flags[i, j, k])
+            var psfVis = new Complex[data.uvw.GetLength(0), data.uvw.GetLength(1), data.frequencies.Length];
+            for (int i = 0; i < data.visibilities.GetLength(0); i++)
+                for (int j = 0; j < data.visibilities.GetLength(1); j++)
+                    for (int k = 0; k < data.visibilities.GetLength(2); k++)
+                        if (!data.flags[i, j, k])
                             psfVis[i, j, k] = new Complex(1.0, 0);
                         else
                             psfVis[i, j, k] = new Complex(0, 0);
 
             Console.WriteLine("gridding psf");
-            var psfGrid = IDG.GridW(c, metadata, psfVis, uvw, frequencies);
-            var psf = FFT.WStackIFFTFloat(psfGrid, c.VisibilitiesCount);
+            var psfGrid = IDG.GridW(data.c, data.metadata, psfVis, data.uvw, data.frequencies);
+            var psf = FFT.WStackIFFTFloat(psfGrid, data.c.VisibilitiesCount);
             FFT.Shift(psf);
 
             Directory.CreateDirectory("PSFSizeExperiment");
@@ -302,7 +277,7 @@ namespace Single_Reference.Experiments
             //reconstruct with full psf and find reference objective value
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
-            var recalculateFullPSF = true;
+            var recalculateFullPSF = false;
             if (recalculateFullPSF)
             {
                 ReconstructionInfo referenceInfo = null;
@@ -317,7 +292,7 @@ namespace Single_Reference.Experiments
             
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 32 };
+            var psfCuts = new int[] { 32};
             var outFolder = "cutPsf";
             Directory.CreateDirectory(outFolder);
             outFolder += @"\";
@@ -365,19 +340,42 @@ namespace Single_Reference.Experiments
             var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
 
             var data = LMC.Load(folder);
-            int gridSize = 4096;
-            int subgridsize = 16;
-            int kernelSize = 4;
-            //cell = image / grid
-            int max_nr_timesteps = 512;
+            int gridSize = 2048;
+            int subgridsize = 32;
+            int kernelSize = 16;
+            int max_nr_timesteps = 1024;
+            double cellSize = 2.0 / 3600.0 * PI / 180.0;
+            int wLayerCount = 32;
             double scaleArcSec = 1.25 / 3600.0 * Math.PI / 180.0;
 
-            data.c = new GriddingConstants(data.visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)scaleArcSec, 1, 0.0f);
+            var maxW = 0.0;
+            for (int i = 0; i < data.uvw.GetLength(0); i++)
+                for (int j = 0; j < data.uvw.GetLength(1); j++)
+                    maxW = Math.Max(maxW, Math.Abs(data.uvw[i, j, 2]));
+            maxW = Partitioner.MetersToLambda(maxW, data.frequencies[data.frequencies.Length - 1]);
+
+            var visCount2 = 0;
+            for (int i = 0; i < data.flags.GetLength(0); i++)
+                for (int j = 0; j < data.flags.GetLength(1); j++)
+                    for (int k = 0; k < data.flags.GetLength(2); k++)
+                        if (!data.flags[i, j, k])
+                            visCount2++;
+
+            data.c = new GriddingConstants(data.visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, maxW);
             data.metadata = Partitioner.CreatePartition(data.c, data.uvw, data.frequencies);
 
+            var psfVis = new Complex[data.uvw.GetLength(0), data.uvw.GetLength(1), data.frequencies.Length];
+            for (int i = 0; i < data.visibilities.GetLength(0); i++)
+                for (int j = 0; j < data.visibilities.GetLength(1); j++)
+                    for (int k = 0; k < data.visibilities.GetLength(2); k++)
+                        if (!data.flags[i, j, k])
+                            psfVis[i, j, k] = new Complex(1.0, 0);
+                        else
+                            psfVis[i, j, k] = new Complex(0, 0);
+
             Console.WriteLine("gridding psf");
-            var psfGrid = IDG.GridPSF(data.c, data.metadata, data.uvw, data.flags, data.frequencies);
-            var psf = FFT.BackwardFloat(psfGrid, data.c.VisibilitiesCount);
+            var psfGrid = IDG.GridW(data.c, data.metadata, psfVis, data.uvw, data.frequencies);
+            var psf = FFT.WStackIFFTFloat(psfGrid, data.c.VisibilitiesCount);
             FFT.Shift(psf);
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
 
@@ -387,7 +385,7 @@ namespace Single_Reference.Experiments
 
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 8, 16, 32, 64 };
+            var psfCuts = new int[] { /*8, 16, 32, 64*/ 128 };
             var outFolder = "PSFSpeedExperiment";
             outFolder += @"\";
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
