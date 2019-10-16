@@ -311,12 +311,12 @@ namespace Single_Reference
             return output;
         }
 
-        public static int CountNonZero(float[,] psf)
+        public static int CountNonZero(float[,] image)
         {
             var count = 0;
-            for (int y = 0; y < psf.GetLength(0); y++)
-                for (int x = 0; x < psf.GetLength(1); x++)
-                    if (psf[y, x] != 0.0)
+            for (int y = 0; y < image.GetLength(0); y++)
+                for (int x = 0; x < image.GetLength(1); x++)
+                    if (image[y, x] != 0.0)
                         count++;
             return count;
         }
