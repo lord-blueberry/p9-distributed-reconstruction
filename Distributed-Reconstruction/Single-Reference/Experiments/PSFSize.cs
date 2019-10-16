@@ -346,7 +346,6 @@ namespace Single_Reference.Experiments
             int max_nr_timesteps = 1024;
             double cellSize = 2.0 / 3600.0 * PI / 180.0;
             int wLayerCount = 32;
-            double scaleArcSec = 1.25 / 3600.0 * Math.PI / 180.0;
 
             var maxW = 0.0;
             for (int i = 0; i < data.uvw.GetLength(0); i++)
@@ -385,7 +384,7 @@ namespace Single_Reference.Experiments
 
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { /*8, 16, 32, 64*/ 128 };
+            var psfCuts = new int[] { 8, 16, 32, 64, 128 };
             var outFolder = "PSFSpeedExperiment";
             outFolder += @"\";
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
