@@ -64,8 +64,8 @@ namespace Single_Reference.Experiments
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
             var bMapCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
-            var fastCD2 = new FastGreedyCD(totalSize, psfCut);
-            fastCD2.ResetAMap(fullPsf, cutFactor);
+            var fastCD2 = new FastGreedyCD(totalSize, fullPsf);
+            //fastCD2.ResetAMap(fullPsf, cutFactor);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
             var lambda = 0.4f * fastCD.MaxLipschitz;
@@ -227,10 +227,11 @@ namespace Single_Reference.Experiments
             return info;
         }
 
-        public static void RunPSFSpeed()
+        public static void RunPSFSize()
         {
             var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
             var data = LMC.Load(folder);
+            var rootFolder = Directory.GetCurrentDirectory();
 
             var maxW = 0.0;
             for (int i = 0; i < data.uvw.GetLength(0); i++)
@@ -277,7 +278,7 @@ namespace Single_Reference.Experiments
             //reconstruct with full psf and find reference objective value
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
-            var recalculateFullPSF = true;
+            var recalculateFullPSF = false;
             if (recalculateFullPSF)
             {
                 ReconstructionInfo referenceInfo = null;
@@ -292,7 +293,7 @@ namespace Single_Reference.Experiments
             
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 32};
+            var psfCuts = new int[] { 16, 32};
             var outFolder = "cutPsf";
             Directory.CreateDirectory(outFolder);
             outFolder += @"\";
@@ -333,6 +334,8 @@ namespace Single_Reference.Experiments
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
+
+            Directory.SetCurrentDirectory(rootFolder);
         }
 
         public static void RunSpeed()
@@ -397,153 +400,8 @@ namespace Single_Reference.Experiments
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
+
+            
         }
-
-        public static void RunPSFMask()
-        {
-            var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
-            var data = LMC.Load(folder);
-
-            var maxW = 0.0;
-            for (int i = 0; i < data.uvw.GetLength(0); i++)
-                for (int j = 0; j < data.uvw.GetLength(1); j++)
-                    maxW = Math.Max(maxW, Math.Abs(data.uvw[i, j, 2]));
-            maxW = Partitioner.MetersToLambda(maxW, data.frequencies[data.frequencies.Length - 1]);
-
-            var visCount2 = 0;
-            for (int i = 0; i < data.flags.GetLength(0); i++)
-                for (int j = 0; j < data.flags.GetLength(1); j++)
-                    for (int k = 0; k < data.flags.GetLength(2); k++)
-                        if (!data.flags[i, j, k])
-                            visCount2++;
-            var visibilitiesCount = visCount2;
-            int gridSize = 2048;
-            int subgridsize = 32;
-            int kernelSize = 16;
-            int max_nr_timesteps = 1024;
-            double cellSize = 2.0 / 3600.0 * PI / 180.0;
-            int wLayerCount = 32;
-            double wStep = maxW / (wLayerCount);
-            data.c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
-            data.metadata = Partitioner.CreatePartition(data.c, data.uvw, data.frequencies);
-            data.visibilitiesCount = visibilitiesCount;
-
-            var psfVis = new Complex[data.uvw.GetLength(0), data.uvw.GetLength(1), data.frequencies.Length];
-            for (int i = 0; i < data.visibilities.GetLength(0); i++)
-                for (int j = 0; j < data.visibilities.GetLength(1); j++)
-                    for (int k = 0; k < data.visibilities.GetLength(2); k++)
-                        if (!data.flags[i, j, k])
-                            psfVis[i, j, k] = new Complex(1.0, 0);
-                        else
-                            psfVis[i, j, k] = new Complex(0, 0);
-
-            Console.WriteLine("gridding psf");
-            var psfGrid = IDG.GridW(data.c, data.metadata, psfVis, data.uvw, data.frequencies);
-            var psf = FFT.WStackIFFTFloat(psfGrid, data.c.VisibilitiesCount);
-            FFT.Shift(psf);
-            var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
-
-            Console.WriteLine("Calc Histogram");
-            var histPsf = GetHistogram(psf, 256, 0.05f);
-            var experiments = new float[] { 0.5f, /*0.4f, 0.2f, 0.1f, 0.05f*/};
-            Console.WriteLine("Done Histogram");
-
-            Directory.CreateDirectory("PSFMask");
-            Directory.SetCurrentDirectory("PSFMask");
-            FitsIO.Write(psf, "psfFull.fits");
-
-            //reconstruct with full psf and find reference objective value
-            ReconstructionInfo experimentInfo = null;
-            var outFolder = "";
-            var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
-            foreach (var maskPercent in experiments)
-            {
-                using (var writer = new StreamWriter(outFolder + maskPercent + "Psf.txt", false))
-                {
-                    var maskedPSF = Common.Copy(psf);
-                    var maskedPixels = MaskPSF(maskedPSF, histPsf, maskPercent);
-                    var maskedPSF2 = PSF.CalcPSFSquared(maskedPSF);
-                    FitsIO.Write(maskedPSF, outFolder + maskPercent + "Psf.fits");
-                    FitsIO.Write(maskedPSF2, outFolder + maskPercent + "Psf2.fits");
-                    writer.WriteLine(maskedPixels + ";" + maskedPixels / (double)maskedPSF.Length+";" + CountNonZero(maskedPSF2));
-                    writer.WriteLine(fileHeader);
-                    writer.Flush();
-                    experimentInfo = ReconstructSimple(data, maskedPSF, outFolder, 1, 10, maskPercent + "dirty", maskPercent + "x", writer, objectiveCutoff, 1e-5f, false);
-                    File.WriteAllText(outFolder + maskPercent + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
-                }
-            }
-
-        }
-
-        private static Tuple<int[], float[]> GetHistogram(float[,] psf, int bins, float max)
-        {
-            var min = float.MaxValue;
-            for (int i = 0; i < psf.GetLength(0); i++)
-                for (int j = 0; j < psf.GetLength(1); j++)
-                {
-                    min = Math.Min(Math.Abs(psf[i, j]), min);
-                }
-
-            var histogram = new int[bins];
-            var breaks = new float[bins];
-            for(int i = 0; i < bins; i++)
-                breaks[i] = i * (max - min) / bins + min;
-
-            for (int i = 0; i < psf.GetLength(0); i++)
-                for (int j = 0; j < psf.GetLength(1); j++)
-                {
-                    var value = Math.Abs(psf[i, j]);
-
-                    //binary search for bin
-                    int start = 0;
-                    int end = histogram.Length-1;
-                    while (start != end)
-                    {
-                        var idx = start + (end - start + 1) / 2;
-                        if (value < breaks[idx])
-                            end = idx - 1;
-                        else
-                            start = idx;
-                        
-                    }
-                    histogram[start]++;
-                }
-
-            return new Tuple<int[], float[]>(histogram, breaks);
-        }
-
-        private static int MaskPSF(float[,] psf, Tuple<int[], float[]> histPsf, float percent)
-        {
-            var sum = 0;
-            var cutoff = 0.0f;
-            var histogram = histPsf.Item1;
-            for (int i = histogram.Length - 1; i >= 0; i--)
-            {
-                sum += histogram[i];
-                var percentageOfValues = sum / (float)psf.Length;
-                if (percentageOfValues > percent)
-                {
-                    cutoff = (1 + percentageOfValues - percent) * histPsf.Item2[i];
-                    break;
-                }
-            }
-
-            return Mask(psf, cutoff);
-        }
-
-        public static int Mask(float[,] psf, float cutOff)
-        {
-            var zeroCount = 0;
-            for (int y = 0; y < psf.GetLength(0); y++)
-                for (int x = 0; x < psf.GetLength(1); x++)
-                    if (Math.Abs(psf[y, x]) < cutOff)
-                    {
-                        psf[y, x] = 0.0f;
-                        zeroCount++;
-                    }
-            return zeroCount;
-        }
-
-
     }
 }
