@@ -114,7 +114,7 @@ namespace Single_Reference.Experiments
                     info.totalDeconv.Start();
                     if (!firstTimeConverged)
                     {
-                        lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 20000, epsilon);
+                        lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 50000, epsilon);
                     } else
                     {
                         bMap = bMapCalculator2.Convolve(dirtyImage);
@@ -122,7 +122,7 @@ namespace Single_Reference.Experiments
                         currentSideLobe = Residuals.GetMax(bMap) * maxSidelobe;
                         currentLambda = Math.Max(currentSideLobe / alpha, lambdaTrue);
                         info.totalDeconv.Start();
-                        lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 20000, epsilon);
+                        lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 50000, epsilon);
                         info.totalDeconv.Stop();
                     }
                    
@@ -202,7 +202,7 @@ namespace Single_Reference.Experiments
                 if (!objectiveReached & !minimumReached)
                 {
                     info.totalDeconv.Start();
-                    lastResult = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 20000, epsilon);
+                    lastResult = fastCD.Deconvolve(xImage, dirtyImage, currentLambda, alpha, 50000, epsilon);
                     info.totalDeconv.Stop();
 
                     FitsIO.Write(xImage, folder+xImagePrefix + cycle + ".fits");
@@ -277,7 +277,7 @@ namespace Single_Reference.Experiments
             //reconstruct with full psf and find reference objective value
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
-            var recalculateFullPSF = false;
+            var recalculateFullPSF = true;
             if (recalculateFullPSF)
             {
                 ReconstructionInfo referenceInfo = null;

@@ -241,7 +241,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 10; cycle++)
+            for (int cycle = 0; cycle < 5; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -346,7 +346,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 4; cycle++)
+            for (int cycle = 0; cycle < 10; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -366,7 +366,7 @@ namespace Single_Reference
                 //var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f * fastCD.MaxLipschitz, 0.8f, 1000, 1e-4f);
                 //var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 8, 1, 1);
                 //var converged = approx.DeconvolveGreedy(xImage, dirtyImage, psfCut, lambda, alpha, random, 4, 4, 500);
-                var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 4, 4, 100);
+                var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, 4, 500);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else

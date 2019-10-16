@@ -6,9 +6,11 @@ namespace Single_Reference
     {
         static void Main()
         {
+
             //Experiments.GPUSpeed.Run();
+            Experiments.PSFSize.RunSpeed();
             Experiments.PSFSize.Run();
-            //Experiments.PSFSize.RunSpeed();
+
 
 
             //Experiments.PSFSize.DebugConvergence();
