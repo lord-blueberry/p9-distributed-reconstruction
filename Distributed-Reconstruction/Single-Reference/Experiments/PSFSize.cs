@@ -64,8 +64,8 @@ namespace Single_Reference.Experiments
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
             var bMapCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
-            var fastCD2 = new FastGreedyCD(totalSize, fullPsf);
-            //fastCD2.ResetAMap(fullPsf, cutFactor);
+            var fastCD2 = new FastGreedyCD(totalSize, psfCut);
+            fastCD2.ResetAMap(fullPsf, cutFactor);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
             var lambda = 0.4f * fastCD.MaxLipschitz;
@@ -278,7 +278,7 @@ namespace Single_Reference.Experiments
             //reconstruct with full psf and find reference objective value
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
-            var recalculateFullPSF = false;
+            var recalculateFullPSF = true;
             if (recalculateFullPSF)
             {
                 ReconstructionInfo referenceInfo = null;
@@ -387,7 +387,7 @@ namespace Single_Reference.Experiments
 
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 4, 8, 16, 32, 64, 128 };
+            var psfCuts = new int[] { 2, 4, 8, 16, 32, 64, 128 };
             var outFolder = "PSFSpeedExperiment";
             outFolder += @"\";
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
