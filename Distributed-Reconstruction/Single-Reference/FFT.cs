@@ -201,58 +201,28 @@ namespace Single_Reference
         }
 
         #region w-stacking methods
-        public static double[,,] WStackIFFT(Complex[,,] grid, long visibilityCount)
+
+        public static float[,] WStackIFFTFloat(List<Complex[,]> grid, long visibilityCount)
         {
-            var output = new double[grid.GetLength(0), grid.GetLength(1), grid.GetLength(2)];
-            using (var imageSpace = new AlignedArrayComplex(16, grid.GetLength(1), grid.GetLength(2)))
+            var output = new float[grid[0].GetLength(0), grid[0].GetLength(1)];
+            using (var imageSpace = new AlignedArrayComplex(16, grid[0].GetLength(0), grid[0].GetLength(1)))
             using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
             {
-                for (int k = 0; k < grid.GetLength(0); k++)
+                for (int k = 0; k < grid.Count; k++)
                 {
-                    for (int y = 0; y < grid.GetLength(1); y++)
+                    for (int y = 0; y < grid[0].GetLength(0); y++)
                     {
-                        for (int x = 0; x < grid.GetLength(2); x++)
+                        for (int x = 0; x < grid[0].GetLength(1); x++)
                         {
-                            fourierSpace[y, x] = grid[k, y, x];
+                            fourierSpace[y, x] = grid[k][y, x];
                         }
                     }
 
                     DFT.IFFT(fourierSpace, imageSpace);
 
-                    for (int y = 0; y < grid.GetLength(1); y++)
+                    for (int y = 0; y < grid[0].GetLength(0); y++)
                     {
-                        for (int x = 0; x < grid.GetLength(2); x++)
-                        {
-                            output[k, y, x] += imageSpace[y, x].Real / visibilityCount;
-                        }
-                    }
-                }
-            }
-
-            return output;
-        }
-
-        public static float[,] WStackIFFTFloat(Complex[,,] grid, long visibilityCount)
-        {
-            var output = new float[grid.GetLength(1), grid.GetLength(2)];
-            using (var imageSpace = new AlignedArrayComplex(16, grid.GetLength(1), grid.GetLength(2)))
-            using (var fourierSpace = new AlignedArrayComplex(16, imageSpace.GetSize()))
-            {
-                for (int k = 0; k < grid.GetLength(0); k++)
-                {
-                    for (int y = 0; y < grid.GetLength(1); y++)
-                    {
-                        for (int x = 0; x < grid.GetLength(2); x++)
-                        {
-                            fourierSpace[y, x] = grid[k, y, x];
-                        }
-                    }
-
-                    DFT.IFFT(fourierSpace, imageSpace);
-
-                    for (int y = 0; y < grid.GetLength(1); y++)
-                    {
-                        for (int x = 0; x < grid.GetLength(2); x++)
+                        for (int x = 0; x < grid[0].GetLength(1); x++)
                         {
                             output[y, x] += (float)(imageSpace[y, x].Real / visibilityCount);
                         }
@@ -285,23 +255,23 @@ namespace Single_Reference
             }
         }
 
-        public static void Shift(Complex[,,] grid)
+        public static void Shift(List<Complex[,]> grid)
         {
-            for (int k = 0; k < grid.GetLength(0); k++)
+            for (int k = 0; k < grid.Count; k++)
             {
                 // Interchange entries in 4 quadrants, 1 <--> 3 and 2 <--> 4
-                var n2 = grid.GetLength(1) / 2;
+                var n2 = grid[0].GetLength(0) / 2;
                 for (int i = 0; i < n2; i++)
                 {
                     for (int j = 0; j < n2; j++)
                     {
-                        var tmp13 = grid[k, i, j];
-                        grid[k, i, j] = grid[k, i + n2, j + n2];
-                        grid[k, i + n2, j + n2] = tmp13;
+                        var tmp13 = grid[k][i, j];
+                        grid[k][ i, j] = grid[k][i + n2, j + n2];
+                        grid[k][ i + n2, j + n2] = tmp13;
 
-                        var tmp24 = grid[k, i + n2, j];
-                        grid[k, i + n2, j] = grid[k, i, j + n2];
-                        grid[k, i, j + n2] = tmp24;
+                        var tmp24 = grid[k][ i + n2, j];
+                        grid[k][ i + n2, j] = grid[k][ i, j + n2];
+                        grid[k][ i, j + n2] = tmp24;
                     }
                 }
             }

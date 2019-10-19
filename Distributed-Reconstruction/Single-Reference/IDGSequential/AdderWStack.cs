@@ -8,8 +8,11 @@ namespace Single_Reference.IDGSequential
 {
     class AdderWStack
     {
-        public static Complex[,,] AddHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgrids)
+        public static List<Complex[,]> AddHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgrids)
         {
+            var grid = new List<Complex[,]>(c.WLayerCount);
+            for (int i = 0; i < c.WLayerCount; i++)
+                grid.Add(new Complex[c.GridSize, c.GridSize]);
 
             var phasorPrecomputed = new Complex[c.SubgridSize, c.SubgridSize];
             Parallel.For(0, phasorPrecomputed.GetLength(0), (y) =>
@@ -21,7 +24,6 @@ namespace Single_Reference.IDGSequential
                 }
             });
 
-            var grid = new Complex[c.WLayerCount, c.GridSize, c.GridSize];
             for (int baseline = 0; baseline < subgrids.Count; baseline++)
             {
                 var blMeta = metadata[baseline];
@@ -65,7 +67,7 @@ namespace Single_Reference.IDGSequential
                             var phasor = phasorPrecomputed[y_, x_];
                             var value = phasor * data[ySrc, xSrc];
                             value = negativeW ? Complex.Conjugate(value) : value;
-                            grid[subgridW, yDst, xDst] += value;
+                            grid[subgridW][yDst, xDst] += value;
                         }
                     }
                 }

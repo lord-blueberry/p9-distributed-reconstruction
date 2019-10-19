@@ -136,7 +136,7 @@ namespace Single_Reference.IDGSequential
             return outputVis;
         }
 
-        public static Complex[,,] GridW(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
+        public static List<Complex[,]> GridW(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
             var ftgridded = SubgridFFT.Forward(c, gridded);

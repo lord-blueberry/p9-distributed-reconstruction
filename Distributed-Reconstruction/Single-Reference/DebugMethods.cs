@@ -578,69 +578,6 @@ namespace Single_Reference
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
             }
         }
-
-        public static void DebugSimulatedWStack()
-        {
-            var frequencies = FitsIO.ReadFrequencies(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\freq.fits");
-            var uvw = FitsIO.ReadUVW(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\uvw.fits");
-            var flags = new bool[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length]; //completely unflagged dataset
-            double norm = 2.0;
-            var visibilities = FitsIO.ReadVisibilities(@"C:\dev\GitHub\p9-data\small\fits\simulation_point\vis.fits", uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
-
-            var maxW = 0.0;
-            for (int i = 0; i < uvw.GetLength(0); i++)
-                for (int j = 0; j < uvw.GetLength(1); j++)
-                    maxW = Math.Max(maxW, Math.Abs(uvw[i, j, 2]));
-            maxW = Partitioner.MetersToLambda(maxW, frequencies[frequencies.Length - 1]);
-
-            var visibilitiesCount = visibilities.Length;
-            int gridSize = 2048;
-            int subgridsize = 8;
-            int kernelSize = 4;
-            int max_nr_timesteps = 1024;
-            double cellSize = 5 / 3600.0 * PI / 180.0;
-            int wLayerCount = 32;
-            double wStep = maxW / (wLayerCount);
-            var c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
-            var c2 = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0);
-            var metadata2 = Partitioner.CreatePartition(c2, uvw, frequencies);
-
-            var watchTotal = new Stopwatch();
-            var watchForward = new Stopwatch();
-            var watchBackwards = new Stopwatch();
-            var watchDeconv = new Stopwatch();
-
-            var psfVis = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
-            for (int i = 0; i < visibilities.GetLength(0); i++)
-                for (int j = 0; j < visibilities.GetLength(1); j++)
-                    for (int k = 0; k < visibilities.GetLength(2); k++)
-                        if (!flags[i, j, k])
-                            psfVis[i, j, k] = new Complex(1.0, 0);
-                        else
-                            psfVis[i, j, k] = new Complex(0, 0);
-            
-            watchTotal.Start();
-            var metadata = Partitioner.CreatePartition(c, uvw, frequencies);
-            var psfGrid = IDG.GridW(c, metadata, psfVis, uvw, frequencies);
-            var psf = FFT.WStackIFFT(psfGrid, c.VisibilitiesCount);
-            //var psfGridAdded = FFT.GridFFT(psf);
-            FFT.Shift(psf);
-
-            var psf2Grid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
-            var psf2 = FFT.Backward(psf2Grid, c.VisibilitiesCount);
-            FFT.Shift(psf2);
-            FitsIO.Write(psf2, "psf2222.fits");
-            FitsIO.Write(psf, "psf");
-
-            var psfSum = new double[gridSize, gridSize];
-            for (int k = 0; k < wLayerCount; k++)
-                for (int i = 0; i < gridSize; i++)
-                    for (int j = 0; j < gridSize; j++)
-                        psfSum[i, j] += psf[k, i, j];
-
-            FitsIO.Write(psfSum, "psfSum.fits");
-
-        }
         #endregion
 
 

@@ -6,11 +6,13 @@ namespace Single_Reference
     {
         static void Main()
         {
-            
+
             //Experiments.GPUSpeed.Run();
-            Experiments.PSFSize.RunSpeed();
+            Experiments.PSFSize.RunSpeedSmall();
+            Experiments.PSFSize.RunSpeedLarge();
+            
             //Experiments.PSFSize.RunPSFSize();
-            Experiments.PSFMask.Run();
+            //Experiments.PSFMask.Run();
 
 
             //Experiments.PSFSize.DebugConvergence();
