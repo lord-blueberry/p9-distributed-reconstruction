@@ -96,6 +96,7 @@ namespace Single_Reference.Experiments
             var gridSizes = new int[] { 256, 512, 1024, 2048, 4096};
             Directory.CreateDirectory("GPUSpeedup");
             var writer = new StreamWriter("GPUSpeedup/GPUSpeedup.txt", false);
+            writer.WriteLine("imgSize;iterCPU;timeCPU;iterGPU;timeGPU");
             foreach (var gridSize in gridSizes)
             {
                 var visibilitiesCount = data.visibilitiesCount;
