@@ -81,38 +81,39 @@ namespace Distributed_Reference
         public static LocalDataset LoadTinyMeerKAT2(int rank, int nodeCount, string folder)
         {
             var blSum = 0;
-            var baselinesPerFile = new int[8];
-            for(int i = 0; i < 8; i++)
+            var blFileScans = new int[8];
+            var blFileCounts = new int[8];
+            for (int i = 0; i < 8; i++)
             {
-                baselinesPerFile[i] = FitsIO.CountBaselines(Path.Combine(folder, "uvw" + i + ".fits"));
-                blSum += baselinesPerFile[i];
+                blFileCounts[i] = FitsIO.CountBaselines(Path.Combine(folder, "uvw" + i + ".fits"));
+                blSum += blFileCounts[i];
+                blFileScans[i] = blSum;
             }
 
             var frequencies = FitsIO.ReadFrequencies(Path.Combine(folder, "freq.fits"));
-            var beginBlIdx = rank * blSum / nodeCount;
-            var endBlIdx = (rank + 1) * blSum / nodeCount;
-            int blCount = endBlIdx - beginBlIdx;
-            blSum = 0;
+            var blBeginIdx = rank * (int)(blSum / (double)nodeCount);
+            var blEndIdx = rank + 1 < nodeCount ? (rank + 1) * (int)(blSum / (double)nodeCount) : blSum;
+            var baselineCount = blEndIdx - blBeginIdx;
+
             LocalDataset output = null;
             for (int i = 0; i < 8; i++)
             {
-                blSum += baselinesPerFile[i];
-                if (beginBlIdx <= blSum)
+                if (blBeginIdx < blFileScans[i])
                 {
-
-                    var start = blSum - beginBlIdx;
-                    var end = Math.Min(start + blCount, baselinesPerFile[i]);
+                    var blBefore = i > 0 ? blFileScans[i] : 0;
+                    var start = blBeginIdx - blBefore;
+                    var end = Math.Min(start + baselineCount, blFileCounts[i]);
                     var uvw = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + i + ".fits"), start, end);
                     var flags = FitsIO.ReadFlags(Path.Combine(folder, "flags" + i + ".fits"), start, end, uvw.GetLength(1), frequencies.Length);
                     var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis" + i + ".fits"), start, end, uvw.GetLength(1), frequencies.Length, 2.0);
 
-                    if (start + blCount > baselinesPerFile[i])
+                    if (blBeginIdx + baselineCount > blFileCounts[i])
                     {
                         //continue reading files until all baselines, which belong to the current node, are loaded
                         var baselinesLoaded = end - start;
                         for(int j = i+1; j < 8; j++)
                         {
-                            var end2 = Math.Min(blCount - baselinesLoaded, baselinesPerFile[j]);
+                            var end2 = Math.Min(baselineCount - baselinesLoaded, blFileCounts[j]);
                             var uvw0 = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + j + ".fits"), 0, end2);
                             var flags0 = FitsIO.ReadFlags(Path.Combine(folder, "flags" + j + ".fits"), 0, end2, uvw.GetLength(1), frequencies.Length);
                             var visibilities0 = FitsIO.ReadVisibilities(Path.Combine(folder, "vis" + j + ".fits"), 0, end2, uvw.GetLength(1), frequencies.Length, 2.0);
@@ -121,7 +122,7 @@ namespace Distributed_Reference
                             flags = FitsIO.Stitch(flags, flags0);
                             visibilities = FitsIO.Stitch(visibilities, visibilities0);
                             baselinesLoaded += end2;
-                            if (baselinesLoaded >= blCount)
+                            if (baselinesLoaded >= baselineCount)
                             {
                                 //last file read;
                                 break;

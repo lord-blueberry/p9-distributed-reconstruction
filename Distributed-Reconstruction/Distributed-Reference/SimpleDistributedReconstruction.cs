@@ -8,6 +8,7 @@ using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
 using Single_Reference;
 using static Single_Reference.Common;
+using System.IO;
 
 
 namespace Distributed_Reference
@@ -44,20 +45,28 @@ namespace Distributed_Reference
             Complex[,] PsfCorrelation = null;
             var maxSidelobe = PSF.CalcMaxSidelobe(psf);
             lambda = (float)(lambda * PSF.CalcMaxLipschitz(psf));
-            
+                
+            StreamWriter writer = null;
             if (comm.Rank == 0)
             {
+                FitsIO.Write(psf, "psf.fits");
+                Console.WriteLine("done PSF gridding ");
                 PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psf, totalSize);
+                writer = new StreamWriter(comm.Size + "runtimestats.txt");
             }
 
             var deconvovler = new MPIGreedyCD(comm, totalSize, patchSize, psf);
 
             var residualVis = local.Visibilities;
             var xLocal = new float[patchSize.YEnd - patchSize.Y, patchSize.XEnd - patchSize.X];
-            var totalStatistics = new MPIGreedyCD.Statistics(false, 0, 0);
+            
+            
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
+                if (comm.Rank == 0)
+                    Console.WriteLine("cycle " + cycle);
                 var dirtyImage = ForwardCalculateB(comm, c, metadata, residualVis, local.UVW, local.Frequencies, PsfCorrelation, psf, maxSidelobe, watchForward);
+                
                 var bLocal = GetImgSection(dirtyImage.Image, patchSize);
 
                 MPIGreedyCD.Statistics lastRun;
@@ -67,13 +76,12 @@ namespace Distributed_Reference
                     lastRun = deconvovler.DeconvolvePath(xLocal, bLocal, currentLambda, 4.0f, alpha, 5, iterPerCycle, 2e-5f);
                 } else
                 {
-                    lastRun = deconvovler.Deconvolve(xLocal, bLocal, lambda, alpha, iterPerCycle, 2e-5f);
-                    
+                    lastRun = deconvovler.Deconvolve(xLocal, bLocal, lambda, alpha, iterPerCycle, 1e-5f);
                 }
-                totalStatistics += lastRun;
 
                 if (comm.Rank == 0)
                 {
+                    WriteToFile(cycle, lastRun, writer);
                     if (lastRun.Converged)
                         Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                     else
@@ -100,6 +108,7 @@ namespace Distributed_Reference
                 var modelVis = IDG.DeGrid(c, metadata, modelGrid, local.UVW, local.Frequencies);
                 residualVis = IDG.Substract(local.Visibilities, modelVis, local.Flags);
             }
+            writer.Close();
 
             float[][,] gatherX = null;
             comm.Gather(xLocal, 0, ref gatherX);
@@ -111,6 +120,12 @@ namespace Distributed_Reference
             }
             
             return reconstructed;
+        }
+
+        private static void WriteToFile(int cycle, MPIGreedyCD.Statistics run, StreamWriter writer)
+        {
+            writer.WriteLine(cycle + ";" + run.IterationsRun + ";" + run.ElapsedMilliseconds.TotalSeconds);
+            writer.Flush();
         }
 
         public static Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
@@ -160,7 +175,8 @@ namespace Distributed_Reference
             {
                 var dirtyImage = FFT.BackwardFloat(grid_total, c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
-
+                if (comm.Rank == 0)
+                    FitsIO.Write(dirtyImage, "dirtyImage.fits");
                 maxSideLobeLevel = maxSidelobe * Residuals.GetMax(dirtyImage);
                 //remove spheroidal
 

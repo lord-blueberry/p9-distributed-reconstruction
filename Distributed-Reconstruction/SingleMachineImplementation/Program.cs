@@ -1,18 +1,17 @@
 ﻿using System;
 
-namespace Single_Reference
+namespace SingleMachineRuns
 {
     class Program
     {
-        static void Main()
+        static void Main(string[] args)
         {
-
             //Experiments.GPUSpeed.Run();
             Experiments.PSFSize.RunPSFSize();
             //Experiments.PSFSize.RunSpeedSmall();
             //Experiments.PSFSize.RunSpeedLarge();
-            
-            
+
+
             //Experiments.PSFMask.Run();
 
 
@@ -20,7 +19,7 @@ namespace Single_Reference
             //Experiments.PSFSize.DebugConvergence2();
 
 
-            //DebugMethods.DebugSimulatedPCDM();
+            Single_Reference.DebugMethods.DebugSimulatedPCDM();
             //DebugMethods.DebugSimulatedApprox();
             //DebugMethods.DebugILGPU();
 
@@ -30,6 +29,5 @@ namespace Single_Reference
             //DebugMethods.MeerKATFull();
             //DebugMethods.DebugdWStack();
         }
-
     }
 }

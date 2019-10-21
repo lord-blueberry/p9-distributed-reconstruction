@@ -27,7 +27,9 @@ namespace Distributed_Reference
         public Statistics DeconvolvePath(float[,] xImage, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001f)
         {
             bool converged = false;
-            var totalStats = new Statistics(false, 0, 0);
+            var watch = new Stopwatch();
+            watch.Start();
+            long totalIterations = 0;
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
                 var max = GetAbsMax(xImage, bMap, 0.0f, 1.0f);
@@ -40,12 +42,12 @@ namespace Distributed_Reference
                 var pathConverged = Deconvolve(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
                 converged = lambdaMin == lambdaCurrent & pathConverged.Converged;
 
-                totalStats += pathConverged;
+                totalIterations += pathConverged.IterationsRun;
                 if (converged)
                     break;
             }
-
-            return new Statistics(converged, totalStats.IterationsRun, totalStats.ElapsedMilliseconds);
+            watch.Stop();
+            return new Statistics(converged, totalIterations, watch.Elapsed);
         }
 
         public Statistics Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
@@ -80,7 +82,7 @@ namespace Distributed_Reference
             if (comm.Rank == 0)
                 Console.WriteLine(iter + " iterations in:" + watch.Elapsed + "\t" + iterPerSecond + " iterations per second");
 
-            return new Statistics(converged, iter, watch.ElapsedMilliseconds);
+            return new Statistics(converged, iter, watch.Elapsed);
         }
 
         private Pixel GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
@@ -163,19 +165,15 @@ namespace Distributed_Reference
         {
             public bool Converged { get; private set; }
             public long IterationsRun { get; private set; }
-            public long ElapsedMilliseconds { get; private set; }
+            public TimeSpan ElapsedMilliseconds { get; private set; }
 
-            public Statistics(bool converged, long iterations, long elapsed)
+            public Statistics(bool converged, long iterations, TimeSpan elapsed)
             {
                 Converged = converged;
                 IterationsRun = iterations;
                 ElapsedMilliseconds = elapsed;
             }
 
-            public static Statistics operator +(Statistics s0, Statistics s1)
-            {
-                return new Statistics(s0.Converged & s1.Converged, s0.IterationsRun + s1.IterationsRun, s0.ElapsedMilliseconds + s1.ElapsedMilliseconds);
-            }
 
         }
     }
