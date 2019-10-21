@@ -8,10 +8,11 @@ namespace Single_Reference
         {
 
             //Experiments.GPUSpeed.Run();
-            Experiments.PSFSize.RunSpeedSmall();
-            Experiments.PSFSize.RunSpeedLarge();
+            Experiments.PSFSize.RunPSFSize();
+            //Experiments.PSFSize.RunSpeedSmall();
+            //Experiments.PSFSize.RunSpeedLarge();
             
-            //Experiments.PSFSize.RunPSFSize();
+            
             //Experiments.PSFMask.Run();
 
 

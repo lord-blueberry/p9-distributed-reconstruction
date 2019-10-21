@@ -40,24 +40,24 @@ namespace Distributed_Reference
             var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
 
             //calculate psf and prepare for correlation in the Fourier space
-            var psf = ToFloatImage(CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies));
-            var psfCut = PSF.Cut(psf);
+            var psf = CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies);
             Complex[,] PsfCorrelation = null;
             var maxSidelobe = PSF.CalcMaxSidelobe(psf);
+            lambda = (float)(lambda * PSF.CalcMaxLipschitz(psf));
             
             if (comm.Rank == 0)
             {
-                PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psfCut, totalSize);
+                PsfCorrelation = PSF.CalcPaddedFourierCorrelation(psf, totalSize);
             }
 
-            var deconvovler = new MPIGreedyCD(comm, totalSize, patchSize, psfCut);
+            var deconvovler = new MPIGreedyCD(comm, totalSize, patchSize, psf);
 
             var residualVis = local.Visibilities;
             var xLocal = new float[patchSize.YEnd - patchSize.Y, patchSize.XEnd - patchSize.X];
             var totalStatistics = new MPIGreedyCD.Statistics(false, 0, 0);
             for (int cycle = 0; cycle < maxCycle; cycle++)
             {
-                var dirtyImage = ForwardCalculateB(comm, c, metadata, residualVis, local.UVW, local.Frequencies, PsfCorrelation, psfCut, maxSidelobe, watchForward);
+                var dirtyImage = ForwardCalculateB(comm, c, metadata, residualVis, local.UVW, local.Frequencies, PsfCorrelation, psf, maxSidelobe, watchForward);
                 var bLocal = GetImgSection(dirtyImage.Image, patchSize);
 
                 MPIGreedyCD.Statistics lastRun;
@@ -195,14 +195,14 @@ namespace Distributed_Reference
         }
 
 
-        public static double[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
+        public static float[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
-            double[,] psf = null;
+            float[,] psf = null;
             var localGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);
             var psf_total = comm.Reduce(localGrid, SequentialSum, 0);
             if (comm.Rank == 0)
             {
-                psf = FFT.Backward(psf_total, c.VisibilitiesCount);
+                psf = FFT.BackwardFloat(psf_total, c.VisibilitiesCount);
                 FFT.Shift(psf);
             }
             comm.Broadcast(ref psf, 0);

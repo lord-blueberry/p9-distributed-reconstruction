@@ -37,7 +37,7 @@ namespace Distributed_Reference
                 lambdaCurrent = lambdaCurrent > lambdaMin ? lambdaCurrent : lambdaMin;
 
                 Console.WriteLine("-----------------------------MPIGreedy with lambda " + lambdaCurrent + "------------------------");
-                var pathConverged = DeconvolveImpl(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
+                var pathConverged = Deconvolve(xImage, bMap, lambdaCurrent, alpha, maxIteration, epsilon);
                 converged = lambdaMin == lambdaCurrent & pathConverged.Converged;
 
                 totalStats += pathConverged;
@@ -49,11 +49,6 @@ namespace Distributed_Reference
         }
 
         public Statistics Deconvolve(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon = 1e-4f)
-        {
-            return DeconvolveImpl(xImage, bMap, lambda, alpha, maxIteration, epsilon);
-        }
-
-        private Statistics DeconvolveImpl(float[,] xImage, float[,] bMap, float lambda, float alpha, int maxIteration, float epsilon)
         {
             var watch = new Stopwatch();
             watch.Start();
@@ -98,8 +93,6 @@ namespace Distributed_Reference
                 {
                     var currentA = aMap[y, x];
                     var old = xImage[y, x];
-                    //var xTmp = old + bMap[y, x] / currentA;
-                    //xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
                     var xTmp = ElasticNet.ProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
                     var xDiff = xTmp - old;
 
@@ -120,26 +113,6 @@ namespace Distributed_Reference
 
             var maxPixelGlobal = comm.Allreduce(maxPixelLocal, (aC, bC) => aC.MaxDiff > bC.MaxDiff ? aC : bC);
             return maxPixelGlobal;
-        }
-
-        private void UpdateBSingle(double[,] b, double[,] bUpdate, int yPixel, int xPixel, Pixel max)
-        {
-            var yBHalf = bUpdate.GetLength(0) / 2;
-            var xBHalf = bUpdate.GetLength(1) / 2;
-
-            var yBMin = Math.Max(yPixel - yBHalf, imageSection.Y);
-            var xBMin = Math.Max(xPixel - xBHalf, imageSection.X);
-            var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imageSection.YEnd);
-            var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imageSection.XEnd);
-            for (int i = yBMin; i < yBMax; i++)
-                for (int j = xBMin; j < xBMax; j++)
-                {
-                    var yLocal = i - imageSection.Y;
-                    var xLocal = j - imageSection.X;
-                    var yBUpdate = i + yBHalf - yPixel;
-                    var xBUpdate = j + xBHalf - xPixel;
-                    b[yLocal, xLocal] -= bUpdate[yBUpdate, xBUpdate] * (max.MaxDiff * max.Sign);
-                }
         }
 
         private void UpdateB(float[,] b, float[,] bUpdate, int yPixel, int xPixel, Pixel max)

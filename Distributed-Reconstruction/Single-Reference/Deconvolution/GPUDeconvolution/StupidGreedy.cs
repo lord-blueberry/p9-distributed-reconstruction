@@ -56,7 +56,7 @@ namespace Single_Reference.GPUDeconvolution
         }
 
         private static void UpdateX (
-            Index index,
+            ILGPU.Index index,
             ArrayView2D<float> xImage,
             ArrayView<Pixel> pixel)
         {
@@ -127,7 +127,7 @@ namespace Single_Reference.GPUDeconvolution
             }
         }
 
-        private static void ResetIndicesKernel(Index index,
+        private static void ResetIndicesKernel(ILGPU.Index index,
             ArrayView<int> maxIndices,
             ArrayView<float> maxCandidate,
             ArrayView<Pixel> maxPixel)
@@ -145,9 +145,9 @@ namespace Single_Reference.GPUDeconvolution
             var shrinkKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<Pixel>>(ShrinkKernel);
             var maxIndexKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>, ArrayView<float>>(Shrink2);
             var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateCandidatesKernel);
-            var resetKernel = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView<float>, ArrayView<Pixel>>(ResetIndicesKernel);
+            var resetKernel = accelerator.LoadAutoGroupedStreamKernel<ILGPU.Index, ArrayView<int>, ArrayView<float>, ArrayView<Pixel>>(ResetIndicesKernel);
 
-            var updateXKernel = accelerator.LoadStreamKernel<Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateX);
+            var updateXKernel = accelerator.LoadStreamKernel<ILGPU.Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateX);
             var updateCandidatesKernel2 = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateCandidatesKernel2);
 
             var size = new Index2(xImageInput.GetLength(0), xImageInput.GetLength(1));
@@ -168,12 +168,12 @@ namespace Single_Reference.GPUDeconvolution
                 aMap.CopyFrom(aMapInput, new Index2(0, 0), new Index2(0, 0), new Index2(aMapInput.GetLength(0), aMapInput.GetLength(1)));
                 psf2.CopyFrom(psf2Input, new Index2(0, 0), new Index2(0, 0), new Index2(psf2Input.GetLength(0), psf2Input.GetLength(1)));
 
-                maxIndices.CopyFrom(-1, new Index(0));
-                maxIndices.CopyFrom(-1, new Index(1));
-                maxCandidate.CopyFrom(0, new Index(0));
+                maxIndices.CopyFrom(-1, new ILGPU.Index(0));
+                maxIndices.CopyFrom(-1, new ILGPU.Index(1));
+                maxCandidate.CopyFrom(0, new ILGPU.Index(0));
 
-                lambdaAlpha.CopyFrom(lambda, new Index(0));
-                lambdaAlpha.CopyFrom(alpha, new Index(1));
+                lambdaAlpha.CopyFrom(lambda, new ILGPU.Index(0));
+                lambdaAlpha.CopyFrom(alpha, new ILGPU.Index(1));
 
                 Console.WriteLine("Start");
                 var watch = new System.Diagnostics.Stopwatch();
@@ -188,12 +188,12 @@ namespace Single_Reference.GPUDeconvolution
                     //var indices = maxIndices.GetAsArray();
                     //var maxDiff = maxCandidate.GetAsArray();
 
-                    updateXKernel(new Index(1), xImage.View, maxPixel.View);
+                    updateXKernel(new ILGPU.Index(1), xImage.View, maxPixel.View);
                     updateCandidatesKernel2(psfSize, xCandidates.View, aMap.View, psf2.View, maxPixel.View);
                     //updateCandidatesKernel(psfSize, xCandidates.View, aMap.View, psf2.View, maxCandidate.View, maxIndices.View);
                     accelerator.Synchronize();
 
-                    resetKernel(new Index(2), maxIndices.View, maxCandidate.View, maxPixel.View);
+                    resetKernel(new ILGPU.Index(2), maxIndices.View, maxCandidate.View, maxPixel.View);
                     accelerator.Synchronize();
                     //Console.WriteLine("iteration " + i);
                 }

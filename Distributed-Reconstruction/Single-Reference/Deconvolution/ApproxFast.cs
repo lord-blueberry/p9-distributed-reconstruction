@@ -36,8 +36,6 @@ namespace Single_Reference.Deconvolution
         #endregion
 
 
-
-
         private List<Tuple<int, int>> GetActiveSet(float[,] xExplore, float[,] gExplore, float lambda, float alpha, float lipschitz)
         {
             var debug = new float[xExplore.GetLength(0), xExplore.GetLength(1)];

@@ -29,11 +29,11 @@ namespace Single_Reference.Deconvolution
         private MemoryBuffer<Pixel> maxPixelGPU;
 
         readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>> shrink;
-        readonly Action<Index, ArrayView2D<float>, ArrayView<Pixel>> updateX;
+        readonly Action<ILGPU.Index, ArrayView2D<float>, ArrayView<Pixel>> updateX;
         readonly Action<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>> updateB;
 
         private void ShrinkGPU() => shrink(xImageGPU.Extent, xImageGPU.View, bMapGPU.View, aMapGPU.View, lambdaAlpha.View, maxPixelGPU.View);
-        private void UpdateXGPU() => updateX(new Index(1), xImageGPU.View, maxPixelGPU.View);
+        private void UpdateXGPU() => updateX(new ILGPU.Index(1), xImageGPU.View, maxPixelGPU.View);
         private void UpdateBGPU() => updateB(psf2GPU.Extent, bMapGPU.View, psf2GPU.View, maxPixelGPU.View);
         #endregion
 
@@ -82,7 +82,7 @@ namespace Single_Reference.Deconvolution
             }
 
             shrink = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<Pixel>>(ShrinkKernel);
-            updateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateXKernel);
+            updateX = accelerator.LoadAutoGroupedStreamKernel<ILGPU.Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateXKernel);
             updateB = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateBKernel);
         }
 
@@ -98,7 +98,7 @@ namespace Single_Reference.Deconvolution
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
                 //set lambdap
-                lambdaAlpha.CopyFrom(0.0f, new Index(0));
+                lambdaAlpha.CopyFrom(0.0f, new ILGPU.Index(0));
                 ShrinkGPU();
                 accelerator.Synchronize();
                 var maxPixel = maxPixelGPU.GetAsArray()[0];
@@ -106,8 +106,8 @@ namespace Single_Reference.Deconvolution
                 var lambdaCurrent = lambdaMax / lambdaFactor;
                 lambdaCurrent = lambdaCurrent > lambdaMin ? lambdaCurrent : lambdaMin;
 
-                maxPixelGPU.CopyFrom(new Pixel(0, -1, -1, 0), new Index(0));
-                lambdaAlpha.CopyFrom(lambdaCurrent, new Index(0));
+                maxPixelGPU.CopyFrom(new Pixel(0, -1, -1, 0), new ILGPU.Index(0));
+                lambdaAlpha.CopyFrom(lambdaCurrent, new ILGPU.Index(0));
 
                 Console.WriteLine("-----------------------------GPUGreedy with lambda " + lambdaCurrent + "------------------------");
                 bool pathConverged = false;
@@ -208,8 +208,8 @@ namespace Single_Reference.Deconvolution
             psf2GPU.CopyFrom(psf2, zeroIndex, zeroIndex, sizePSF);
 
             lambdaAlpha = accelerator.Allocate<float>(2);
-            lambdaAlpha.CopyFrom(lambda, new Index(0));
-            lambdaAlpha.CopyFrom(alpha, new Index(1));
+            lambdaAlpha.CopyFrom(lambda, new ILGPU.Index(0));
+            lambdaAlpha.CopyFrom(alpha, new ILGPU.Index(1));
 
             maxPixelGPU = accelerator.Allocate<Pixel>(1);
         }
@@ -321,7 +321,7 @@ namespace Single_Reference.Deconvolution
         }
 
         private static void UpdateXKernel(
-            Index index,
+            ILGPU.Index index,
             ArrayView2D<float> xImage,
             ArrayView<Pixel> pixel)
         {

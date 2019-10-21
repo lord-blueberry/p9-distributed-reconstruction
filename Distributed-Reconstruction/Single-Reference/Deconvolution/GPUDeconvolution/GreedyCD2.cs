@@ -219,7 +219,7 @@ namespace Single_Reference.GPUDeconvolution
         }
 
         private static void ReduceAndUpdate(
-            Index threadIndex,
+            ILGPU.Index threadIndex,
             ArrayView<int> totalThreads,
             ArrayView2D<float> xImage,
             ArrayView<float> xDiff,
@@ -349,7 +349,7 @@ namespace Single_Reference.GPUDeconvolution
             var nextPower2 = 1 << (63 - CountLeadingZeroBits((UInt64)maxGroups));    //calculate the next smallest power of 2 value for the group size. Used for reduceAndUpdate
 
             var shrinkReduce = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>>(ShrinkReduceKernel);
-            var reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<Index, ArrayView<int>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView<float> , ArrayView<int>>(ReduceAndUpdate);
+            var reduceAndUpdateX = accelerator.LoadAutoGroupedStreamKernel<ILGPU.Index, ArrayView<int>, ArrayView2D<float>, ArrayView<float>, ArrayView<float>, ArrayView<int>, ArrayView<int>, ArrayView<float> , ArrayView<int>>(ReduceAndUpdate);
             var updateCandidatesKernel = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateBKernelV0);
             var updateBKernel = accelerator.LoadStreamKernel<GroupedIndex, ArrayView2D<float>, ArrayView2D<float>, ArrayView<float>, ArrayView<int>>(UpdateBKernelV1);
 
@@ -377,9 +377,9 @@ namespace Single_Reference.GPUDeconvolution
                 aMap.CopyFrom(aMapIn, new Index2(0, 0), new Index2(0, 0), new Index2(aMapIn.GetLength(0), aMapIn.GetLength(1)));
                 psf2.CopyFrom(psf2In, new Index2(0, 0), new Index2(0, 0), new Index2(psf2In.GetLength(0), psf2In.GetLength(1)));
 
-                lambdaAlpha.CopyFrom(lambda, new Index(0));
-                lambdaAlpha.CopyFrom(alpha, new Index(1));
-                maxReduceThreads.CopyFrom(nextPower2, new Index(0));
+                lambdaAlpha.CopyFrom(lambda, new ILGPU.Index(0));
+                lambdaAlpha.CopyFrom(alpha, new ILGPU.Index(1));
+                maxReduceThreads.CopyFrom(nextPower2, new ILGPU.Index(0));
                 Console.WriteLine("Start");
                 var watch = new System.Diagnostics.Stopwatch();
                 watch.Start();
@@ -405,7 +405,7 @@ namespace Single_Reference.GPUDeconvolution
                             yIndexT = t3[j];
                         }
                         */
-                    reduceAndUpdateX(new Index(nextPower2), maxReduceThreads.View, xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
+                    reduceAndUpdateX(new ILGPU.Index(nextPower2), maxReduceThreads.View, xImage.View, maxDiff.View, maxAbsDiff.View, xIndex.View, yIndex.View, maxPixel.View, maxIndices.View);
                     accelerator.Synchronize();
                     updateCandidatesKernel(psfSize, bMap.View, psf2.View, maxPixel.View, maxIndices.View);
                     //updateBKernel(groupThreadIdx, bMap.View, psf2.View, maxPixel.View, maxIndices.View);

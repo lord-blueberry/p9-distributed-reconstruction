@@ -31,7 +31,7 @@ namespace Distributed_Reference
             var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
 
             //calculate psf and prepare for correlation in the Fourier space
-            var psf = ToFloatImage(CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies));
+            var psf = CalculatePSF(comm, c, metadata, local.UVW, local.Flags, local.Frequencies);
             //TODO: Debug above
             var psfCut = PSF.Cut(psf, PSF_CUTFACTOR);
             var psfUsed = psfCut;
