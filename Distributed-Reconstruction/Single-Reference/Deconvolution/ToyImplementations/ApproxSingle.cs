@@ -391,13 +391,16 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     blockCount = activeSet.Count;
                     theta = tau / (float)blockCount;
                     theta0 = theta;
+                    beta = CalcESO(tau, degreeOfSeperability, blockCount);
+                    lipschitz = maxLipschitz * yBlockSize * xBlockSize;
+                    lipschitz *= (float)beta;
                 }
 
                 if(xDiffMax < epsilon)
                 {
                     //converged = true;
                 }
-                Console.WriteLine("Done Active Set iteration");
+                Console.WriteLine("Done Active Set iteration " + iter);
                 iter++;
             }
 
