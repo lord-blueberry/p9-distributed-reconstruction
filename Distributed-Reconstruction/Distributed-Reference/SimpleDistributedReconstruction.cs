@@ -11,7 +11,7 @@ using static Single_Reference.Common;
 using System.IO;
 
 
-namespace Distributed_Reference
+namespace DistributedReconstruction
 {
     class SimpleDistributedReconstruction
     {

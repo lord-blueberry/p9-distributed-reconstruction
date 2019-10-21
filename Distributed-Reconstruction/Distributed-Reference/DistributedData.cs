@@ -6,7 +6,7 @@ using MPI;
 using Single_Reference;
 using System.IO;
 
-namespace Distributed_Reference
+namespace DistributedReconstruction
 {
     class DistributedData
     {
@@ -100,7 +100,7 @@ namespace Distributed_Reference
             {
                 if (blBeginIdx < blFileScans[i])
                 {
-                    var blBefore = i > 0 ? blFileScans[i] : 0;
+                    var blBefore = i > 0 ? blFileScans[i - 1] : 0;
                     var start = blBeginIdx - blBefore;
                     var end = Math.Min(start + baselineCount, blFileCounts[i]);
                     var uvw = FitsIO.ReadUVW(Path.Combine(folder, "uvw" + i + ".fits"), start, end);

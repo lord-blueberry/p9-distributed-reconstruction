@@ -3,8 +3,8 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>netcoreapp3.0</TargetFramework>
-    <RootNamespace>Distributed_Reference</RootNamespace>
-    <StartupObject>Distributed_Reference.Program</StartupObject>
+    <RootNamespace>DistributedReconstruction</RootNamespace>
+    <StartupObject>DistributedReconstruction.Program</StartupObject>
     <ApplicationIcon />
   </PropertyGroup>
 

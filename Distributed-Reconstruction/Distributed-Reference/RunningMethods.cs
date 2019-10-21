@@ -12,7 +12,7 @@ using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
 using static Single_Reference.Common;
 
-namespace Distributed_Reference
+namespace DistributedReconstruction
 {
     class RunningMethods
     { 

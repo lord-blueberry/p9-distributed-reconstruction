@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Distributed_Reference
+namespace DistributedReconstruction
 {
     class Communication
     {

@@ -8,11 +8,11 @@ using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
 using Single_Reference;
 using static Single_Reference.Common;
-using static Distributed_Reference.SimpleDistributedReconstruction;
+using static DistributedReconstruction.SimpleDistributedReconstruction;
 
 
 
-namespace Distributed_Reference
+namespace DistributedReconstruction
 {
     class DistributedParallelReconstruction
     {

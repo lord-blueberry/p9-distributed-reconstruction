@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.28803.202
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Single-Reference", "Single-Reference\Single-Reference.csproj", "{EC2EB8AD-1CAD-4C9B-869B-A48C83777BC8}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DistributedImplementation", "Distributed-Reference\DistributedImplementation.csproj", "{7160F4E8-123C-47A0-8F4F-4D91DB1C084F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DistributedReconstruction", "Distributed-Reference\DistributedReconstruction.csproj", "{7160F4E8-123C-47A0-8F4F-4D91DB1C084F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DependencyTest", "DependencyTest\DependencyTest.csproj", "{B7B2DFBB-34E3-4228-A4EC-FFAE29463891}"
 EndProject

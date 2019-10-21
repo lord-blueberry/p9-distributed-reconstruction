@@ -7,7 +7,7 @@ using static Single_Reference.Common;
 
 using MPI;
 
-namespace Distributed_Reference
+namespace DistributedReconstruction
 {
     class MPIGreedyCD
     {

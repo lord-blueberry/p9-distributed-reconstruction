@@ -1,14 +1,14 @@
 ﻿using System;
 
-namespace Distributed_Reference
+namespace DistributedReconstruction
 {
     class Program
     {
         static void Main(string[] args)
         {
-            var rank = 0;
-            var rankCount = 1;
-            //var data = DistributedData.LoadTinyMeerKAT2(rank, rankCount, @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\");
+            var rank = 3;
+            var rankCount = 4;
+            var data = DistributedData.LoadTinyMeerKAT2(rank, rankCount, @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\");
 
             //RunningMethods.RunSimulated(args);
             //RunningMethods.RunTinyMeerKAT(args);

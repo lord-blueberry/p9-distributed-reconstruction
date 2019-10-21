@@ -19,7 +19,7 @@ namespace SingleMachineRuns
             //Experiments.PSFSize.DebugConvergence2();
 
 
-            Single_Reference.DebugMethods.DebugSimulatedPCDM();
+            //Single_Reference.DebugMethods.DebugSimulatedPCDM();
             //DebugMethods.DebugSimulatedApprox();
             //DebugMethods.DebugILGPU();
 
