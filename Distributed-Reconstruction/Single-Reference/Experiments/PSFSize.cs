@@ -75,7 +75,6 @@ namespace Single_Reference.Experiments
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
             DeconvolutionResult lastResult = null;
-            var minimumReached = false;
             var firstTimeConverged = false;
             var lastLambda = 0.0f;
             for (int cycle = 0; cycle < maxMajor; cycle++)
@@ -103,9 +102,12 @@ namespace Single_Reference.Experiments
 
                 //check wether we can minimize the objective further with the current psf
                 var objectiveReached = (dataPenalty + regPenalty) < objectiveCutoff;
-                minimumReached = (lastResult != null && lastResult.Converged && lastResult.IterationCount < 20 && currentLambda == lambda);
-                if (lambda == lastLambda)
+                var minimumReached = (lastResult != null && lastResult.Converged && lastResult.IterationCount < 100 && currentLambda == lambda);
+                if (lambda == lastLambda & !firstTimeConverged)
+                {
                     firstTimeConverged = true;
+                    minimumReached = false;
+                }
 
                 if (!objectiveReached & !minimumReached)
                 {
@@ -246,11 +248,11 @@ namespace Single_Reference.Experiments
                         if (!data.flags[i, j, k])
                             visCount2++;
             var visibilitiesCount = visCount2;
-            int gridSize = 2048;
+            int gridSize = 3072;
             int subgridsize = 32;
             int kernelSize = 16;
             int max_nr_timesteps = 1024;
-            double cellSize = 2.0 / 3600.0 * PI / 180.0;
+            double cellSize = 1.5 / 3600.0 * PI / 180.0;
             int wLayerCount = 32;
             double wStep = maxW / (wLayerCount);
             data.c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
@@ -271,8 +273,8 @@ namespace Single_Reference.Experiments
             var psf = FFT.WStackIFFTFloat(psfGrid, data.c.VisibilitiesCount);
             FFT.Shift(psf);
 
-            Directory.CreateDirectory("PSFSizeExperiment");
-            Directory.SetCurrentDirectory("PSFSizeExperiment");
+            Directory.CreateDirectory("PSFSizeExperimentLarge");
+            Directory.SetCurrentDirectory("PSFSizeExperimentLarge");
             FitsIO.Write(psf, "psfFull.fits");
 
             //reconstruct with full psf and find reference objective value
@@ -344,8 +346,8 @@ namespace Single_Reference.Experiments
 
             var data = LMC.Load(folder);
             int gridSize = 3072;
-            int subgridsize = 24;
-            int kernelSize = 12;
+            int subgridsize = 32;
+            int kernelSize = 16;
             int max_nr_timesteps = 1024;
             double cellSize = 1.5 / 3600.0 * PI / 180.0;
             int wLayerCount = 32;
@@ -387,7 +389,7 @@ namespace Single_Reference.Experiments
 
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 1, 16, 24, 32 ,40 , 64,128};
+            var psfCuts = new int[] { 1,2,8, 16, 24, 32, 64,128};
             var outFolder = "PSFSpeedExperiment";
             outFolder += @"\";
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
@@ -408,8 +410,8 @@ namespace Single_Reference.Experiments
 
             var data = LMC.Load(folder);
             int gridSize = 2048;
-            int subgridsize = 24;
-            int kernelSize = 12;
+            int subgridsize = 32;
+            int kernelSize = 16;
             int max_nr_timesteps = 1024;
             double cellSize = 1.5 / 3600.0 * PI / 180.0;
             int wLayerCount = 32;
@@ -451,7 +453,7 @@ namespace Single_Reference.Experiments
 
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 1, 8, 16, 32, 64, 128 };
+            var psfCuts = new int[] { 1, 2, 8, 16, 32, 64, 128 };
             var outFolder = "PSFSpeedExperimentSmall";
             outFolder += @"\";
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
