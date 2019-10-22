@@ -9,7 +9,7 @@ namespace SingleMachineRuns
             //Experiments.GPUSpeed.Run();
             Experiments.PSFSize.RunPSFSize();
             //Experiments.PSFSize.RunSpeedSmall();
-            //Experiments.PSFSize.RunSpeedLarge();
+            Experiments.PSFSize.RunSpeedLarge();
 
 
             //Experiments.PSFMask.Run();

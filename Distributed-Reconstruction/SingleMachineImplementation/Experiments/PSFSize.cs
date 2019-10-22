@@ -112,8 +112,8 @@ namespace SingleMachineRuns.Experiments
 
                 if (!objectiveReached & !minimumReached)
                 {
-                    writer.Write(firstTimeConverged + ";");
-                    writer.Flush();
+                    //writer.Write(firstTimeConverged + ";");
+                    //writer.Flush();
                     info.totalDeconv.Start();
                     if (!firstTimeConverged)
                     {
@@ -288,7 +288,7 @@ namespace SingleMachineRuns.Experiments
                 using (var writer = new StreamWriter("1Psf.txt", false))
                 {
                     writer.WriteLine(fileHeader);
-                    referenceInfo = ReconstructSimple(data, psf, "", 1, 10, "dirtyReference", "xReference", writer, 0.0, 1e-5f, false);
+                    referenceInfo = ReconstructSimple(data, psf, "", 1, 8, "dirtyReference", "xReference", writer, 0.0, 1e-5f, false);
                     File.WriteAllText("1PsfTotal.txt", referenceInfo.totalDeconv.Elapsed.ToString());
                 }
                 objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
@@ -305,7 +305,7 @@ namespace SingleMachineRuns.Experiments
                 using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
                 {
                     writer.WriteLine(fileHeader);
-                    experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 10, cut+"dirty", cut+"x", writer, objectiveCutoff, 1e-5f, false);
+                    experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 8, cut+"dirty", cut+"x", writer, objectiveCutoff, 1e-5f, false);
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
@@ -319,7 +319,7 @@ namespace SingleMachineRuns.Experiments
                 using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
                 {
                     writer.WriteLine(fileHeader);
-                    experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 10, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f, true);
+                    experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 8, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f, true);
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
@@ -333,7 +333,7 @@ namespace SingleMachineRuns.Experiments
                 using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
                 {
                     writer.WriteLine(fileHeader);
-                    experimentInfo = ReconstructGradientApprox(data, psf, outFolder, cut, 12, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f);
+                    experimentInfo = ReconstructGradientApprox(data, psf, outFolder, cut, 8, cut + "dirty", cut + "x", writer, objectiveCutoff, 1e-5f);
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
