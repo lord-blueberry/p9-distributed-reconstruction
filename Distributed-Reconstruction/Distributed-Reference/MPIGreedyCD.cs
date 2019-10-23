@@ -87,10 +87,10 @@ namespace DistributedReconstruction
 
         private Pixel GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
         {
-            var maxPixels = new Pixel[imageSection.YExtent()];
-            Parallel.For(0, imageSection.YExtent(), (y) =>
+            var currentMax = new Pixel(0, -1, -1);
+            for (int y = 0; y < imageSection.YExtent(); y++)
             {
-                var currentMax = new Pixel(0, -1, -1);
+                
                 for (int x = 0; x < imageSection.XExtent(); x++)
                 {
                     var currentA = aMap[y, x];
@@ -105,15 +105,9 @@ namespace DistributedReconstruction
                         currentMax = new Pixel(xDiff, yGlobal, xGlobal);
                     }
                 }
-                maxPixels[y] = currentMax;
-            });
+            }
 
-            var maxPixelLocal = new Pixel(0, -1, -1);
-            for (int i = 0; i < maxPixels.Length; i++)
-                if (maxPixelLocal.MaxDiff < maxPixels[i].MaxDiff)
-                    maxPixelLocal = maxPixels[i];
-
-            var maxPixelGlobal = comm.Allreduce(maxPixelLocal, (aC, bC) => aC.MaxDiff > bC.MaxDiff ? aC : bC);
+            var maxPixelGlobal = comm.Allreduce(currentMax, (aC, bC) => aC.MaxDiff > bC.MaxDiff ? aC : bC);
             return maxPixelGlobal;
         }
 
@@ -126,7 +120,7 @@ namespace DistributedReconstruction
             var xBMin = Math.Max(xPixel - xBHalf, imageSection.X);
             var yBMax = Math.Min(yPixel - yBHalf + bUpdate.GetLength(0), imageSection.YEnd);
             var xBMax = Math.Min(xPixel - xBHalf + bUpdate.GetLength(1), imageSection.XEnd);
-            Parallel.For(yBMin, yBMax, (i) =>
+            for(int i = yBMin; i <  yBMax; i++)
             {
                 for (int j = xBMin; j < xBMax; j++)
                 {
@@ -136,7 +130,7 @@ namespace DistributedReconstruction
                     var xBUpdate = j + xBHalf - xPixel;
                     b[yLocal, xLocal] -= bUpdate[yBUpdate, xBUpdate] * (max.MaxDiff * max.Sign);
                 }
-            });
+            }
 
         }
 

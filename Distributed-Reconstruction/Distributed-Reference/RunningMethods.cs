@@ -63,7 +63,7 @@ namespace DistributedReconstruction
 
                 var lambda = 0.4f;
                 var alpha = 0.1f;
-                var reconstruction = SimpleDistributedReconstruction.Reconstruct(comm, data, c, 5, lambda, alpha, 50000);
+                var reconstruction = SimpleDistributedReconstruction.Reconstruct(comm, data, c, 2, lambda, alpha, 10000);
 
                 if (comm.Rank == 0)
                     FitsIO.Write(reconstruction, "tinyMeerKATReconstruction.fits");

@@ -191,22 +191,14 @@ namespace DistributedReconstruction
 
         private static void StitchImage(float[][,] totalX, float[,] stitched, int nodeCount)
         {
-            var yPatchCount = (int)Math.Floor(Math.Sqrt(nodeCount));
-            var xPatchCount = (nodeCount / yPatchCount);
-            int yOffset = 0;
-            for (int yIdx = 0; yIdx < yPatchCount; yIdx++)
+            for(int i = 0; i < totalX.Length; i++)
             {
-                int xOffset = 0;
-                int patchIdx = yIdx * yPatchCount;
-                for (int xIdx = 0; xIdx < xPatchCount; xIdx++)
-                {
-                    var patch = totalX[patchIdx+xIdx];
-                    for (int y = 0; y < patch.GetLength(0); y++)
-                        for (int x = 0; x < patch.GetLength(1); x++)
-                            stitched[yOffset + y, xOffset + x] = patch[y, x];
-                    xOffset += patch.GetLength(1);
-                }
-                yOffset += totalX[patchIdx].GetLength(0);
+                var targetRectangle = CalculateLocalImageSection(i, nodeCount, stitched.GetLength(0), stitched.GetLength(1));
+                for (int yIdx = 0; yIdx < targetRectangle.YExtent();yIdx++)
+                    for(int xIdx = 0; xIdx < targetRectangle.XExtent();xIdx++)
+                    {
+                        stitched[yIdx + targetRectangle.Y, xIdx + targetRectangle.X] = totalX[i][yIdx, xIdx];
+                    }
             }
         }
 
