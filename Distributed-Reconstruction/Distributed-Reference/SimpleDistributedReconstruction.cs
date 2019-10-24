@@ -202,7 +202,6 @@ namespace DistributedReconstruction
             }
         }
 
-
         public static float[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             float[,] psf = null;
