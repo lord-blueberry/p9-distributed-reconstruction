@@ -14,6 +14,7 @@ namespace SingleMachineRuns
 
             //Experiments.PSFMask.Run();
 
+            //Single_Reference.DebugMethods.DebugILGPU();
             Single_Reference.DebugMethods.DebugSimulatedApprox();
 
             //Experiments.PSFSize.DebugConvergence();
@@ -22,7 +23,7 @@ namespace SingleMachineRuns
 
             //Single_Reference.DebugMethods.DebugSimulatedPCDM();
 
-            //DebugMethods.DebugILGPU();
+            //
 
             //DebugMethods.DebugSimulatedMixed();
             //Deconvolution.NaiveGreedyCD.Run();

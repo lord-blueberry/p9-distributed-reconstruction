@@ -365,7 +365,10 @@ namespace Single_Reference
                 //var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f * fastCD.MaxLipschitz, 0.8f, 1000, 1e-4f);
                 //var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 8, 1, 1);
                 //var converged = approx.DeconvolveGreedy(xImage, dirtyImage, psfCut, lambda, alpha, random, 4, 4, 500);
-                var converged = approx.DeconvolveApprox(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, 4, 500);
+                var threads = 4;
+                if (cycle >= 2)
+                    threads = 1;
+                var converged = approx.DeconvolveApprox(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, threads, 500, 1e-4f, cycle == 0);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else

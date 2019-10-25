@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using static Single_Reference.Common;
 
@@ -27,7 +28,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
         private static double CalcESO(int tau, int degreeOfSep, int blockCount) => 1.0 + (degreeOfSep - 1.0) * (tau - 1.0) / (Math.Max(1.0, (blockCount - 1)));
 
 
-        public bool DeconvolveApprox(float[,] xImage, float[,] residuals, float[,] psf, float lambda, float alpha, Random random, int blockSize, int threadCount, int maxIteration = 100, float epsilon = 1e-4f)
+        public bool DeconvolveApprox(float[,] xImage, float[,] residuals, float[,] psf, float lambda, float alpha, Random random, int blockSize, int threadCount, int maxIteration = 100, float epsilon = 1e-4f, bool coldStart = false)
         {
             var xExplore = Copy(xImage);
             var xCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
@@ -37,6 +38,13 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var gExplore = Residuals.CalcBMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var gCorrection = new float[residuals.GetLength(0), residuals.GetLength(1)];
             var psf2 = PSF.CalcPSFSquared(psf);
+
+            if (coldStart)
+            {
+                var rec = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
+                var fastCD = new FastGreedyCD(rec, rec, psf, psf2);
+                fastCD.Deconvolve(xExplore, gExplore, lambda, alpha, xImage.GetLength(0));
+            }
 
             yBlockSize = blockSize;
             xBlockSize = blockSize;
@@ -84,11 +92,9 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var theta0 = theta;
             float eta = 1.0f / blockCount;
 
-            var testRestart = 0.0;
+            var testRestart = 0.0f;
             var iter = 0;
-            var blocks = new float[tau, yBlockSize, xBlockSize];
             
-            var containsNonZero = new bool[tau];
             var converged = false;
             Console.WriteLine("Starting Active Set iterations with " + activeSet.Count + " blocks");
             while (iter < maxIteration & !converged)
@@ -99,27 +105,18 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                 {
                     var stepSize = lipschitz * theta / theta0;
                     var theta2 = theta * theta;
-                    var correctionFactor = -(1.0f - theta / theta0) / (theta * theta);
+                    var correctionFactor = -(1.0f - theta / theta0) / theta2;
                     var samples = activeSet.Shuffle(random).Take(tau).ToList();
-
-                    //values for calculating the restart parameter
-                    var udpateXExplores = new float[tau];
-                    var oldXExplores = new float[tau];
-                    var newXExplores = new float[tau];
-                    var oldXCorrections = new float[tau];
                     
                     Parallel.For(0, tau, (i) =>
                     {
-                        udpateXExplores[i] = 0.0f;
-                        oldXExplores[i] = 0.0f;
-                        newXExplores[i] = 0.0f;
-                        oldXCorrections[i] = 0.0f;
 
                         var blockSample = samples[i];
                         var yOffset = blockSample.Item1 * yBlockSize;
                         var xOffset = blockSample.Item2 * xBlockSize;
 
                         var blockUpdate = new float[yBlockSize, xBlockSize];
+                        var updateSum = 0.0f;
                         var updateAbsSum = 0.0f;
                         for (int y = yOffset; y < (yOffset + yBlockSize); y++)
                             for (int x = xOffset; x < (xOffset + xBlockSize); x++)
@@ -127,7 +124,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                                 var update = theta2 * gCorrection[y, x] + gExplore[y, x] + xExplore[y, x] * stepSize;
                                 update = ElasticNet.ProximalOperator(update, stepSize, lambda, alpha) - xExplore[y, x];
                                 blockUpdate[y - yOffset, x - xOffset] = update;
-                                udpateXExplores[i] += update;
+                                updateSum = update;
                                 updateAbsSum += Math.Abs(update);
                             }
 
@@ -136,6 +133,9 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                         {
                             xDiffMax[i] = Math.Max(xDiffMax[i], updateAbsSum);
                             UpdateBMaps(blockUpdate, blockSample.Item1, blockSample.Item2, psf2, gExplore, gCorrection, correctionFactor);
+                            var newXExplore = 0.0f;
+                            var oldXExplore = 0.0f;
+                            var oldXCorr = 0.0f;
                             for (int y = yOffset; y < (yOffset + yBlockSize); y++)
                                 for (int x = xOffset; x < (xOffset + xBlockSize); x++)
                                 {
@@ -143,22 +143,21 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                                     var oldExplore = xExplore[y, x];
                                     var oldCorrection = xCorrection[y, x];
 
-                                    oldXExplores[i] += xExplore[y, x];
-                                    oldXCorrections[i] += xCorrection[y, x];
-                                    newXExplores[i] += oldExplore + update;
-   
+                                    oldXExplore += xExplore[y, x];
+                                    oldXCorr += xCorrection[y, x];
+                                    newXExplore += oldExplore + update;
 
                                     xExplore[y, x] += update;
                                     xCorrection[y, x] += update * correctionFactor;
                                 }
+
+                            //not 100% sure this is the correct generalization from single pixel/single thread rule to block/parallel rule
+                            var testRestartUpdate = (updateSum) * (newXExplore - (theta2 * oldXCorr + oldXExplore));
+                            ConcurrentUpdateTestRestart(ref testRestart, eta, testRestartUpdate);
                         }
                     });
-
-                    //not 100% sure this is the correct generalization from single pixel/single thread rule to block/parallel rule
-                    for (int i = 0; i < tau;i++)
-                        testRestart = (1.0 - eta) * testRestart - eta * (udpateXExplores[i]) * (newXExplores[i] - (theta * theta * oldXCorrections[i] + oldXExplores[i]));
                     
-                    theta = (float)(Math.Sqrt((theta * theta * theta * theta) + 4 * (theta * theta)) - theta * theta) / 2.0f;
+                    theta = (float)(Math.Sqrt((theta2 * theta2) + 4 * (theta2)) - theta2) / 2.0f;
                 }
 
                 if (testRestart > 0)
@@ -229,9 +228,32 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                             correctionUpdate += update * correctionFactor;
                         }
 
-                    gExplore[globalY, globalX] -= exploreUpdate;
-                    gCorrection[globalY, globalX] -= correctionUpdate;
+                    ConcurrentSubtract(gExplore, globalY, globalX, exploreUpdate);
+                    ConcurrentSubtract(gCorrection, globalY, globalX, correctionUpdate);
                 }
+        }
+
+        private static void ConcurrentSubtract(float[,] map, int yIdx, int xIdx, float value)
+        {
+            var successfulWrite = value == 0.0f;    //skip write if value to subtract is zero
+            while (!successfulWrite)
+            {
+                var read = map[yIdx, xIdx];
+                var old = Interlocked.CompareExchange(ref map[yIdx, xIdx], read - value, read);
+                successfulWrite = old == read;
+            }
+        }
+
+        private static void ConcurrentUpdateTestRestart(ref float test, float eta, float subtract)
+        {
+            var successfulWrite = subtract == 0.0f;    //skip write if value to subtract is zero
+            while (!successfulWrite) 
+            {
+                var read = test;
+                var update = (1.0f - eta) * read - subtract;
+                var old = Interlocked.CompareExchange(ref test, update, read);
+                successfulWrite = old == read;
+            }
         }
 
         private List<Tuple<int, int>> GetActiveSet(float[,] xExplore, float[,] gExplore, float lambda, float alpha, float lipschitz)
@@ -265,7 +287,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
                     }
 
                 }
-            FitsIO.Write(debug, "activeSet.fits");
+            //FitsIO.Write(debug, "activeSet.fits");
             //can write max change for convergence purposes
             return output;
         }
