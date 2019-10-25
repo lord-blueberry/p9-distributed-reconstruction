@@ -93,9 +93,12 @@ namespace SingleMachineRuns.Experiments
                 info.lastDataPenalty = dataPenalty;
                 info.lastRegPenalty = regPenalty;
 
+                var maxDirty = Residuals.GetMax(dirtyImage);
                 var bMap = bMapCalculator.Convolve(dirtyImage);
                 FitsIO.Write(bMap, folder + dirtyPrefix + "bmap_" + cycle + ".fits");
-                var currentSideLobe = Residuals.GetMax(bMap) * maxSidelobe;
+                var maxB = Residuals.GetMax(bMap);
+                var correctionFactor = Math.Max(maxB / (maxDirty * fastCD.MaxLipschitz), 1.0f);
+                var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
                 writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
@@ -122,7 +125,9 @@ namespace SingleMachineRuns.Experiments
                     {
                         bMap = bMapCalculator2.Convolve(dirtyImage);
                         //FitsIO.Write(bMap, folder + dirtyPrefix + "bmap_" + cycle + "_full.fits");
-                        currentSideLobe = Residuals.GetMax(bMap) * maxSidelobe;
+                        maxB = Residuals.GetMax(bMap);
+                        correctionFactor = Math.Max(maxB / (maxDirty * fastCD2.MaxLipschitz), 1.0f);
+                        currentSideLobe = maxB * maxSidelobe * correctionFactor;
                         currentLambda = Math.Max(currentSideLobe / alpha, lambdaTrue);
                         info.totalDeconv.Start();
                         lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 30000, epsilon);
@@ -152,6 +157,9 @@ namespace SingleMachineRuns.Experiments
                 lastLambda = currentLambda;
 
             }
+
+            bMapCalculator.Dispose();
+            bMapCalculator2.Dispose();
 
             return info;
         }
@@ -190,9 +198,12 @@ namespace SingleMachineRuns.Experiments
                 info.lastDataPenalty = dataPenalty;
                 info.lastRegPenalty = regPenalty;
 
+                var maxDirty = Residuals.GetMax(dirtyImage);
                 bMapCalculator.ConvolveInPlace(dirtyImage);
-                //FitsIO.Write(dirtyImage, folder + dirtyPrefix + "bmap_" + cycle + ".fits");
-                var currentSideLobe = Residuals.GetMax(dirtyImage) * maxSidelobe;
+                FitsIO.Write(dirtyImage, folder + dirtyPrefix + "bmap_" + cycle + ".fits");
+                var maxB = Residuals.GetMax(dirtyImage);
+                var correctionFactor = Math.Max(maxB / (maxDirty * fastCD.MaxLipschitz), 1.0f);
+                var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
                 writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
@@ -225,6 +236,9 @@ namespace SingleMachineRuns.Experiments
                 }
 
             }
+
+            bMapCalculator.Dispose();
+
 
             return info;
         }
@@ -280,7 +294,7 @@ namespace SingleMachineRuns.Experiments
             //reconstruct with full psf and find reference objective value
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
-            var recalculateFullPSF = true;
+            var recalculateFullPSF = false;
             if (recalculateFullPSF)
             {
                 ReconstructionInfo referenceInfo = null;
@@ -390,10 +404,11 @@ namespace SingleMachineRuns.Experiments
 
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 2,8, 16, 32, 64, 128};
+            var psfCuts = new int[] { 2, 8, 16, 32, 64, 128};
             var outFolder = "PSFSpeedExperimentApproxDeconv";
             outFolder += @"\";
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
+            /*
             foreach (var cut in psfCuts)
             {
                 using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
@@ -402,7 +417,7 @@ namespace SingleMachineRuns.Experiments
                     experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 8, cut+"dirty", cut+"x", writer, 0.0, 1e-5f, false);
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
-            }
+            }*/
 
             Directory.CreateDirectory("PSFSpeedExperimentApproxPSF");
             outFolder = "PSFSpeedExperimentApproxPSF";

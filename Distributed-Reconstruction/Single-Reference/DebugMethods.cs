@@ -15,7 +15,6 @@ namespace Single_Reference
 {
     public class DebugMethods
     {
-    
         #region full
         public static void MeerKATFull()
         {
@@ -335,7 +334,7 @@ namespace Single_Reference
             //fastCD.ResetAMap(psf);
             var lambda = 0.5f * fastCD.MaxLipschitz;
             var alpha = 0.8f;
-            var approx = new ApproxSingle();
+            var approx = new ApproxParallel();
 
             var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;
@@ -346,7 +345,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
-            for (int cycle = 0; cycle < 10; cycle++)
+            for (int cycle = 0; cycle < 4; cycle++)
             {
                 //FORWARD
                 watchForward.Start();
@@ -366,7 +365,7 @@ namespace Single_Reference
                 //var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f * fastCD.MaxLipschitz, 0.8f, 1000, 1e-4f);
                 //var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 8, 1, 1);
                 //var converged = approx.DeconvolveGreedy(xImage, dirtyImage, psfCut, lambda, alpha, random, 4, 4, 500);
-                var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, 4, 500);
+                var converged = approx.DeconvolveApprox(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, 4, 500);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else

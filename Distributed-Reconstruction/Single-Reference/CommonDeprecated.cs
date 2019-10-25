@@ -6,7 +6,7 @@ using System.Numerics;
 namespace Single_Reference
 {
     [Obsolete("Only here so toy examples still work")]
-    static class CommonDeprecated
+    public static class CommonDeprecated
     {
         public static double ShrinkElasticNet(double value, double lambda, double alpha) => Math.Max(value - lambda * alpha, 0.0) / (1 + lambda * (1 - alpha));
 

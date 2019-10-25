@@ -193,7 +193,7 @@ namespace Single_Reference
                 for (int y = 0; y < fullPsf.GetLength(0); y++)
                     for (int x = 0; x < fullPsf.GetLength(1); x++)
                         if (!(y >= yOffset & y < (yOffset + fullPsf.GetLength(0) / cutFactor)) | !(x >= xOffset & x < (xOffset + fullPsf.GetLength(1) / cutFactor)))
-                            output = Math.Max(output, fullPsf[y, x]);
+                            output = Math.Max(output, Math.Abs(fullPsf[y, x]));
                 return output;
             }
 

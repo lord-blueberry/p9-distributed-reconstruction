@@ -7,19 +7,21 @@ namespace SingleMachineRuns
         static void Main(string[] args)
         {
             //Experiments.GPUSpeed.Run();
-            Experiments.PSFSize.RunPSFSize();
-            Experiments.PSFSize.RunSpeedLarge();
+            //Experiments.PSFSize.RunSpeedLarge();
+            //Experiments.PSFSize.RunPSFSize();
+
 
 
             //Experiments.PSFMask.Run();
 
+            Single_Reference.DebugMethods.DebugSimulatedApprox();
 
             //Experiments.PSFSize.DebugConvergence();
             //Experiments.PSFSize.DebugConvergence2();
 
 
             //Single_Reference.DebugMethods.DebugSimulatedPCDM();
-            //DebugMethods.DebugSimulatedApprox();
+
             //DebugMethods.DebugILGPU();
 
             //DebugMethods.DebugSimulatedMixed();

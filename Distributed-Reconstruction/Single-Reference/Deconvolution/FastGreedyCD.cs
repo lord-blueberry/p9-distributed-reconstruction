@@ -51,8 +51,6 @@ namespace Single_Reference.Deconvolution
             for (int i = 0; i < psf2.GetLength(0); i++)
                 for (int j = 0; j < psf2.GetLength(1); j++)
                     psf2[i, j] *= (maxFull / maxCut);
-
-
         }
 
         #region ISubpatchDeconvolver implementation

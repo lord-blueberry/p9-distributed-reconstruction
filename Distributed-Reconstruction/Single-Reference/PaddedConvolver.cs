@@ -9,7 +9,7 @@ namespace Single_Reference
     /// <summary>
     /// Faster implementation of a padded convolution in fourier space.
     /// </summary>
-    public class PaddedConvolver
+    public class PaddedConvolver :IDisposable
     {
         readonly FFT fft;
         readonly Rectangle kernelSize;
@@ -73,5 +73,32 @@ namespace Single_Reference
                         fft.ImageBuffer[i, j] = Complex.Zero;
                     }
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    fft.Dispose();
+                }
+
+
+                disposedValue = true;
+            }
+        }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
+        }
+        #endregion
     }
 }
