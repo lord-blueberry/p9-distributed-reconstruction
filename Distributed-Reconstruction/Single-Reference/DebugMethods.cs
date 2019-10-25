@@ -335,6 +335,7 @@ namespace Single_Reference
             var lambda = 0.5f * fastCD.MaxLipschitz;
             var alpha = 0.8f;
             var approx = new ApproxParallel();
+            var approx2 = new ApproxFast(0, 0);
 
             var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;
@@ -368,7 +369,8 @@ namespace Single_Reference
                 var threads = 4;
                 if (cycle >= 2)
                     threads = 1;
-                var converged = approx.DeconvolveApprox(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, threads, 500, 1e-4f, cycle == 0);
+                //var converged = approx.DeconvolveApprox(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, threads, 500, 1e-4f, cycle == 0);
+                var converged = approx2.Deconvolve(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, threads, 5, 1e-4f);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using static Single_Reference.Common;
 
 namespace Single_Reference.Deconvolution
@@ -11,12 +12,7 @@ namespace Single_Reference.Deconvolution
     {
         private static double CalcESO(int tau, int degreeOfSep, int blockCount) => 1.0 + (degreeOfSep - 1.0) * (tau - 1.0) / (Math.Max(1.0, (blockCount - 1)));
 
-
-        private int threadCount;
-
         const float ACTIVE_SET_CUTOFF = 1e-8f;
-        int yBlockSize;
-        int xBlockSize;
         bool useCDStart = true;
 
         public ApproxFast(int blockSize, int threadCount)
@@ -61,7 +57,7 @@ namespace Single_Reference.Deconvolution
             {
                 var rec = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
                 var fastCD = new FastGreedyCD(rec, rec, psf, psf2);
-                fastCD.Deconvolve(xExplore, gExplore, lambda, alpha, xImage.GetLength(0)/10);
+                fastCD.Deconvolve(xExplore, gExplore, lambda, alpha, xImage.GetLength(0));
             }
 
             var maxLipschitz = (float)PSF.CalcMaxLipschitz(psf);
@@ -69,7 +65,7 @@ namespace Single_Reference.Deconvolution
             var p = new SharedParams(lambda, alpha, blockSize, blockSize, threadCount,
                 CountNonZero(psf), psf2, null,
                 xExplore, xCorrection, gExplore, gCorrection, random);
-            p.ActiveSet = GetActiveSet(xExplore, gExplore, lambda, alpha, maxLipschitz);
+            p.ActiveSet = GetActiveSet(xExplore, gExplore, p.YBlockSize, p.XBlockSize, lambda, alpha, maxLipschitz);
             p.BlockLock = new int[p.ActiveSet.Count];
             p.maxLipschitz = maxLipschitz;
             p.MaxIterations = 1000;
@@ -136,7 +132,7 @@ namespace Single_Reference.Deconvolution
             return output;
         }
 
-        private List<Tuple<int, int>> GetActiveSet(float[,] xExplore, float[,] gExplore, float lambda, float alpha, float lipschitz)
+        private static List<Tuple<int, int>> GetActiveSet(float[,] xExplore, float[,] gExplore, int yBlockSize, int xBlockSize, float lambda, float alpha, float lipschitz)
         {
             var debug = new float[xExplore.GetLength(0), xExplore.GetLength(1)];
             var output = new List<Tuple<int, int>>();
@@ -178,15 +174,14 @@ namespace Single_Reference.Deconvolution
             float eta = 1.0f / blockCount;
             p.testRestart = 0.0f;
 
-            //initialize concurrent deconvolution
             var deconvolvers = new List<ConcurrentDeconvolver>(p.Tau);
-            var deconvThread = new List<Thread>(p.Tau);
+            
             for(int i = 0; i < p.Tau; i++)
             {
                 deconvolvers.Add(new ConcurrentDeconvolver(p, theta0));
-                deconvThread.Add(new Thread(new ThreadStart(deconvolvers[i].Run)));
             }
 
+            var tasks = new Task[p.Tau];
             int iter = 0;
             var converged = false;
             Console.WriteLine("Starting Active Set iterations with " + p.ActiveSet.Count + " blocks");
@@ -194,12 +189,15 @@ namespace Single_Reference.Deconvolution
             {
 
                 //iterations
-                for (int i = 0; i < deconvThread.Count; i++)
-                    deconvThread[i].Start();
+                for (int i = 0; i < deconvolvers.Count; i++)
+                {
+                    tasks[i] = new Task(deconvolvers[i].Run);
+                    tasks[i].Start();
+                }
 
-                for (int i = 0; i < deconvThread.Count; i++)
-                    deconvThread[i].Join();
-
+                for (int i = 0; i < deconvolvers.Count; i++)
+                    tasks[i].Wait();
+                
                 if (p.testRestart > 0.0f)
                 {
                     Console.WriteLine("restarting");
@@ -215,7 +213,7 @@ namespace Single_Reference.Deconvolution
                         }
 
                     //new active set
-                    p.ActiveSet = GetActiveSet(p.XExpl, p.GExpl, p.Lambda, p.Alpha, p.maxLipschitz);
+                    p.ActiveSet = GetActiveSet(p.XExpl, p.GExpl, p.YBlockSize, p.XBlockSize, p.Lambda, p.Alpha, p.maxLipschitz);
                     blockCount = p.ActiveSet.Count;
                     theta0 = p.Tau / (float)blockCount;
                     for (int i = 0; i < deconvolvers.Count; i++)
@@ -303,23 +301,23 @@ namespace Single_Reference.Deconvolution
         private class ConcurrentDeconvolver
         {
             private readonly SharedParams p;
+            private readonly float[,] blockUpdate;
             public float theta = 0.0f;
             public float xDiffMax = 0.0f;
+            
 
             public ConcurrentDeconvolver(SharedParams p, float theta0)
             {
                 this.p = p;
                 theta = theta0;
+                blockUpdate = new float[p.YBlockSize, p.XBlockSize];
             }
 
             public void Run()
             {
-                var blockUpdate = new float[p.YBlockSize, p.XBlockSize];
-                
                 var blockCount = p.ActiveSet.Count;
                 var theta0 = p.Tau / (float)blockCount;
                 float eta = 1.0f / blockCount;
-
 
                 var beta = CalcESO(p.Tau, p.DegreeOfSeperability, blockCount);
                 var lipschitz = p.maxLipschitz * p.YBlockSize * p.XBlockSize;
