@@ -33,7 +33,6 @@ namespace Single_Reference.Deconvolution
         #endregion
 
 
- 
         public bool Deconvolve(float[,] xImage, float[,] residuals, float[,] psf, float lambda, float alpha, Random random, int blockSize, int threadCount, int maxIteration = 100, float epsilon = 1e-4f)
         {
             var xExplore = Copy(xImage);
@@ -62,17 +61,17 @@ namespace Single_Reference.Deconvolution
 
             var maxLipschitz = (float)PSF.CalcMaxLipschitz(psf);
 
-            var p = new SharedParams(lambda, alpha, blockSize, blockSize, threadCount,
+            var shared = new SharedData(lambda, alpha, blockSize, blockSize, threadCount,
                 CountNonZero(psf), psf2, null,
                 xExplore, xCorrection, gExplore, gCorrection, random);
-            p.ActiveSet = GetActiveSet(xExplore, gExplore, p.YBlockSize, p.XBlockSize, lambda, alpha, maxLipschitz);
-            p.BlockLock = new int[p.ActiveSet.Count];
-            p.maxLipschitz = maxLipschitz;
-            p.MaxIterations = 1000;
+            shared.ActiveSet = GetActiveSet(xExplore, gExplore, shared.YBlockSize, shared.XBlockSize, lambda, alpha, maxLipschitz);
+            shared.BlockLock = new int[shared.ActiveSet.Count];
+            shared.maxLipschitz = maxLipschitz;
+            shared.MaxConcurrentIterations = 1000;
 
-            var theta = DeconvolveConcurrent(p, maxIteration, epsilon);
+            var theta = DeconvolveConcurrent(shared, maxIteration, epsilon);
 
-            var theta0 = p.Tau / (float)p.ActiveSet.Count;
+            var theta0 = shared.Tau / (float)shared.ActiveSet.Count;
             var tmpTheta = theta < 1.0f ? ((theta * theta) / (1.0f - theta)) : theta0;
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
@@ -167,24 +166,24 @@ namespace Single_Reference.Deconvolution
             return output;
         }
 
-        private float DeconvolveConcurrent(SharedParams p, int activeSetIterations, float epsilon)
+        private float DeconvolveConcurrent(SharedData shared, int activeSetIterations, float epsilon)
         {
-            var blockCount = p.ActiveSet.Count;
-            var theta0 = p.Tau / (float)blockCount;
+            var blockCount = shared.ActiveSet.Count;
+            var theta0 = shared.Tau / (float)blockCount;
             float eta = 1.0f / blockCount;
-            p.testRestart = 0.0f;
+            shared.testRestart = 0.0f;
 
-            var deconvolvers = new List<ConcurrentDeconvolver>(p.Tau);
+            var deconvolvers = new List<ConcurrentDeconvolver>(shared.Tau);
             
-            for(int i = 0; i < p.Tau; i++)
+            for(int i = 0; i < shared.Tau; i++)
             {
-                deconvolvers.Add(new ConcurrentDeconvolver(p, theta0));
+                deconvolvers.Add(new ConcurrentDeconvolver(shared, theta0));
             }
 
-            var tasks = new Task[p.Tau];
+            var tasks = new Task[shared.Tau];
             int iter = 0;
             var converged = false;
-            Console.WriteLine("Starting Active Set iterations with " + p.ActiveSet.Count + " blocks");
+            Console.WriteLine("Starting Active Set iterations with " + shared.ActiveSet.Count + " blocks");
             while (iter < activeSetIterations & !converged)
             {
 
@@ -198,27 +197,27 @@ namespace Single_Reference.Deconvolution
                 for (int i = 0; i < deconvolvers.Count; i++)
                     tasks[i].Wait();
                 
-                if (p.testRestart > 0.0f)
+                if (shared.testRestart > 0.0f)
                 {
                     Console.WriteLine("restarting");
                     var currentTheta = deconvolvers[0].theta;
                     var tmpTheta = currentTheta < 1.0f ? ((currentTheta * currentTheta) / (1.0f - currentTheta)) : theta0;
-                    for (int y = 0; y < p.XExpl.GetLength(0); y++)
-                        for (int x = 0; x < p.XExpl.GetLength(1); x++)
+                    for (int y = 0; y < shared.XExpl.GetLength(0); y++)
+                        for (int x = 0; x < shared.XExpl.GetLength(1); x++)
                         {
-                            p.XExpl[y, x] += tmpTheta * p.XCorr[y, x];
-                            p.XCorr[y, x] = 0;
-                            p.GExpl[y, x] += tmpTheta * p.GCorr[y, x];
-                            p.GCorr[y, x] = 0;
+                            shared.XExpl[y, x] += tmpTheta * shared.XCorr[y, x];
+                            shared.XCorr[y, x] = 0;
+                            shared.GExpl[y, x] += tmpTheta * shared.GCorr[y, x];
+                            shared.GCorr[y, x] = 0;
                         }
 
                     //new active set
-                    p.ActiveSet = GetActiveSet(p.XExpl, p.GExpl, p.YBlockSize, p.XBlockSize, p.Lambda, p.Alpha, p.maxLipschitz);
-                    blockCount = p.ActiveSet.Count;
-                    theta0 = p.Tau / (float)blockCount;
+                    shared.ActiveSet = GetActiveSet(shared.XExpl, shared.GExpl, shared.YBlockSize, shared.XBlockSize, shared.Lambda, shared.Alpha, shared.maxLipschitz);
+                    blockCount = shared.ActiveSet.Count;
+                    theta0 = shared.Tau / (float)blockCount;
                     for (int i = 0; i < deconvolvers.Count; i++)
                         deconvolvers[i].theta = theta0;
-                    p.testRestart = 0.0f;
+                    shared.testRestart = 0.0f;
                 }
 
                 if (deconvolvers.Sum(x => x.xDiffMax) < epsilon)
@@ -236,7 +235,7 @@ namespace Single_Reference.Deconvolution
             return deconvolvers[0].theta;
         }
 
-        private class SharedParams
+        private class SharedData
         {
             public float Lambda { get; set; }
             public float Alpha { get; set; }
@@ -258,11 +257,11 @@ namespace Single_Reference.Deconvolution
             public List<Tuple<int, int>> ActiveSet { get; set; }
             public int[] BlockLock { get;  set; }
 
-            public int MaxIterations { get; set; }
+            public int MaxConcurrentIterations { get; set; }
             public float testRestart;
             public float maxLipschitz;
 
-            public SharedParams(
+            public SharedData(
                 float lambda,
                 float alpha,
                 int yBlockSize,
@@ -300,47 +299,46 @@ namespace Single_Reference.Deconvolution
 
         private class ConcurrentDeconvolver
         {
-            private readonly SharedParams p;
+            private readonly SharedData shared;
             private readonly float[,] blockUpdate;
             public float theta = 0.0f;
             public float xDiffMax = 0.0f;
             
-
-            public ConcurrentDeconvolver(SharedParams p, float theta0)
+            public ConcurrentDeconvolver(SharedData shared, float theta0)
             {
-                this.p = p;
+                this.shared = shared;
                 theta = theta0;
-                blockUpdate = new float[p.YBlockSize, p.XBlockSize];
+                blockUpdate = new float[shared.YBlockSize, shared.XBlockSize];
             }
 
             public void Run()
             {
-                var blockCount = p.ActiveSet.Count;
-                var theta0 = p.Tau / (float)blockCount;
+                var blockCount = shared.ActiveSet.Count;
+                var theta0 = shared.Tau / (float)blockCount;
                 float eta = 1.0f / blockCount;
 
-                var beta = CalcESO(p.Tau, p.DegreeOfSeperability, blockCount);
-                var lipschitz = p.maxLipschitz * p.YBlockSize * p.XBlockSize;
+                var beta = CalcESO(shared.Tau, shared.DegreeOfSeperability, blockCount);
+                var lipschitz = shared.maxLipschitz * shared.YBlockSize * shared.XBlockSize;
                 lipschitz *= (float)beta;
                 
-                for (int inner = 0; inner < p.MaxIterations; inner++)
+                for (int inner = 0; inner < shared.MaxConcurrentIterations; inner++)
                 {
                     var stepSize = lipschitz * theta / theta0;
                     var theta2 = theta * theta;
                     var correctionFactor = -(1.0f - theta / theta0) / theta2;
 
-                    var blockIdx = GetRandomBlockIdx(p.Random, p.BlockLock);
-                    var blockSample = p.ActiveSet[blockIdx];
-                    var yOffset = blockSample.Item1 * p.YBlockSize;
-                    var xOffset = blockSample.Item2 * p.XBlockSize;
+                    var blockIdx = GetRandomBlockIdx(shared.Random, shared.BlockLock);
+                    var blockSample = shared.ActiveSet[blockIdx];
+                    var yOffset = blockSample.Item1 * shared.YBlockSize;
+                    var xOffset = blockSample.Item2 * shared.XBlockSize;
 
                     var updateSum = 0.0f;
                     var updateAbsSum = 0.0f;
-                    for (int y = yOffset; y < (yOffset + p.YBlockSize); y++)
-                        for (int x = xOffset; x < (xOffset + p.XBlockSize); x++)
+                    for (int y = yOffset; y < (yOffset + shared.YBlockSize); y++)
+                        for (int x = xOffset; x < (xOffset + shared.XBlockSize); x++)
                         {
-                            var update = theta2 * p.GCorr[y, x] + p.GExpl[y, x] + p.XExpl[y, x] * stepSize;
-                            update = ElasticNet.ProximalOperator(update, stepSize, p.Lambda, p.Alpha) - p.XExpl[y, x];
+                            var update = theta2 * shared.GCorr[y, x] + shared.GExpl[y, x] + shared.XExpl[y, x] * stepSize;
+                            update = ElasticNet.ProximalOperator(update, stepSize, shared.Lambda, shared.Alpha) - shared.XExpl[y, x];
                             blockUpdate[y - yOffset, x - xOffset] = update;
                             updateSum = update;
                             updateAbsSum += Math.Abs(update);
@@ -350,32 +348,32 @@ namespace Single_Reference.Deconvolution
                     if (0.0f != updateAbsSum)
                     {
                         xDiffMax = Math.Max(xDiffMax, updateAbsSum);
-                        UpdateBMaps(blockUpdate, blockSample.Item1, blockSample.Item2, p.Psf2, p.GExpl, p.GCorr, correctionFactor);
+                        UpdateBMaps(blockUpdate, blockSample.Item1, blockSample.Item2, shared.Psf2, shared.GExpl, shared.GCorr, correctionFactor);
                         var newXExplore = 0.0f;
                         var oldXExplore = 0.0f;
                         var oldXCorr = 0.0f;
-                        for (int y = yOffset; y < (yOffset + p.YBlockSize); y++)
-                            for (int x = xOffset; x < (xOffset + p.XBlockSize); x++)
+                        for (int y = yOffset; y < (yOffset + shared.YBlockSize); y++)
+                            for (int x = xOffset; x < (xOffset + shared.XBlockSize); x++)
                             {
                                 var update = blockUpdate[y - yOffset, x - xOffset];
-                                var oldExplore = p.XExpl[y, x];
-                                var oldCorrection = p.XCorr[y, x];
+                                var oldExplore = shared.XExpl[y, x];
+                                var oldCorrection = shared.XCorr[y, x];
 
-                                oldXExplore += p.XExpl[y, x];
-                                oldXCorr += p.XCorr[y, x];
+                                oldXExplore += shared.XExpl[y, x];
+                                oldXCorr += shared.XCorr[y, x];
                                 newXExplore += oldExplore + update;
 
-                                p.XExpl[y, x] += update;
-                                p.XCorr[y, x] += update * correctionFactor;
+                                shared.XExpl[y, x] += update;
+                                shared.XCorr[y, x] += update * correctionFactor;
                             }
 
-                        //not 100% sure this is the correct generalization from single pixel/single thread rule to block/parallel rule
+                        //not 100% sure this is the correct generalization from single pixel thread rule to block rule
                         var testRestartUpdate = (updateSum) * (newXExplore - (theta2 * oldXCorr + oldXExplore));
-                        ConcurrentUpdateTestRestart(ref p.testRestart, eta, testRestartUpdate);
+                        ConcurrentUpdateTestRestart(ref shared.testRestart, eta, testRestartUpdate);
                     }
 
                     //unlockBlock
-                    p.BlockLock[blockIdx] = 0;
+                    shared.BlockLock[blockIdx] = 0;
                     
                     theta = (float)(Math.Sqrt((theta2 * theta2) + 4 * (theta2)) - theta2) / 2.0f;
                 }  
