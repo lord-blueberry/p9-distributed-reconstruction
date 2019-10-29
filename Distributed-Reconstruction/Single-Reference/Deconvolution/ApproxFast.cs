@@ -8,30 +8,17 @@ using static Single_Reference.Common;
 
 namespace Single_Reference.Deconvolution
 {
-    public class ApproxFast : IDeconvolver
+    public class ApproxFast 
     {
         private static double CalcESO(int tau, int degreeOfSep, int blockCount) => 1.0 + (degreeOfSep - 1.0) * (tau - 1.0) / (Math.Max(1.0, (blockCount - 1)));
 
         const float ACTIVE_SET_CUTOFF = 1e-8f;
-        bool useCDStart = true;
+        bool useCDColdStart = true;
 
-        public ApproxFast(int blockSize, int threadCount)
+        public ApproxFast(int threadCount, int blockSize, bool useCDColdStart)
         {
-
+            this.useCDColdStart = useCDColdStart;
         }
-
-        #region IDeconvolver implementation
-        public DeconvolutionResult Deconvolve(float[,] reconstruction, float[,] bMap, float lambda, float alpha, int iterations, float epsilon = 0.0001F)
-        {
-            throw new NotImplementedException();
-        }
-
-        public DeconvolutionResult DeconvolvePath(float[,] reconstruction, float[,] bMap, float lambdaMin, float lambdaFactor, float alpha, int maxPathIteration = 10, int maxIteration = 100, float epsilon = 0.0001F)
-        {
-            throw new NotImplementedException();
-        }
-        #endregion
-
 
         public bool Deconvolve(float[,] xImage, float[,] residuals, float[,] psf, float lambda, float alpha, Random random, int blockSize, int threadCount, int maxIteration = 100, float epsilon = 1e-4f)
         {
@@ -52,7 +39,7 @@ namespace Single_Reference.Deconvolution
             var gCorrection = new float[residuals.GetLength(0), residuals.GetLength(1)];
             var psf2 = PSF.CalcPSFSquared(psf);
 
-            if (coldStart & useCDStart)
+            if (coldStart & useCDColdStart)
             {
                 var rec = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
                 var fastCD = new FastGreedyCD(rec, rec, psf, psf2);
