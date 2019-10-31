@@ -16,10 +16,10 @@ namespace SingleMachineRuns.Experiments
 {
     class ApproxParameters
     {
-        /*
+        
         private static void Reconstruct()
         {
-            var approx = new ApproxFast(0, 0);
+            var approx = new ApproxFast(0, 0, true);
         }
 
 
@@ -74,13 +74,14 @@ namespace SingleMachineRuns.Experiments
             var outFolder = "PSFSpeedExperimentApproxDeconv";
             outFolder += @"\";
             var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
-
+            /*
+            ReconstructSimple(data, psf, outFolder, cut, 8, cut + "dirty", cut + "x", writer, 0.0, 1e-5f, false);
             foreach (var cut in psfCuts)
             {
                 using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
                 {
                     writer.WriteLine(fileHeader);
-                    experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 8, cut + "dirty", cut + "x", writer, 0.0, 1e-5f, false);
+                    experimentInfo =
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
             }
@@ -96,7 +97,7 @@ namespace SingleMachineRuns.Experiments
                     experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 8, cut + "dirty", cut + "x", writer, 0.0, 1e-5f, true);
                     File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
                 }
-            }
-        }*/
+            }*/
+        }
     }
 }

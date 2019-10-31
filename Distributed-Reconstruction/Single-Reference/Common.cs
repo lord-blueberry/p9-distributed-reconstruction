@@ -62,6 +62,12 @@ namespace Single_Reference
 
                 return psfScan[psfScan.GetLength(0) - 1 - yOverShoot, psfScan.GetLength(1) - 1 - xOverShoot] - correction;
             }
+
+            public static float[,] CalcAMap(float[,] psf, Rectangle totalSize)
+            {
+                return CalcAMap(psf, totalSize, totalSize);
+            }
+
             public static float[,] CalcAMap(float[,] psf, Rectangle totalSize, Rectangle imageSection)
             {
                 //scan algorithm. This uses double precision. With more realistic psf sizes, single precision became inaccurate

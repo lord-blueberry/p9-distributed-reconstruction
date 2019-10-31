@@ -38,18 +38,18 @@ namespace Single_Reference.Deconvolution
             var gExplore = Residuals.CalcBMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var gCorrection = new float[residuals.GetLength(0), residuals.GetLength(1)];
             var psf2 = PSF.CalcPSFSquared(psf);
+            var totalSize = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
 
             if (coldStart & useCDColdStart)
             {
-                var rec = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
-                var fastCD = new FastGreedyCD(rec, rec, psf, psf2);
+                var fastCD = new FastGreedyCD(totalSize, totalSize, psf, psf2);
                 fastCD.Deconvolve(xExplore, gExplore, lambda, alpha, xImage.GetLength(0));
             }
 
             var maxLipschitz = (float)PSF.CalcMaxLipschitz(psf);
 
             var shared = new SharedData(lambda, alpha, blockSize, blockSize, threadCount,
-                CountNonZero(psf), psf2, null,
+                CountNonZero(psf), psf2, PSF.CalcAMap(psf, totalSize),
                 xExplore, xCorrection, gExplore, gCorrection, random);
             shared.ActiveSet = GetActiveSet(xExplore, gExplore, shared.YBlockSize, shared.XBlockSize, lambda, alpha, maxLipschitz);
             shared.BlockLock = new int[shared.ActiveSet.Count];
@@ -310,22 +310,23 @@ namespace Single_Reference.Deconvolution
                 
                 for (int inner = 0; inner < shared.MaxConcurrentIterations; inner++)
                 {
-                    var stepSize = lipschitz * theta / theta0;
-                    var theta2 = theta * theta;
-                    var correctionFactor = -(1.0f - theta / theta0) / theta2;
-
                     var blockIdx = GetRandomBlockIdx(shared.Random, shared.BlockLock);
                     var blockSample = shared.ActiveSet[blockIdx];
                     var yOffset = blockSample.Item1 * shared.YBlockSize;
                     var xOffset = blockSample.Item2 * shared.XBlockSize;
+
+                    var blockLipschitz = GetBlockLipschitz(shared.AMap, yOffset, xOffset, shared.YBlockSize, shared.XBlockSize);
+                    var step = blockLipschitz * (float)beta * theta / theta0;
+                    var theta2 = theta * theta;
+                    var correctionFactor = -(1.0f - theta / theta0) / theta2;
 
                     var updateSum = 0.0f;
                     var updateAbsSum = 0.0f;
                     for (int y = yOffset; y < (yOffset + shared.YBlockSize); y++)
                         for (int x = xOffset; x < (xOffset + shared.XBlockSize); x++)
                         {
-                            var update = theta2 * shared.GCorr[y, x] + shared.GExpl[y, x] + shared.XExpl[y, x] * stepSize;
-                            update = ElasticNet.ProximalOperator(update, stepSize, shared.Lambda, shared.Alpha) - shared.XExpl[y, x];
+                            var update = theta2 * shared.GCorr[y, x] + shared.GExpl[y, x] + shared.XExpl[y, x] * step;
+                            update = ElasticNet.ProximalOperator(update, step, shared.Lambda, shared.Alpha) - shared.XExpl[y, x];
                             blockUpdate[y - yOffset, x - xOffset] = update;
                             updateSum = update;
                             updateAbsSum += Math.Abs(update);
@@ -344,7 +345,6 @@ namespace Single_Reference.Deconvolution
                             {
                                 var update = blockUpdate[y - yOffset, x - xOffset];
                                 var oldExplore = shared.XExpl[y, x];
-                                var oldCorrection = shared.XCorr[y, x];
 
                                 oldXExplore += shared.XExpl[y, x];
                                 oldXCorr += shared.XCorr[y, x];
@@ -438,6 +438,15 @@ namespace Single_Reference.Deconvolution
                     var old = Interlocked.CompareExchange(ref test, update, read);
                     successfulWrite = old == read;
                 }
+            }
+
+            private static float GetBlockLipschitz(float[,] lipschitzMap, int yOffset, int xOffset, int yBlockSize, int xBlockSize)
+            {
+                var output = 1.0f;
+                for (int y = yOffset; y < yOffset + yBlockSize; y++)
+                    for (int x = xOffset; x < xOffset + xBlockSize; x++)
+                        output *= lipschitzMap[y, x];
+                return output;
             }
         }
     }
