@@ -335,7 +335,7 @@ namespace Single_Reference
             var lambda = 0.5f * fastCD.MaxLipschitz;
             var alpha = 0.8f;
             var approx = new ApproxParallel();
-            var approx2 = new ApproxFast(0, 0, true);
+            var approx2 = new ApproxFast(2, 1, true);
 
             var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;
@@ -346,6 +346,7 @@ namespace Single_Reference
             var truthVis = IDG.ToVisibilities(c, metadata, truth, uvw, frequencies);
             visibilities = truthVis;
             var residualVis = truthVis;*/
+            var data = new ApproxFast.TestingData(new StreamWriter("approxConvergence.txt"));
             for (int cycle = 0; cycle < 4; cycle++)
             {
                 //FORWARD
@@ -366,12 +367,12 @@ namespace Single_Reference
                 //var result = fastCD.Deconvolve(xImage, dirtyImage, 0.5f * fastCD.MaxLipschitz, 0.8f, 1000, 1e-4f);
                 //var converged = approx.DeconvolveActiveSet(xImage, dirtyImage, psfCut, lambda, alpha, random, 8, 1, 1);
                 //var converged = approx.DeconvolveGreedy(xImage, dirtyImage, psfCut, lambda, alpha, random, 4, 4, 500);
-                var threads = 4;
-                if (cycle >= 2)
-                    threads = 1;
                 //var converged = approx.DeconvolveApprox(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, threads, 500, 1e-4f, cycle == 0);
-                var converged = approx2.Deconvolve(xImage, dirtyImage, psfCut, lambda, alpha, random, 1, threads, 5, 1e-4f);
-                if (converged)
+                
+                approx2.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, psf, lambda, alpha, random, 50, 1e-4f);
+
+
+                if (data.converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!!------------------------");
                 else
                     Console.WriteLine("-------------------------------not converged----------------------");
@@ -387,6 +388,7 @@ namespace Single_Reference
                 residualVis = IDG.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
             }
+            
 
             var dirtyGridCheck = IDG.Grid(c, metadata, residualVis, uvw, frequencies);
             var dirtyCheck = FFT.Backward(dirtyGridCheck, c.VisibilitiesCount);
@@ -395,6 +397,8 @@ namespace Single_Reference
             var l2Penalty = Residuals.CalcPenalty(ToFloatImage(dirtyCheck));
             var elasticPenalty = ElasticNet.CalcPenalty(xImage, (float)lambda, (float)alpha);
             var sum = l2Penalty + elasticPenalty;
+
+            data.writer.Close();
         }
 
         public static void DebugILGPU()

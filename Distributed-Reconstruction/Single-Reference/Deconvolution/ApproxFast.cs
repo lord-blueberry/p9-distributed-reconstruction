@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -10,14 +12,22 @@ namespace Single_Reference.Deconvolution
 {
     public class ApproxFast 
     {
+
         private static double CalcESO(int tau, int degreeOfSep, int blockCount) => 1.0 + (degreeOfSep - 1.0) * (tau - 1.0) / (Math.Max(1.0, (blockCount - 1)));
 
         const float ACTIVE_SET_CUTOFF = 1e-8f;
         bool useCDColdStart = true;
+        bool useAcceleration = true;
+        int threadCount;
+        int blockSize;
 
-        public ApproxFast(int threadCount, int blockSize, bool useCDColdStart)
+
+        public ApproxFast(int threadCount, int blockSize, bool useCDColdStart, bool useAcceleration = true)
         {
+            this.threadCount = threadCount;
+            this.blockSize = blockSize;
             this.useCDColdStart = useCDColdStart;
+            this.useAcceleration = useAcceleration;
         }
 
         public bool Deconvolve(float[,] xImage, float[,] residuals, float[,] psf, float lambda, float alpha, Random random, int blockSize, int threadCount, int maxIteration = 100, float epsilon = 1e-4f)
@@ -59,12 +69,13 @@ namespace Single_Reference.Deconvolution
             var theta = DeconvolveConcurrent(shared, maxIteration, epsilon);
 
             var theta0 = shared.Tau / (float)shared.ActiveSet.Count;
+            var theta0 = shared.ProcessorCount / (float)shared.ActiveSet.Count;
             var tmpTheta = theta < 1.0f ? ((theta * theta) / (1.0f - theta)) : theta0;
             for (int i = 0; i < xImage.GetLength(0); i++)
                 for (int j = 0; j < xImage.GetLength(1); j++)
                     xCorrection[i, j] = tmpTheta * xCorrection[i, j] + xExplore[i, j];
 
-            var objectives = CalcObjectives(xImage, residuals, psf, xExplore, xCorrection, lambda, alpha);
+            var objectives = EstimateObjectives(xImage, residuals, psf, xExplore, xCorrection, lambda, alpha);
 
             //decide whether we take the correction or explore version
             if (objectives.Item2 < objectives.Item1)
@@ -84,7 +95,73 @@ namespace Single_Reference.Deconvolution
             return objectives.Item2 < objectives.Item1;
         }
 
-        private static Tuple<double, double> CalcObjectives(float[,] xImage, float[,] residuals, float[,] psf, float[,] xExplore, float[,] xAccelerated, float lambda, float alpha)
+        private float DeconvolveConcurrent(SharedData shared, int activeSetIterations, float epsilon)
+        {
+            var blockCount = shared.ActiveSet.Count;
+            var theta0 = shared.ProcessorCount / (float)blockCount;
+            float eta = 1.0f / blockCount;
+            shared.testRestart = 0.0f;
+
+            var deconvolvers = new List<ConcurrentDeconvolver>(shared.ProcessorCount);
+            for(int i = 0; i < shared.ProcessorCount; i++)
+                deconvolvers.Add(new ConcurrentDeconvolver(shared, theta0));
+            
+            var tasks = new Task[shared.ProcessorCount];
+            int iter = 0;
+            var converged = false;
+            Console.WriteLine("Starting Active Set iterations with " + shared.ActiveSet.Count + " blocks");
+            while (iter < activeSetIterations & !converged)
+            {
+                //iterations
+                for (int i = 0; i < deconvolvers.Count; i++)
+                {
+                    tasks[i] = new Task(deconvolvers[i].Run);
+                    tasks[i].Start();
+                }
+
+                for (int i = 0; i < deconvolvers.Count; i++)
+                    tasks[i].Wait();
+                
+                if (shared.testRestart > 0.0f)
+                {
+                    Console.WriteLine("restarting");
+                    var currentTheta = deconvolvers[0].theta;
+                    var tmpTheta = currentTheta < 1.0f ? ((currentTheta * currentTheta) / (1.0f - currentTheta)) : theta0;
+                    for (int y = 0; y < shared.XExpl.GetLength(0); y++)
+                        for (int x = 0; x < shared.XExpl.GetLength(1); x++)
+                        {
+                            shared.XExpl[y, x] += tmpTheta * shared.XCorr[y, x];
+                            shared.XCorr[y, x] = 0;
+                            shared.GExpl[y, x] += tmpTheta * shared.GCorr[y, x];
+                            shared.GCorr[y, x] = 0;
+                        }
+
+                    //new active set
+                    shared.ActiveSet = GetActiveSet(shared.XExpl, shared.GExpl, shared.YBlockSize, shared.XBlockSize, shared.Lambda, shared.Alpha, shared.maxLipschitz);
+                    blockCount = shared.ActiveSet.Count;
+                    theta0 = shared.ProcessorCount / (float)blockCount;
+                    for (int i = 0; i < deconvolvers.Count; i++)
+                        deconvolvers[i].theta = theta0;
+                    shared.testRestart = 0.0f;
+                }
+
+                if (deconvolvers.Sum(x => x.xDiffMax) < epsilon)
+                {
+                    converged = true;
+                }
+
+                for(int i = 0; i < deconvolvers.Count; i++)
+                    deconvolvers[i].xDiffMax = 0.0f;
+
+                Console.WriteLine("Done Active Set iteration " + iter);
+                iter++;
+            }
+
+            return deconvolvers[0].theta;
+        }
+
+        #region helper methods
+        private static Tuple<double, double> EstimateObjectives(float[,] xImage, float[,] residuals, float[,] psf, float[,] xExplore, float[,] xAccelerated, float lambda, float alpha)
         {
             Tuple<double, double> output = null;
 
@@ -99,14 +176,14 @@ namespace Single_Reference.Deconvolution
                         residualsExplore[i, j] = xExplore[i, j] - xImage[i, j];
                         residualsAccelerated[i, j] = xAccelerated[i, j] - xImage[i, j];
                     }
-
                 residualsCalculator.ConvolveInPlace(residualsExplore);
                 residualsCalculator.ConvolveInPlace(residualsAccelerated);
+
                 for (int i = 0; i < xImage.GetLength(0); i++)
                     for (int j = 0; j < xImage.GetLength(1); j++)
                     {
-                        residualsExplore[i, j] -= residuals[i, j];
-                        residualsAccelerated[i, j] -= residuals[i, j];
+                        residualsExplore[i, j] = residuals[i, j] - residualsExplore[i, j];
+                        residualsAccelerated[i, j] = residuals[i, j] - residualsAccelerated[i, j];
                     }
 
                 var objectiveExplore = Residuals.CalcPenalty(residualsExplore) + ElasticNet.CalcPenalty(xExplore, lambda, alpha);
@@ -153,74 +230,38 @@ namespace Single_Reference.Deconvolution
             return output;
         }
 
-        private float DeconvolveConcurrent(SharedData shared, int activeSetIterations, float epsilon)
+        private static float GetAbsMax(float[,] xImage, float[,] bMap, float[,] aMap, float lambda, float alpha)
         {
-            var blockCount = shared.ActiveSet.Count;
-            var theta0 = shared.Tau / (float)blockCount;
-            float eta = 1.0f / blockCount;
-            shared.testRestart = 0.0f;
-
-            var deconvolvers = new List<ConcurrentDeconvolver>(shared.Tau);
-            
-            for(int i = 0; i < shared.Tau; i++)
+            var maxPixels = new float[xImage.GetLength(0)];
+            Parallel.For(0, xImage.GetLength(0), (y) =>
             {
-                deconvolvers.Add(new ConcurrentDeconvolver(shared, theta0));
-            }
+                var yLocal = y;
 
-            var tasks = new Task[shared.Tau];
-            int iter = 0;
-            var converged = false;
-            Console.WriteLine("Starting Active Set iterations with " + shared.ActiveSet.Count + " blocks");
-            while (iter < activeSetIterations & !converged)
-            {
-
-                //iterations
-                for (int i = 0; i < deconvolvers.Count; i++)
+                var currentMax = 0.0f;
+                for (int x = 0; x < xImage.GetLength(1); x++)
                 {
-                    tasks[i] = new Task(deconvolvers[i].Run);
-                    tasks[i].Start();
+                    var xLocal = x;
+                    var currentA = aMap[yLocal, xLocal];
+                    var old = xImage[yLocal, xLocal];
+                    //var xTmp = old + bMap[y, x] / currentA;
+                    //xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
+                    var xTmp = ElasticNet.ProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
+                    var xDiff = old - xTmp;
+
+                    if (currentMax < Math.Abs(xDiff))
+                        currentMax = Math.Abs(xDiff);
                 }
+                maxPixels[yLocal] = currentMax;
+            });
 
-                for (int i = 0; i < deconvolvers.Count; i++)
-                    tasks[i].Wait();
-                
-                if (shared.testRestart > 0.0f)
-                {
-                    Console.WriteLine("restarting");
-                    var currentTheta = deconvolvers[0].theta;
-                    var tmpTheta = currentTheta < 1.0f ? ((currentTheta * currentTheta) / (1.0f - currentTheta)) : theta0;
-                    for (int y = 0; y < shared.XExpl.GetLength(0); y++)
-                        for (int x = 0; x < shared.XExpl.GetLength(1); x++)
-                        {
-                            shared.XExpl[y, x] += tmpTheta * shared.XCorr[y, x];
-                            shared.XCorr[y, x] = 0;
-                            shared.GExpl[y, x] += tmpTheta * shared.GCorr[y, x];
-                            shared.GCorr[y, x] = 0;
-                        }
+            var maxPixel = 0.0f;
+            for (int i = 0; i < maxPixels.Length; i++)
+                if (maxPixel < maxPixels[i])
+                    maxPixel = maxPixels[i];
 
-                    //new active set
-                    shared.ActiveSet = GetActiveSet(shared.XExpl, shared.GExpl, shared.YBlockSize, shared.XBlockSize, shared.Lambda, shared.Alpha, shared.maxLipschitz);
-                    blockCount = shared.ActiveSet.Count;
-                    theta0 = shared.Tau / (float)blockCount;
-                    for (int i = 0; i < deconvolvers.Count; i++)
-                        deconvolvers[i].theta = theta0;
-                    shared.testRestart = 0.0f;
-                }
-
-                if (deconvolvers.Sum(x => x.xDiffMax) < epsilon)
-                {
-                    converged = true;
-                }
-
-                for(int i = 0; i < deconvolvers.Count; i++)
-                    deconvolvers[i].xDiffMax = 0.0f;
-
-                Console.WriteLine("Done Active Set iteration " + iter);
-                iter++;
-            }
-
-            return deconvolvers[0].theta;
+            return maxPixel;
         }
+        #endregion
 
         private class SharedData
         {
@@ -229,7 +270,7 @@ namespace Single_Reference.Deconvolution
 
             public int YBlockSize { get; set; }
             public int XBlockSize { get; set; }
-            public int Tau { get; private set; }
+            public int ProcessorCount { get; private set; }
 
             public int DegreeOfSeperability { get; private set; }
             public float[,] Psf2 { get; private set; }
@@ -270,7 +311,7 @@ namespace Single_Reference.Deconvolution
                 Alpha = alpha;
                 YBlockSize = yBlockSize;
                 XBlockSize = xBlockSize;
-                Tau = tau;
+                ProcessorCount = tau;
 
                 DegreeOfSeperability = degreeOfSep;
                 Psf2 = psf2;
@@ -288,23 +329,25 @@ namespace Single_Reference.Deconvolution
         {
             private readonly SharedData shared;
             private readonly float[,] blockUpdate;
+            private readonly bool useAcceleration;
             public float theta = 0.0f;
             public float xDiffMax = 0.0f;
             
-            public ConcurrentDeconvolver(SharedData shared, float theta0)
+            public ConcurrentDeconvolver(SharedData shared, float theta0, bool useAcceleration = true)
             {
                 this.shared = shared;
                 theta = theta0;
                 blockUpdate = new float[shared.YBlockSize, shared.XBlockSize];
+                this.useAcceleration = useAcceleration;
             }
 
             public void Run()
             {
                 var blockCount = shared.ActiveSet.Count;
-                var theta0 = shared.Tau / (float)blockCount;
+                var theta0 = shared.ProcessorCount / (float)blockCount;
                 float eta = 1.0f / blockCount;
 
-                var beta = CalcESO(shared.Tau, shared.DegreeOfSeperability, blockCount);
+                var beta = CalcESO(shared.ProcessorCount, shared.DegreeOfSeperability, blockCount);
                 var lipschitz = shared.maxLipschitz * shared.YBlockSize * shared.XBlockSize;
                 lipschitz *= (float)beta;
                 
@@ -362,7 +405,8 @@ namespace Single_Reference.Deconvolution
                     //unlockBlock
                     shared.BlockLock[blockIdx] = 0;
                     
-                    theta = (float)(Math.Sqrt((theta2 * theta2) + 4 * (theta2)) - theta2) / 2.0f;
+                    if(useAcceleration)
+                        theta = (float)(Math.Sqrt((theta2 * theta2) + 4 * (theta2)) - theta2) / 2.0f;
                 }  
             }
 
@@ -449,5 +493,191 @@ namespace Single_Reference.Deconvolution
                 return output;
             }
         }
+
+        #region Testing 
+        public class TestingData
+        {
+            public List<Tuple<int, double, double, double>> Lines;
+            public float lastTheta;
+            public bool converged;
+            public bool usingAccelerated;
+            public StreamWriter writer;
+            public int lineIdx = 0;
+            public int processorCount;
+            public int blockSize;
+
+            public TestingData(StreamWriter writer)
+            {
+                Lines = new List<Tuple<int, double, double, double>>();
+                this.writer = writer;
+                writer.WriteLine("idx;cycle;seconds;objectiveNormal;objectiveAccelerated;processorCount;blockSize") ;
+            }
+
+            public void Write(Tuple<int, double, double, double> line)
+            {
+                Lines.Add(line);
+                writer.WriteLine(lineIdx++ + ";" + line.Item1 + ";" + line.Item2 + ";" + line.Item3 + ";" + line.Item4 + ";" + processorCount + ";" + blockSize);
+                writer.Flush();
+            }
+        }
+
+        public void DeconvolveTest(TestingData data, int cycle, float[,] xImage, float[,] residuals, float[,] psf, float[,] psfFull, float lambda, float alpha, Random random, int maxIteration = 100, float epsilon = 1e-4f)
+        {
+            var xExplore = Copy(xImage);
+            var xCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
+            var coldStart = true;
+            for (int i = 0; i < xExplore.GetLength(0); i++)
+                for (int j = 0; j < xExplore.GetLength(1); j++)
+                    if (xExplore[i, j] != 0.0f)
+                    {
+                        coldStart = false;
+                        break;
+                    }
+
+            //calculate gradients for each pixel
+            var PSFCorr = PSF.CalcPaddedFourierCorrelation(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
+            var gExplore = Residuals.CalcBMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            var gCorrection = new float[residuals.GetLength(0), residuals.GetLength(1)];
+            var psf2 = PSF.CalcPSFSquared(psf);
+            var totalSize = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
+
+            if (coldStart & useCDColdStart)
+            {
+                var fastCD = new FastGreedyCD(totalSize, totalSize, psf, psf2);
+                fastCD.Deconvolve(xExplore, gExplore, lambda, alpha, xImage.GetLength(0));
+            }
+
+            var maxLipschitz = (float)PSF.CalcMaxLipschitz(psf);
+
+            var shared = new SharedData(lambda, alpha, blockSize, blockSize, threadCount,
+                CountNonZero(psf), psf2, PSF.CalcAMap(psf, totalSize),
+                xExplore, xCorrection, gExplore, gCorrection, random);
+            shared.ActiveSet = GetActiveSet(xExplore, gExplore, shared.YBlockSize, shared.XBlockSize, lambda, alpha, maxLipschitz);
+            shared.BlockLock = new int[shared.ActiveSet.Count];
+            shared.maxLipschitz = maxLipschitz;
+            shared.MaxConcurrentIterations = 100;
+
+            var objectivesFirst = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, shared.XExpl, shared.Lambda, shared.Alpha);
+            var timeOffset = data.Lines.Count == 0 ? 0.0 : data.Lines.Last().Item2;
+            var dataPoint = new Tuple<int, double, double, double>(cycle, timeOffset, objectivesFirst.Item1, objectivesFirst.Item2);
+            data.Lines.Add(dataPoint);
+            var theta = DeconvolveConcurrentTest(data, cycle, timeOffset, shared, maxIteration, epsilon, xImage, residuals, psf, psfFull);
+
+            var theta0 = shared.ProcessorCount / (float)shared.ActiveSet.Count;
+            var tmpTheta = theta < 1.0f ? ((theta * theta) / (1.0f - theta)) : theta0;
+            for (int i = 0; i < xImage.GetLength(0); i++)
+                for (int j = 0; j < xImage.GetLength(1); j++)
+                    xCorrection[i, j] = tmpTheta * xCorrection[i, j] + xExplore[i, j];
+
+            var objectives = EstimateObjectives(xImage, residuals, psfFull, xExplore, xCorrection, lambda, alpha);
+            var objectives2 = EstimateObjectives(xImage, residuals, psf, xExplore, xCorrection, lambda, alpha);
+
+            if (objectives.Item1 < objectives.Item2 ^ objectives2.Item1 < objectives2.Item2)
+                Console.WriteLine("Different objectives");
+
+            //decide whether we take the correction or explore version
+            if (objectives.Item2 < objectives.Item1)
+            {
+                //correction has the lower objective than explore
+                for (int i = 0; i < xImage.GetLength(0); i++)
+                    for (int j = 0; j < xImage.GetLength(1); j++)
+                        xImage[i, j] = xCorrection[i, j];
+            }
+            else
+            {
+                for (int i = 0; i < xImage.GetLength(0); i++)
+                    for (int j = 0; j < xImage.GetLength(1); j++)
+                        xImage[i, j] = xExplore[i, j];
+            }
+
+        }
+
+        private float DeconvolveConcurrentTest(TestingData data, int cycle, double timeOffset, SharedData shared, int activeSetIterations, float epsilon, float[,] xImage, float[,] residuals, float[,] psf, float[,] psfFull)
+        {
+            var watch = new Stopwatch();
+
+            var blockCount = shared.ActiveSet.Count;
+            var theta0 = shared.ProcessorCount / (float)blockCount;
+            float eta = 1.0f / blockCount;
+            shared.testRestart = 0.0f;
+
+            var deconvolvers = new List<ConcurrentDeconvolver>(shared.ProcessorCount);
+            for (int i = 0; i < shared.ProcessorCount; i++)
+                deconvolvers.Add(new ConcurrentDeconvolver(shared, theta0, useAcceleration));
+
+            var tasks = new Task[shared.ProcessorCount];
+            int iter = 0;
+            var converged = false;
+            Console.WriteLine("Starting Active Set iterations with " + shared.ActiveSet.Count + " blocks");
+            while (iter < activeSetIterations & !converged)
+            {
+                watch.Start();
+                //iterations
+                for (int i = 0; i < deconvolvers.Count; i++)
+                {
+                    tasks[i] = new Task(deconvolvers[i].Run);
+                    tasks[i].Start();
+                }
+
+                for (int i = 0; i < deconvolvers.Count; i++)
+                    tasks[i].Wait();
+                watch.Stop();
+
+
+                //Console.WriteLine("calculating objective");
+                var xAccelerated = new float[xImage.GetLength(0), xImage.GetLength(1)];
+                var theta = deconvolvers[0].theta;
+                var tmpTheta2 = theta < 1.0f ? ((theta * theta) / (1.0f - theta)) : theta0;
+                for (int i = 0; i < xImage.GetLength(0); i++)
+                    for (int j = 0; j < xImage.GetLength(1); j++)
+                        xAccelerated[i, j] = tmpTheta2 * shared.XCorr[i, j] + shared.XExpl[i, j];
+                var objectives = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, xAccelerated, shared.Lambda, shared.Alpha);
+                var dataPoint = new Tuple<int, double, double, double>(cycle, timeOffset + watch.Elapsed.TotalSeconds, objectives.Item1, objectives.Item2);
+                data.Write(dataPoint);
+
+
+                if (shared.testRestart > 0.0f)
+                {
+                    Console.WriteLine("restarting");
+                    var currentTheta = deconvolvers[0].theta;
+                    var tmpTheta = currentTheta < 1.0f ? ((currentTheta * currentTheta) / (1.0f - currentTheta)) : theta0;
+                    for (int y = 0; y < shared.XExpl.GetLength(0); y++)
+                        for (int x = 0; x < shared.XExpl.GetLength(1); x++)
+                        {
+                            shared.XExpl[y, x] += tmpTheta * shared.XCorr[y, x];
+                            shared.XCorr[y, x] = 0;
+                            shared.GExpl[y, x] += tmpTheta * shared.GCorr[y, x];
+                            shared.GCorr[y, x] = 0;
+                        }
+
+                    //new active set
+                    shared.ActiveSet = GetActiveSet(shared.XExpl, shared.GExpl, shared.YBlockSize, shared.XBlockSize, shared.Lambda, shared.Alpha, shared.maxLipschitz);
+                    blockCount = shared.ActiveSet.Count;
+                    theta0 = shared.ProcessorCount / (float)blockCount;
+                    for (int i = 0; i < deconvolvers.Count; i++)
+                        deconvolvers[i].theta = theta0;
+                    shared.testRestart = 0.0f;
+                }
+
+                if (deconvolvers.Sum(x => x.xDiffMax) < epsilon)
+                {
+                    if(GetAbsMax(shared.XExpl, shared.GExpl, shared.AMap, shared.Lambda, shared.Alpha) < epsilon)
+                    {
+                        converged = true;
+                        data.converged = true;
+                    }
+                }
+
+                for (int i = 0; i < deconvolvers.Count; i++)
+                    deconvolvers[i].xDiffMax = 0.0f;
+
+                Console.WriteLine("Done Active Set iteration " + iter);
+                iter++;
+            }
+
+            return deconvolvers[0].theta;
+        }
+
+        #endregion
     }
 }

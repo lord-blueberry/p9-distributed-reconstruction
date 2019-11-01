@@ -16,14 +16,49 @@ namespace SingleMachineRuns.Experiments
 {
     class ApproxParameters
     {
-        
-        private static void Reconstruct()
+        static float LAMBDA = 0.4f;
+        static float ALPHA = 0.1f;
+
+        private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, int threads, int blockSize, bool accelerated)
         {
-            var approx = new ApproxFast(0, 0, true);
+            var approx = new ApproxFast(threads, blockSize, true, accelerated);
+            var psfCut = PSF.Cut(fullPsf, cutFactor);
+            var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
+            var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
+            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
+            var random = new Random(123);
+
+            var maxLipschitzCut = PSF.CalcMaxLipschitz(psfCut);
+            var lambda = (float)(LAMBDA * PSF.CalcMaxLipschitz(psfCut));
+            var lambdaTrue = (float)(LAMBDA * PSF.CalcMaxLipschitz(fullPsf));
+            var alpha = ALPHA;
+
+            var data = new ApproxFast.TestingData(new StreamWriter(folder+ "/" + folder + ".txt"));
+            var xImage = new float[input.c.GridSize, input.c.GridSize];
+            var residualVis = input.visibilities;
+            for (int cycle = 0; cycle < 3; cycle++)
+            {
+                Console.WriteLine("cycle " + cycle);
+                var dirtyGrid = IDG.GridW(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
+                var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, input.c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, folder + "dirty" + cycle + ".fits");
+
+                var maxDirty = Residuals.GetMax(dirtyImage);
+                var bMap = bMapCalculator.Convolve(dirtyImage);
+                var maxB = Residuals.GetMax(bMap);
+                var correctionFactor = Math.Max(maxB / (maxDirty * maxLipschitzCut), 1.0f);
+                var currentSideLobe = maxB * maxSidelobe * correctionFactor;
+                var currentLambda = (float)Math.Max(currentSideLobe / alpha, lambda);
+
+                approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 100);
+                FitsIO.Write(xImage, folder + "xImage_" + cycle + ".fits");
+
+            }
         }
 
 
-        public static void RunSpeedLarge()
+        public static void Run()
         {
             var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
 
@@ -71,33 +106,10 @@ namespace SingleMachineRuns.Experiments
 
 
             //tryout with simply cutting the PSF
-            var outFolder = "PSFSpeedExperimentApproxDeconv";
-            outFolder += @"\";
-            var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
-            /*
-            ReconstructSimple(data, psf, outFolder, cut, 8, cut + "dirty", cut + "x", writer, 0.0, 1e-5f, false);
-            foreach (var cut in psfCuts)
-            {
-                using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
-                {
-                    writer.WriteLine(fileHeader);
-                    experimentInfo =
-                    File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
-                }
-            }
-
-            Directory.CreateDirectory("PSFSpeedExperimentApproxPSF");
-            outFolder = "PSFSpeedExperimentApproxPSF";
-            outFolder += @"\";
-            foreach (var cut in psfCuts)
-            {
-                using (var writer = new StreamWriter(outFolder + cut + "Psf.txt", false))
-                {
-                    writer.WriteLine(fileHeader);
-                    experimentInfo = ReconstructSimple(data, psf, outFolder, cut, 8, cut + "dirty", cut + "x", writer, 0.0, 1e-5f, true);
-                    File.WriteAllText(outFolder + cut + "PsfTotal.txt", experimentInfo.totalDeconv.Elapsed.ToString());
-                }
-            }*/
+            var outFolder = "ApproxTest";
+            Directory.CreateDirectory(outFolder);
+            Reconstruct(data, 4, psf, outFolder, 4, 1, true);
+            
         }
     }
 }
