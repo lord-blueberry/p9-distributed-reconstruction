@@ -286,7 +286,7 @@ namespace Single_Reference.Deconvolution
                 float alpha,
                 int yBlockSize,
                 int xBlockSize,
-                int tau,
+                int processorCount,
 
                 int degreeOfSep,
                 float[,] psf2,
@@ -303,7 +303,7 @@ namespace Single_Reference.Deconvolution
                 Alpha = alpha;
                 YBlockSize = yBlockSize;
                 XBlockSize = xBlockSize;
-                ProcessorCount = tau;
+                ProcessorCount = processorCount;
 
                 DegreeOfSeperability = degreeOfSep;
                 Psf2 = psf2;
@@ -323,7 +323,6 @@ namespace Single_Reference.Deconvolution
             private readonly float[,] blockUpdate;
             private readonly bool useAcceleration;
             public float theta = 0.0f;
-            public float xDiffMax = 0.0f;
             
             public AsyncDeconvolver(SharedData shared, float theta0, bool useAcceleration = true)
             {
@@ -335,7 +334,7 @@ namespace Single_Reference.Deconvolution
 
             public float Deconvolve(int maxIterations, float theta0)
             {
-                var blockCount = shared.ActiveSet.Count;
+                var blockCount = shared.XExpl.Length;
                 float eta = 1.0f / blockCount;
 
                 var beta = CalcESO(shared.ProcessorCount, shared.DegreeOfSeperability, blockCount);
@@ -393,7 +392,7 @@ namespace Single_Reference.Deconvolution
                     }
 
                     //unlockBlock
-                    shared.BlockLock[blockIdx] = 0;
+                    Thread.VolatileWrite(ref shared.BlockLock[blockIdx], 0);
                     
                     if(useAcceleration)
                         theta = (float)(Math.Sqrt((theta2 * theta2) + 4 * (theta2)) - theta2) / 2.0f;
@@ -460,7 +459,7 @@ namespace Single_Reference.Deconvolution
                 {
                     var read = Thread.VolatileRead(ref map[yIdx, xIdx]);
                     var old = Interlocked.CompareExchange(ref map[yIdx, xIdx], read - value, read);
-                    successfulWrite = old == read;
+                    successfulWrite = old == read | !float.IsNormal(old);
                 } 
             }
 
@@ -478,10 +477,10 @@ namespace Single_Reference.Deconvolution
 
             private static float GetBlockLipschitz(float[,] lipschitzMap, int yOffset, int xOffset, int yBlockSize, int xBlockSize)
             {
-                var output = 1.0f;
+                var output = 0.0f;
                 for (int y = yOffset; y < yOffset + yBlockSize; y++)
                     for (int x = xOffset; x < xOffset + xBlockSize; x++)
-                        output *= lipschitzMap[y, x];
+                        output += lipschitzMap[y, x];
                 return output;
             }
         }
@@ -547,9 +546,9 @@ namespace Single_Reference.Deconvolution
             shared.ActiveSet = GetActiveSet(xExplore, gExplore, shared.YBlockSize, shared.XBlockSize, lambda, alpha, maxLipschitz);
             shared.BlockLock = new int[shared.ActiveSet.Count];
             shared.maxLipschitz = maxLipschitz;
-            shared.MaxConcurrentIterations = 100;
+            shared.MaxConcurrentIterations = 50;
 
-            var objectivesFirst = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, shared.XExpl, shared.Lambda, shared.Alpha);
+            var objectivesFirst = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, shared.XExpl, LAMBDA_TEST, ALPHA_TEST);
             var timeOffset = data.Lines.Count == 0 ? 0.0 : data.Lines.Last().Item2;
             var dataPoint = new Tuple<int, double, double, double>(cycle, timeOffset, objectivesFirst.Item1, objectivesFirst.Item2);
             data.Lines.Add(dataPoint);
@@ -584,11 +583,14 @@ namespace Single_Reference.Deconvolution
 
         }
 
+        public static float LAMBDA_TEST;
+        public static float ALPHA_TEST;
+
         private float DeconvolveConcurrentTest(TestingData data, int cycle, double timeOffset, SharedData shared, int activeSetIterations, float epsilon, float[,] xImage, float[,] residuals, float[,] psf, float[,] psfFull)
         {
             var watch = new Stopwatch();
 
-            var blockCount = shared.ActiveSet.Count;
+            var blockCount = shared.XExpl.Length / (shared.YBlockSize * shared.XBlockSize); ;
             var theta0 = shared.ProcessorCount / (float)blockCount;
             float eta = 1.0f / blockCount;
             shared.testRestart = 0.0f;
@@ -620,7 +622,7 @@ namespace Single_Reference.Deconvolution
                 for (int i = 0; i < xImage.GetLength(0); i++)
                     for (int j = 0; j < xImage.GetLength(1); j++)
                         xAccelerated[i, j] = tmpTheta2 * shared.XCorr[i, j] + shared.XExpl[i, j];
-                var objectives = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, xAccelerated, shared.Lambda, shared.Alpha);
+                var objectives = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, xAccelerated, LAMBDA_TEST, ALPHA_TEST);
                 var dataPoint = new Tuple<int, double, double, double>(cycle, timeOffset + watch.Elapsed.TotalSeconds, objectives.Item1, objectives.Item2);
                 data.Write(dataPoint);
 
@@ -641,7 +643,7 @@ namespace Single_Reference.Deconvolution
 
                     //new active set
                     shared.ActiveSet = GetActiveSet(shared.XExpl, shared.GExpl, shared.YBlockSize, shared.XBlockSize, shared.Lambda, shared.Alpha, shared.maxLipschitz);
-                    blockCount = shared.ActiveSet.Count;
+                    blockCount = shared.XExpl.Length / (shared.YBlockSize * shared.XBlockSize);
                     theta0 = shared.ProcessorCount / (float)blockCount;
                     for (int i = 0; i < deconvolvers.Count; i++)
                         deconvolvers[i].theta = theta0;

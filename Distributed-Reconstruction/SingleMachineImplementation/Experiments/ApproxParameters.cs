@@ -21,6 +21,7 @@ namespace SingleMachineRuns.Experiments
 
         private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, int threads, int blockSize, bool accelerated)
         {
+            
             var approx = new ApproxFast(threads, blockSize, true, accelerated);
             var psfCut = PSF.Cut(fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
@@ -32,6 +33,8 @@ namespace SingleMachineRuns.Experiments
             var lambda = (float)(LAMBDA * PSF.CalcMaxLipschitz(psfCut));
             var lambdaTrue = (float)(LAMBDA * PSF.CalcMaxLipschitz(fullPsf));
             var alpha = ALPHA;
+            ApproxFast.LAMBDA_TEST = lambda;
+            ApproxFast.ALPHA_TEST = alpha;
 
             var data = new ApproxFast.TestingData(new StreamWriter(folder+ "/" + folder + ".txt"));
             var xImage = new float[input.c.GridSize, input.c.GridSize];
@@ -51,8 +54,14 @@ namespace SingleMachineRuns.Experiments
                 var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = (float)Math.Max(currentSideLobe / alpha, lambda);
 
-                approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 100);
+                approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 10);
                 FitsIO.Write(xImage, folder + "/xImage_" + cycle + ".fits");
+
+                FFT.Shift(xImage);
+                var xGrid = FFT.Forward(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGridW(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
+                residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
             }
         }
 
@@ -107,7 +116,7 @@ namespace SingleMachineRuns.Experiments
             //tryout with simply cutting the PSF
             var outFolder = "ApproxTest";
             Directory.CreateDirectory(outFolder);
-            Reconstruct(data, 4, psf, outFolder, 4, 1, true);
+            Reconstruct(data, 4, psf, outFolder, 4, 8, false);
             
         }
     }
