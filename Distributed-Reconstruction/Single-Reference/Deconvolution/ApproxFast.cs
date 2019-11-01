@@ -13,7 +13,7 @@ namespace Single_Reference.Deconvolution
     public class ApproxFast 
     {
 
-        private static double CalcESO(int tau, int degreeOfSep, int blockCount) => 1.0 + (degreeOfSep - 1.0) * (tau - 1.0) / (Math.Max(1.0, (blockCount - 1)));
+        private static double CalcESO(int processorCount, int degreeOfSep, int blockCount) => 1.0 + (degreeOfSep - 1.0) * (processorCount - 1.0) / (Math.Max(1.0, (blockCount - 1)));
 
         const float ACTIVE_SET_CUTOFF = 1e-8f;
         bool useCDColdStart = true;
@@ -68,7 +68,6 @@ namespace Single_Reference.Deconvolution
 
             var theta = DeconvolveConcurrent(shared, maxIteration, epsilon);
 
-            var theta0 = shared.Tau / (float)shared.ActiveSet.Count;
             var theta0 = shared.ProcessorCount / (float)shared.ActiveSet.Count;
             var tmpTheta = theta < 1.0f ? ((theta * theta) / (1.0f - theta)) : theta0;
             for (int i = 0; i < xImage.GetLength(0); i++)
@@ -102,25 +101,21 @@ namespace Single_Reference.Deconvolution
             float eta = 1.0f / blockCount;
             shared.testRestart = 0.0f;
 
-            var deconvolvers = new List<ConcurrentDeconvolver>(shared.ProcessorCount);
+            var xDiffs = new float[shared.ProcessorCount];
+            var deconvolvers = new List<AsyncDeconvolver>(shared.ProcessorCount);
             for(int i = 0; i < shared.ProcessorCount; i++)
-                deconvolvers.Add(new ConcurrentDeconvolver(shared, theta0));
+                deconvolvers.Add(new AsyncDeconvolver(shared, theta0));
             
-            var tasks = new Task[shared.ProcessorCount];
             int iter = 0;
             var converged = false;
             Console.WriteLine("Starting Active Set iterations with " + shared.ActiveSet.Count + " blocks");
             while (iter < activeSetIterations & !converged)
             {
                 //iterations
-                for (int i = 0; i < deconvolvers.Count; i++)
+                Parallel.For(0, deconvolvers.Count, (i) =>
                 {
-                    tasks[i] = new Task(deconvolvers[i].Run);
-                    tasks[i].Start();
-                }
-
-                for (int i = 0; i < deconvolvers.Count; i++)
-                    tasks[i].Wait();
+                    xDiffs[i] = deconvolvers[i].Deconvolve(shared.MaxConcurrentIterations, theta0);
+                });
                 
                 if (shared.testRestart > 0.0f)
                 {
@@ -145,13 +140,10 @@ namespace Single_Reference.Deconvolution
                     shared.testRestart = 0.0f;
                 }
 
-                if (deconvolvers.Sum(x => x.xDiffMax) < epsilon)
+                if (xDiffs.Sum() < epsilon)
                 {
                     converged = true;
                 }
-
-                for(int i = 0; i < deconvolvers.Count; i++)
-                    deconvolvers[i].xDiffMax = 0.0f;
 
                 Console.WriteLine("Done Active Set iteration " + iter);
                 iter++;
@@ -325,7 +317,7 @@ namespace Single_Reference.Deconvolution
             }
         }
 
-        private class ConcurrentDeconvolver
+        private class AsyncDeconvolver
         {
             private readonly SharedData shared;
             private readonly float[,] blockUpdate;
@@ -333,7 +325,7 @@ namespace Single_Reference.Deconvolution
             public float theta = 0.0f;
             public float xDiffMax = 0.0f;
             
-            public ConcurrentDeconvolver(SharedData shared, float theta0, bool useAcceleration = true)
+            public AsyncDeconvolver(SharedData shared, float theta0, bool useAcceleration = true)
             {
                 this.shared = shared;
                 theta = theta0;
@@ -341,16 +333,13 @@ namespace Single_Reference.Deconvolution
                 this.useAcceleration = useAcceleration;
             }
 
-            public void Run()
+            public float Deconvolve(int maxIterations, float theta0)
             {
                 var blockCount = shared.ActiveSet.Count;
-                var theta0 = shared.ProcessorCount / (float)blockCount;
                 float eta = 1.0f / blockCount;
 
                 var beta = CalcESO(shared.ProcessorCount, shared.DegreeOfSeperability, blockCount);
-                var lipschitz = shared.maxLipschitz * shared.YBlockSize * shared.XBlockSize;
-                lipschitz *= (float)beta;
-                
+                var xDiffMax = 0.0f;
                 for (int inner = 0; inner < shared.MaxConcurrentIterations; inner++)
                 {
                     var blockIdx = GetRandomBlockIdx(shared.Random, shared.BlockLock);
@@ -368,8 +357,9 @@ namespace Single_Reference.Deconvolution
                     for (int y = yOffset; y < (yOffset + shared.YBlockSize); y++)
                         for (int x = xOffset; x < (xOffset + shared.XBlockSize); x++)
                         {
-                            var update = theta2 * shared.GCorr[y, x] + shared.GExpl[y, x] + shared.XExpl[y, x] * step;
-                            update = ElasticNet.ProximalOperator(update, step, shared.Lambda, shared.Alpha) - shared.XExpl[y, x];
+                            var xExpl = Thread.VolatileRead(ref shared.XExpl[y, x]);
+                            var update = theta2 * Thread.VolatileRead(ref shared.GCorr[y, x]) + Thread.VolatileRead(ref shared.GExpl[y, x]) + xExpl * step;
+                            update = ElasticNet.ProximalOperator(update, step, shared.Lambda, shared.Alpha) - xExpl;
                             blockUpdate[y - yOffset, x - xOffset] = update;
                             updateSum = update;
                             updateAbsSum += Math.Abs(update);
@@ -387,14 +377,14 @@ namespace Single_Reference.Deconvolution
                             for (int x = xOffset; x < (xOffset + shared.XBlockSize); x++)
                             {
                                 var update = blockUpdate[y - yOffset, x - xOffset];
-                                var oldExplore = shared.XExpl[y, x];
+                                var oldExplore = shared.XExpl[y, x];    //does not need to be volatile, this index is blocked until this process is finished, and we already made sure with a volatile read that the latest value is in the cache
 
                                 oldXExplore += shared.XExpl[y, x];
-                                oldXCorr += shared.XCorr[y, x];
+                                oldXCorr += Thread.VolatileRead(ref shared.XCorr[y, x]);
                                 newXExplore += oldExplore + update;
 
-                                shared.XExpl[y, x] += update;
-                                shared.XCorr[y, x] += update * correctionFactor;
+                                Thread.VolatileWrite(ref shared.XExpl[y, x], shared.XExpl[y, x] + update);
+                                Thread.VolatileWrite(ref shared.XCorr[y, x], shared.XCorr[y, x] + update * correctionFactor);
                             }
 
                         //not 100% sure this is the correct generalization from single pixel thread rule to block rule
@@ -407,7 +397,9 @@ namespace Single_Reference.Deconvolution
                     
                     if(useAcceleration)
                         theta = (float)(Math.Sqrt((theta2 * theta2) + 4 * (theta2)) - theta2) / 2.0f;
-                }  
+                }
+
+                return xDiffMax;
             }
 
             private static int GetRandomBlockIdx(Random rand, int[] blockLock)
@@ -466,7 +458,7 @@ namespace Single_Reference.Deconvolution
                 var successfulWrite = value == 0.0f;    //skip write if value to subtract is zero
                 while (!successfulWrite)
                 {
-                    var read = map[yIdx, xIdx];
+                    var read = Thread.VolatileRead(ref map[yIdx, xIdx]);
                     var old = Interlocked.CompareExchange(ref map[yIdx, xIdx], read - value, read);
                     successfulWrite = old == read;
                 } 
@@ -477,7 +469,7 @@ namespace Single_Reference.Deconvolution
                 var successfulWrite = subtract == 0.0f;    //skip write if value to subtract is zero
                 while (!successfulWrite)
                 {
-                    var read = test;
+                    var read = Thread.VolatileRead(ref test);
                     var update = (1.0f - eta) * read - subtract;
                     var old = Interlocked.CompareExchange(ref test, update, read);
                     successfulWrite = old == read;
@@ -544,7 +536,7 @@ namespace Single_Reference.Deconvolution
             if (coldStart & useCDColdStart)
             {
                 var fastCD = new FastGreedyCD(totalSize, totalSize, psf, psf2);
-                fastCD.Deconvolve(xExplore, gExplore, lambda, alpha, xImage.GetLength(0));
+                fastCD.Deconvolve(xExplore, gExplore, lambda, alpha, xImage.GetLength(0)/2);
             }
 
             var maxLipschitz = (float)PSF.CalcMaxLipschitz(psf);
@@ -601,30 +593,27 @@ namespace Single_Reference.Deconvolution
             float eta = 1.0f / blockCount;
             shared.testRestart = 0.0f;
 
-            var deconvolvers = new List<ConcurrentDeconvolver>(shared.ProcessorCount);
+            var xDiffs = new float[shared.ProcessorCount];
+            var deconvolvers = new List<AsyncDeconvolver>(shared.ProcessorCount);
             for (int i = 0; i < shared.ProcessorCount; i++)
-                deconvolvers.Add(new ConcurrentDeconvolver(shared, theta0, useAcceleration));
-
-            var tasks = new Task[shared.ProcessorCount];
+                deconvolvers.Add(new AsyncDeconvolver(shared, theta0, useAcceleration));
+               
             int iter = 0;
             var converged = false;
             Console.WriteLine("Starting Active Set iterations with " + shared.ActiveSet.Count + " blocks");
             while (iter < activeSetIterations & !converged)
             {
                 watch.Start();
-                //iterations
-                for (int i = 0; i < deconvolvers.Count; i++)
+                //async iterations
+                Parallel.For(0, deconvolvers.Count, (i) =>
                 {
-                    tasks[i] = new Task(deconvolvers[i].Run);
-                    tasks[i].Start();
-                }
+                    xDiffs[i] = deconvolvers[i].Deconvolve(shared.MaxConcurrentIterations, theta0);
+                });
 
-                for (int i = 0; i < deconvolvers.Count; i++)
-                    tasks[i].Wait();
                 watch.Stop();
 
 
-                //Console.WriteLine("calculating objective");
+                Console.WriteLine("calculating objective");
                 var xAccelerated = new float[xImage.GetLength(0), xImage.GetLength(1)];
                 var theta = deconvolvers[0].theta;
                 var tmpTheta2 = theta < 1.0f ? ((theta * theta) / (1.0f - theta)) : theta0;
@@ -659,7 +648,7 @@ namespace Single_Reference.Deconvolution
                     shared.testRestart = 0.0f;
                 }
 
-                if (deconvolvers.Sum(x => x.xDiffMax) < epsilon)
+                if (xDiffs.Sum() < epsilon)
                 {
                     if(GetAbsMax(shared.XExpl, shared.GExpl, shared.AMap, shared.Lambda, shared.Alpha) < epsilon)
                     {
@@ -667,9 +656,6 @@ namespace Single_Reference.Deconvolution
                         data.converged = true;
                     }
                 }
-
-                for (int i = 0; i < deconvolvers.Count; i++)
-                    deconvolvers[i].xDiffMax = 0.0f;
 
                 Console.WriteLine("Done Active Set iteration " + iter);
                 iter++;

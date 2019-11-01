@@ -42,7 +42,7 @@ namespace SingleMachineRuns.Experiments
                 var dirtyGrid = IDG.GridW(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
                 var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, input.c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
-                FitsIO.Write(dirtyImage, folder + "dirty" + cycle + ".fits");
+                FitsIO.Write(dirtyImage, folder + "/dirty" + cycle + ".fits");
 
                 var maxDirty = Residuals.GetMax(dirtyImage);
                 var bMap = bMapCalculator.Convolve(dirtyImage);
@@ -52,8 +52,7 @@ namespace SingleMachineRuns.Experiments
                 var currentLambda = (float)Math.Max(currentSideLobe / alpha, lambda);
 
                 approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 100);
-                FitsIO.Write(xImage, folder + "xImage_" + cycle + ".fits");
-
+                FitsIO.Write(xImage, folder + "/xImage_" + cycle + ".fits");
             }
         }
 
