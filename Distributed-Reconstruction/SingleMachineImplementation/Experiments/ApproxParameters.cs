@@ -19,10 +19,9 @@ namespace SingleMachineRuns.Experiments
         static float LAMBDA = 0.4f;
         static float ALPHA = 0.1f;
 
-        private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, int threads, int blockSize, bool accelerated)
+        private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated)
         {
-            
-            var approx = new ApproxFast(threads, blockSize, true, accelerated);
+            var approx = new ApproxFast(threads, blockSize, false,  true);
             var psfCut = PSF.Cut(fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
@@ -36,10 +35,11 @@ namespace SingleMachineRuns.Experiments
             ApproxFast.LAMBDA_TEST = lambda;
             ApproxFast.ALPHA_TEST = alpha;
 
-            var data = new ApproxFast.TestingData(new StreamWriter(folder+ "/" + folder + ".txt"));
+            var writer = new StreamWriter(folder + "/" + file + "_lambda.txt");
+            var data = new ApproxFast.TestingData(new StreamWriter(folder+ "/" + file + ".txt"));
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
-            for (int cycle = 0; cycle < 3; cycle++)
+            for (int cycle = 0; cycle < 8; cycle++)
             {
                 Console.WriteLine("cycle " + cycle);
                 var dirtyGrid = IDG.GridW(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
@@ -54,7 +54,10 @@ namespace SingleMachineRuns.Experiments
                 var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = (float)Math.Max(currentSideLobe / alpha, lambda);
 
-                approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 10);
+                writer.WriteLine("cycle" + ";" + currentLambda);
+                writer.Flush();
+
+                approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 30);
                 FitsIO.Write(xImage, folder + "/xImage_" + cycle + ".fits");
 
                 FFT.Shift(xImage);
@@ -63,6 +66,8 @@ namespace SingleMachineRuns.Experiments
                 var modelVis = IDG.DeGridW(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
                 residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
             }
+            writer.Close();
+
         }
 
 
@@ -109,14 +114,20 @@ namespace SingleMachineRuns.Experiments
             FFT.Shift(psf);
             
 
-            Directory.CreateDirectory("ApproxParams");
+            Directory.CreateDirectory("ApproxTest/cpu");
             FitsIO.Write(psf, "psfFull.fits");
 
-
             //tryout with simply cutting the PSF
-            var outFolder = "ApproxTest";
-            Directory.CreateDirectory(outFolder);
-            Reconstruct(data, 4, psf, outFolder, 4, 8, false);
+            var outFolder = "ApproxTest/cpu";
+            
+            var cpuTest = new int[] { 8};
+            foreach(var cpu in cpuTest)
+            {
+                var currentFolder = outFolder + cpu;
+                Directory.CreateDirectory(currentFolder);
+                Reconstruct(data, 8, psf, currentFolder,"cpuTest"+cpu, cpu, 8, true);
+            }
+            
             
         }
     }
