@@ -1,4 +1,5 @@
 ﻿using System;
+using Single_Reference;
 
 namespace SingleMachineRuns
 {
@@ -10,10 +11,14 @@ namespace SingleMachineRuns
             //Experiments.PSFSize.RunSpeedLarge();
             //Experiments.PSFSize.RunPSFSize();
 
+            var image = FitsIO.ReadImage("ApproxTest/xImage_4.fits");
+            var x2 = ImageGeneration.Tools.LMC.CutCalibration(image);
+            FitsIO.Write(x2, "n132.fits");
+            
 
 
             //Experiments.PSFMask.Run();
-            Experiments.ApproxParameters.Run();
+            //Experiments.ApproxParameters.Run();
             //Experiments.ApproxParameters.ActiveSetDebug();
 
             //Single_Reference.DebugMethods.DebugILGPU();
