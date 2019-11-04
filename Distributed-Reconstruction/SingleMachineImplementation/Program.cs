@@ -14,6 +14,7 @@ namespace SingleMachineRuns
 
             //Experiments.PSFMask.Run();
             Experiments.ApproxParameters.Run();
+            //Experiments.ApproxParameters.ActiveSetDebug();
 
             //Single_Reference.DebugMethods.DebugILGPU();
             //Single_Reference.DebugMethods.DebugSimulatedApprox();

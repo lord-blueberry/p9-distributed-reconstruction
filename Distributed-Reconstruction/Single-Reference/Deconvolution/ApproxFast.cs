@@ -20,12 +20,14 @@ namespace Single_Reference.Deconvolution
         bool useAcceleration = true;
         int threadCount;
         int blockSize;
+        float randomFraction;
 
 
-        public ApproxFast(int threadCount, int blockSize, bool useCDColdStart, bool useAcceleration = true)
+        public ApproxFast(int threadCount, int blockSize, float randomFraction, bool useCDColdStart, bool useAcceleration = true)
         {
             this.threadCount = threadCount;
             this.blockSize = blockSize;
+            this.randomFraction = randomFraction;
             this.useCDColdStart = useCDColdStart;
             this.useAcceleration = useAcceleration;
         }
@@ -198,7 +200,7 @@ namespace Single_Reference.Deconvolution
             return output;
         }
 
-        private static List<Tuple<int, int>> GetActiveSet(float[,] xExplore, float[,] gExplore, int yBlockSize, int xBlockSize, float lambda, float alpha, float lipschitz)
+        public static List<Tuple<int, int>> GetActiveSet(float[,] xExplore, float[,] gExplore, int yBlockSize, int xBlockSize, float lambda, float alpha, float[,] lipschitzMap)
         {
             var debug = new float[xExplore.GetLength(0), xExplore.GetLength(1)];
             var output = new List<Tuple<int, int>>();
@@ -208,12 +210,16 @@ namespace Single_Reference.Deconvolution
                     var yPixel = i * yBlockSize;
                     var xPixel = j * xBlockSize;
                     var nonZero = false;
+                    
                     for (int y = yPixel; y < yPixel + yBlockSize; y++)
                         for (int x = xPixel; x < xPixel + xBlockSize; x++)
                         {
+                            var lipschitz = lipschitzMap[y, x];
+                            if (y == 2314  && x == 2340)
+                                Console.WriteLine("");
                             var tmp = gExplore[y, x] + xExplore[y, x] * lipschitz;
                             tmp = ElasticNet.ProximalOperator(tmp, lipschitz, lambda, alpha);
-                            if (ACTIVE_SET_CUTOFF < Math.Abs(tmp - xExplore[y, x]))
+                            if (0.0f < Math.Abs(tmp - xExplore[y, x]))
                             {
                                 nonZero = true;
                             }
@@ -230,6 +236,15 @@ namespace Single_Reference.Deconvolution
 
                 }
             FitsIO.Write(debug, "activeSet.fits");
+            return output;
+        }
+
+        private static float GetBlockLipschitz(float[,] lipschitzMap, int yOffset, int xOffset, int yBlockSize, int xBlockSize)
+        {
+            var output = 0.0f;
+            for (int y = yOffset; y < yOffset + yBlockSize; y++)
+                for (int x = xOffset; x < xOffset + xBlockSize; x++)
+                    output += lipschitzMap[y, x];
             return output;
         }
 
@@ -374,7 +389,7 @@ namespace Single_Reference.Deconvolution
                     var yOffset = blockSample.Item1 * shared.YBlockSize;
                     var xOffset = blockSample.Item2 * shared.XBlockSize;
 
-                    var blockLipschitz = AsyncRandom.GetBlockLipschitz(shared.AMap, yOffset, xOffset, shared.YBlockSize, shared.XBlockSize);
+                    var blockLipschitz = GetBlockLipschitz(shared.AMap, yOffset, xOffset, shared.YBlockSize, shared.XBlockSize);
                     var step = blockLipschitz * stepFactor;
                     
                     var correctionFactor = -(1.0f - Theta / theta0) / theta2;
@@ -469,7 +484,7 @@ namespace Single_Reference.Deconvolution
                 var yOffset = block.Item1 * shared.YBlockSize;
                 var xOffset = block.Item2 * shared.XBlockSize;
 
-                var blockLipschitz = AsyncRandom.GetBlockLipschitz(shared.AMap, yOffset, xOffset, shared.YBlockSize, shared.XBlockSize);
+                var blockLipschitz = GetBlockLipschitz(shared.AMap, yOffset, xOffset, shared.YBlockSize, shared.XBlockSize);
                 var step = blockLipschitz * stepFactor;
                 var updateAbsSum = 0.0f;
                 for (int y = yOffset; y < (yOffset + shared.YBlockSize); y++)
@@ -645,16 +660,105 @@ namespace Single_Reference.Deconvolution
                     successfulWrite = old == read | !float.IsNormal(old);
                 }
             }
+        }
 
-            internal static float GetBlockLipschitz(float[,] lipschitzMap, int yOffset, int xOffset, int yBlockSize, int xBlockSize)
+        private class JitterRandom : IAsyncDeconvolver
+        {
+            readonly SharedData shared;
+            readonly int id;
+            readonly float[,] blockUpdate;
+            readonly bool useAcceleration;
+            public float Theta { get; set; }
+
+            public JitterRandom(SharedData shared, int id, float theta0, bool useAcceleration = true)
             {
-                var output = 0.0f;
-                for (int y = yOffset; y < yOffset + yBlockSize; y++)
-                    for (int x = xOffset; x < xOffset + xBlockSize; x++)
-                        output += lipschitzMap[y, x];
-                return output;
+                this.id = id;
+                this.shared = shared;
+                Theta = theta0;
+                blockUpdate = new float[shared.YBlockSize, shared.XBlockSize];
+                this.useAcceleration = useAcceleration;
+            }
+
+            public float Deconvolve(int maxIterations, float theta0)
+            {
+                var blockCount = shared.XExpl.Length / (shared.YBlockSize * shared.XBlockSize);
+                //var blockCount = shared.ActiveSet.Count;
+                float eta = 1.0f / blockCount;
+
+                var beta = CalcESO(shared.ProcessorCount, shared.DegreeOfSeperability, blockCount);
+                var xDiffMax = 0.0f;
+                for (int inner = 0; inner < shared.MaxConcurrentIterations; inner++)
+                {
+                    var blockIdx = AsyncRandom.GetRandomBlockIdx(shared.Random, id, shared.BlockLock);
+                    var blockSample = shared.ActiveSet[blockIdx];
+                    var yOffset = blockSample.Item1 * shared.YBlockSize;
+                    var xOffset = blockSample.Item2 * shared.XBlockSize;
+
+                    //adding jitter, random offset so we combat the blocky appearance of intermediate reconstructions
+                    yOffset += shared.Random.Next(-shared.YBlockSize / 2, Math.Max(shared.YBlockSize / 2 - 1, 0));
+                    xOffset += shared.Random.Next(-shared.XBlockSize / 2, Math.Max(shared.XBlockSize / 2 - 1, 0));
+                    yOffset = Math.Max(yOffset, 0);
+                    xOffset = Math.Max(xOffset, 0);
+                    yOffset = Math.Min(yOffset, shared.XExpl.GetLength(0) - shared.YBlockSize);
+                    xOffset = Math.Min(xOffset, shared.XExpl.GetLength(1) - shared.XBlockSize);
+
+
+                    var blockLipschitz = GetBlockLipschitz(shared.AMap, yOffset, xOffset, shared.YBlockSize, shared.XBlockSize);
+                    var step = blockLipschitz * (float)beta * Theta / theta0;
+                    var theta2 = Theta * Theta;
+                    var correctionFactor = -(1.0f - Theta / theta0) / theta2;
+
+                    var updateSum = 0.0f;
+                    var updateAbsSum = 0.0f;
+                    for (int y = yOffset; y < (yOffset + shared.YBlockSize); y++)
+                        for (int x = xOffset; x < (xOffset + shared.XBlockSize); x++)
+                        {
+                            var xExpl = Thread.VolatileRead(ref shared.XExpl[y, x]);
+                            var update = theta2 * Thread.VolatileRead(ref shared.GCorr[y, x]) + Thread.VolatileRead(ref shared.GExpl[y, x]) + xExpl * step;
+                            update = ElasticNet.ProximalOperator(update, step, shared.Lambda, shared.Alpha) - xExpl;
+                            blockUpdate[y - yOffset, x - xOffset] = update;
+                            updateSum = update;
+                            updateAbsSum += Math.Abs(update);
+                        }
+
+                    //update gradients
+                    if (0.0f != updateAbsSum)
+                    {
+                        xDiffMax = Math.Max(xDiffMax, updateAbsSum);
+                        AsyncRandom.UpdateBMaps(blockUpdate, blockSample.Item1, blockSample.Item2, shared.Psf2, shared.GExpl, shared.GCorr, correctionFactor);
+                        var newXExplore = 0.0f;
+                        var oldXExplore = 0.0f;
+                        var oldXCorr = 0.0f;
+                        for (int y = yOffset; y < (yOffset + shared.YBlockSize); y++)
+                            for (int x = xOffset; x < (xOffset + shared.XBlockSize); x++)
+                            {
+                                var update = blockUpdate[y - yOffset, x - xOffset];
+                                var oldExplore = shared.XExpl[y, x];    //does not need to be volatile, this index is blocked until this process is finished, and we already made sure with a volatile read that the latest value is in the cache
+
+                                oldXExplore += shared.XExpl[y, x];
+                                oldXCorr += Thread.VolatileRead(ref shared.XCorr[y, x]);
+                                newXExplore += oldExplore + update;
+
+                                Thread.VolatileWrite(ref shared.XExpl[y, x], shared.XExpl[y, x] + update);
+                                Thread.VolatileWrite(ref shared.XCorr[y, x], shared.XCorr[y, x] + update * correctionFactor);
+                            }
+
+                        //not 100% sure this is the correct generalization from single pixel thread rule to block rule
+                        var testRestartUpdate = (updateSum) * (newXExplore - (theta2 * oldXCorr + oldXExplore));
+                        AsyncRandom.ConcurrentUpdateTestRestart(ref shared.testRestart, eta, testRestartUpdate);
+                    }
+
+                    //unlockBlock
+                    Thread.VolatileWrite(ref shared.BlockLock[blockIdx], 0);
+
+                    if (useAcceleration)
+                        Theta = (float)(Math.Sqrt((theta2 * theta2) + 4 * (theta2)) - theta2) / 2.0f;
+                }
+
+                return xDiffMax;
             }
         }
+
 
         interface IAsyncDeconvolver
         {
@@ -669,7 +773,7 @@ namespace Single_Reference.Deconvolution
 
         public class TestingData
         {
-            public List<Tuple<int, double, double, double>> Lines;
+            public List<Tuple<int, double, double, double,double, double>> Lines;
             public float lastTheta;
             public bool converged;
             public bool usingAccelerated;
@@ -680,22 +784,21 @@ namespace Single_Reference.Deconvolution
 
             public TestingData(StreamWriter writer)
             {
-                Lines = new List<Tuple<int, double, double, double>>();
+                Lines = new List<Tuple<int, double, double, double, double, double>>();
                 this.writer = writer;
-                writer.WriteLine("idx;cycle;seconds;objectiveNormal;objectiveAccelerated;processorCount;blockSize") ;
+                writer.WriteLine("idx;cycle;seconds;objectiveNormal;objectiveAccelerated;L2GExp;L2GCorr;processorCount;blockSize") ;
             }
 
-            public void Write(Tuple<int, double, double, double> line)
+            public void Write(Tuple<int, double, double, double, double, double> line)
             {
                 Lines.Add(line);
-                writer.WriteLine(lineIdx++ + ";" + line.Item1 + ";" + line.Item2 + ";" + line.Item3 + ";" + line.Item4 + ";" + processorCount + ";" + blockSize);
+                writer.WriteLine(lineIdx++ + ";" + line.Item1 + ";" + line.Item2 + ";" + line.Item3 + ";" + line.Item4 + ";" + line.Item5 + ";" + line.Item6 + ";" + processorCount + ";" + blockSize);
                 writer.Flush();
             }
         }
 
         public void DeconvolveTest(TestingData data, int cycle, float[,] xImage, float[,] residuals, float[,] psf, float[,] psfFull, float lambda, float alpha, Random random, int maxIteration = 100, float epsilon = 1e-4f)
         {
-            
             Stopwatch watch = new Stopwatch();
             var xExplore = Copy(xImage);
             var xCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
@@ -719,14 +822,14 @@ namespace Single_Reference.Deconvolution
             var shared = new SharedData(lambda, alpha, blockSize, blockSize, threadCount,
                 CountNonZero(psf), psf2, PSF.CalcAMap(psf, totalSize),
                 xExplore, xCorrection, gExplore, gCorrection, random);
-            shared.ActiveSet = GetActiveSet(xExplore, gExplore, shared.YBlockSize, shared.XBlockSize, lambda, alpha, maxLipschitz);
+            shared.ActiveSet = GetActiveSet(xExplore, gExplore, shared.YBlockSize, shared.XBlockSize, lambda, alpha, shared.AMap);
             shared.BlockLock = new int[shared.ActiveSet.Count];
             shared.maxLipschitz = maxLipschitz;
-            shared.MaxConcurrentIterations = 200;
+            shared.MaxConcurrentIterations = 400;
 
             var objectivesFirst = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, shared.XExpl, LAMBDA_TEST, ALPHA_TEST, psf, shared.GExpl);
             var timeOffset = data.Lines.Count == 0 ? 0.0 : data.Lines.Last().Item2;
-            var dataPoint = new Tuple<int, double, double, double>(cycle, timeOffset, objectivesFirst.Item1, objectivesFirst.Item2);
+            var dataPoint = new Tuple<int, double, double, double, double, double>(cycle, timeOffset, objectivesFirst.Item1, objectivesFirst.Item2, Residuals.CalcPenalty(shared.GExpl), 0);
             data.Write(dataPoint);
 
             if (coldStart & useCDColdStart)
@@ -738,7 +841,7 @@ namespace Single_Reference.Deconvolution
 
                 objectivesFirst = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, shared.XExpl, LAMBDA_TEST, ALPHA_TEST, psf, shared.GExpl);
                 timeOffset += watch.Elapsed.TotalSeconds;
-                dataPoint = new Tuple<int, double, double, double>(cycle, timeOffset, objectivesFirst.Item1, objectivesFirst.Item2);
+                dataPoint = new Tuple<int, double, double, double, double, double>(cycle, timeOffset, objectivesFirst.Item1, objectivesFirst.Item2, Residuals.CalcPenalty(shared.GExpl), Residuals.CalcPenalty(shared.GCorr));
                 data.Write(dataPoint);
             }
 
@@ -788,10 +891,10 @@ namespace Single_Reference.Deconvolution
 
             var xDiffs = new float[shared.ProcessorCount];
             var deconvolvers = new List<IAsyncDeconvolver>(shared.ProcessorCount);
-            /*
-            for (int i = 0; i < shared.ProcessorCount; i++)
-                deconvolvers.Add(new AsyncRandom(shared, i+ 1, theta0, useAcceleration));*/
-            for (int i = 0; i < shared.ProcessorCount; i++)
+            var randomDeconvolvers = (int)(shared.ProcessorCount * randomFraction);
+            for (int i = 0; i < randomDeconvolvers; i++)
+                deconvolvers.Add(new JitterRandom(shared, i+ 1, theta0, useAcceleration));
+            for (int i = randomDeconvolvers; i < shared.ProcessorCount; i++)
                 deconvolvers.Add(new PseudoRandom(shared, i+ 1, shared.ProcessorCount, 0.25f, theta0, useAcceleration));
 
             int iter = 0;
@@ -817,7 +920,9 @@ namespace Single_Reference.Deconvolution
                     for (int j = 0; j < xImage.GetLength(1); j++)
                         xAccelerated[i, j] = tmpTheta2 * shared.XCorr[i, j] + shared.XExpl[i, j];
                 var objectives = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, xAccelerated, LAMBDA_TEST, ALPHA_TEST, psf, shared.GExpl);
-                var dataPoint = new Tuple<int, double, double, double>(cycle, timeOffset + watch.Elapsed.TotalSeconds, objectives.Item1, objectives.Item2);
+                var gExp2 = Residuals.CalcPenalty(shared.GExpl);
+                var gCorr2 = Residuals.CalcPenalty(shared.GCorr);
+                var dataPoint = new Tuple<int, double, double, double, double, double>(cycle, timeOffset + watch.Elapsed.TotalSeconds, objectives.Item1, objectives.Item2, gExp2, gCorr2);
                 data.Write(dataPoint);
                 FitsIO.Write(shared.XExpl, "intermediate"+iter+".fits");
                 FitsIO.Write(shared.XCorr, "intermediateCorr.fits");
@@ -839,7 +944,7 @@ namespace Single_Reference.Deconvolution
                         }
 
                     //new active set
-                    shared.ActiveSet = GetActiveSet(shared.XExpl, shared.GExpl, shared.YBlockSize, shared.XBlockSize, shared.Lambda, shared.Alpha, shared.maxLipschitz);
+                    shared.ActiveSet = GetActiveSet(shared.XExpl, shared.GExpl, shared.YBlockSize, shared.XBlockSize, shared.Lambda, shared.Alpha, shared.AMap);
                     shared.BlockLock = new int[shared.ActiveSet.Count];
                     blockCount = shared.XExpl.Length / (shared.YBlockSize * shared.XBlockSize);
                     //blockCount = shared.ActiveSet.Count; 

@@ -16,12 +16,12 @@ namespace SingleMachineRuns.Experiments
 {
     class ApproxParameters
     {
-        static float LAMBDA = 0.4f;
-        static float ALPHA = 0.1f;
+        static float LAMBDA = 1.0f;
+        static float ALPHA = 0.01f;
 
         private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated)
         {
-            var approx = new ApproxFast(threads, blockSize, false,  true);
+            var approx = new ApproxFast(threads, blockSize, 0f, false,  true);
             var psfCut = PSF.Cut(fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
@@ -39,7 +39,7 @@ namespace SingleMachineRuns.Experiments
             var data = new ApproxFast.TestingData(new StreamWriter(folder+ "/" + file + ".txt"));
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
-            for (int cycle = 0; cycle < 8; cycle++)
+            for (int cycle = 0; cycle < 5; cycle++)
             {
                 Console.WriteLine("cycle " + cycle);
                 var dirtyGrid = IDG.GridW(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
@@ -57,7 +57,7 @@ namespace SingleMachineRuns.Experiments
                 writer.WriteLine("cycle" + ";" + currentLambda);
                 writer.Flush();
 
-                approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 30);
+                approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 15);
                 FitsIO.Write(xImage, folder + "/xImage_" + cycle + ".fits");
 
                 FFT.Shift(xImage);
@@ -118,17 +118,38 @@ namespace SingleMachineRuns.Experiments
             FitsIO.Write(psf, "psfFull.fits");
 
             //tryout with simply cutting the PSF
-            var outFolder = "ApproxTest/cpu";
+            var outFolder = "ApproxTest/grid";
             
-            var cpuTest = new int[] { 8};
+            var cpuTest = new int[] { 8 };
+            var blockTest = new int[] { 1, 4, 8, 16 };
             foreach(var cpu in cpuTest)
             {
-                var currentFolder = outFolder + cpu;
-                Directory.CreateDirectory(currentFolder);
-                Reconstruct(data, 8, psf, currentFolder,"cpuTest"+cpu, cpu, 8, true);
+                foreach(var block in blockTest)
+                {
+                    var currentFolder = outFolder + cpu + "block" + block;
+                    Directory.CreateDirectory(currentFolder);
+                    Reconstruct(data, 8, psf, currentFolder, "cpuTest" + cpu, cpu, block, true);
+                }
+
             }
             
             
+        }
+
+        public static void ActiveSetDebug()
+        {
+            
+            var psf = FitsIO.ReadImage("ApproxTest/psfFull.fits");
+            var dirty = FitsIO.ReadImage("ApproxTest/dirty7.fits");
+            var xImage = FitsIO.ReadImage("ApproxTest/xImage_7.fits");
+            var psfCut = PSF.Cut(psf, 8);
+            var lambda = 130.84416f;
+
+            var totalSize = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
+            var PSFCorr = PSF.CalcPaddedFourierCorrelation(psfCut, new Rectangle(0, 0, dirty.GetLength(0), dirty.GetLength(1)));
+            var gExplore = Residuals.CalcBMap(dirty, PSFCorr, new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
+            FitsIO.Write(gExplore, "bMapDebug.fits");
+            ApproxFast.GetActiveSet(xImage, gExplore, 8, 8, lambda, ALPHA, PSF.CalcAMap(psf, totalSize));
         }
     }
 }
