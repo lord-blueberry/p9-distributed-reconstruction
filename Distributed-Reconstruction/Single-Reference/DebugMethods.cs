@@ -335,7 +335,7 @@ namespace Single_Reference
             var lambda = 0.5f * fastCD.MaxLipschitz;
             var alpha = 0.8f;
             var approx = new ApproxParallel();
-            var approx2 = new ApproxFast(4, 8,0f, false,true);
+            var approx2 = new ApproxFast(totalSize, psfCut, 4, 8, 0f, 0.25f,false,true);
 
             var xImage = new float[gridSize, gridSize];
             var residualVis = visibilities;

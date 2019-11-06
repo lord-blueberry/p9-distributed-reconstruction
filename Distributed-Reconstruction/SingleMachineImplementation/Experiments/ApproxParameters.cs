@@ -19,14 +19,14 @@ namespace SingleMachineRuns.Experiments
         static float LAMBDA = 1.0f;
         static float ALPHA = 0.01f;
 
-        private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated)
+        private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated, float randomPercent, float searchPercent)
         {
-            var approx = new ApproxFast(threads, blockSize, 0f, false,  true);
+            var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var psfCut = PSF.Cut(fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
-            var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             var random = new Random(123);
+            var approx = new ApproxFast(totalSize, psfCut, threads, blockSize, randomPercent, searchPercent, false, true);
 
             var maxLipschitzCut = PSF.CalcMaxLipschitz(psfCut);
             var lambda = (float)(LAMBDA * PSF.CalcMaxLipschitz(psfCut));
@@ -35,6 +35,7 @@ namespace SingleMachineRuns.Experiments
             ApproxFast.LAMBDA_TEST = lambda;
             ApproxFast.ALPHA_TEST = alpha;
 
+            var switchedToOtherPsf = false;
             var writer = new StreamWriter(folder + "/" + file + "_lambda.txt");
             var data = new ApproxFast.TestingData(new StreamWriter(folder+ "/" + file + ".txt"));
             var xImage = new float[input.c.GridSize, input.c.GridSize];
@@ -57,8 +58,16 @@ namespace SingleMachineRuns.Experiments
                 writer.WriteLine("cycle" + ";" + currentLambda);
                 writer.Flush();
 
-                approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 15);
+                approx.DeconvolveTest(data, cycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 15, 1e-5f);
                 FitsIO.Write(xImage, folder + "/xImage_" + cycle + ".fits");
+
+                if(currentLambda == lambda & !switchedToOtherPsf)
+                {
+                    approx.ResetAMap(fullPsf);
+                    switchedToOtherPsf = true;
+                    writer.WriteLine("switched");
+                    writer.Flush();
+                }
 
                 FFT.Shift(xImage);
                 var xGrid = FFT.Forward(xImage);
@@ -118,22 +127,39 @@ namespace SingleMachineRuns.Experiments
             FitsIO.Write(psf, "psfFull.fits");
 
             //tryout with simply cutting the PSF
-            var outFolder = "ApproxTest/grid";
-            
+            var outFolder = "ApproxTest/";
+
+            /*
             var cpuTest = new int[] { 8 };
-            var blockTest = new int[] { 1, 4, 8, 16 };
+            var blockTest = new int[] { 1, 4, 8, 16};
             foreach(var cpu in cpuTest)
             {
                 foreach(var block in blockTest)
                 {
-                    var currentFolder = outFolder + cpu + "block" + block;
+                    var file = "Grid_cpu"+ cpu + "block" + block;
+                    var currentFolder = outFolder + file;
                     Directory.CreateDirectory(currentFolder);
-                    Reconstruct(data, 8, psf, currentFolder, "cpuTest" + cpu, cpu, block, true);
+                    Reconstruct(data, 8, psf, currentFolder, file, cpu, block, true, 0f, 0.25f);
                 }
+            }*/
 
+            var searchPercent = new float[] { 0.05f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f };
+            foreach (var search in searchPercent)
+            {
+                var file = "Grid_cpu" + 8 + "block" + 1+"search"+search;
+                var currentFolder = outFolder + file;
+                Directory.CreateDirectory(currentFolder);
+                Reconstruct(data, 8, psf, currentFolder, file, 8, 1, true, 0f, search);
             }
             
-            
+            var randomPercentage = new float[] { 0, 0.25f, 0.5f, 0.75f };
+            foreach (var random in randomPercentage)
+            {
+                var file = "Grid_cpu" + 8 + "block" + 1 +"random"+ random;
+                var currentFolder = outFolder + file;
+                Directory.CreateDirectory(currentFolder);
+                Reconstruct(data, 8, psf, currentFolder, file, 8, 1, true, random, 0.25f);
+            }
         }
 
         public static void ActiveSetDebug()
