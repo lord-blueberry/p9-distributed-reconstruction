@@ -51,7 +51,7 @@ namespace SingleMachineRuns.ImageGeneration
 
             for (int y = 0; y < image.GetLength(0); y++)
                 for (int x = 0; x < image.GetLength(1); x++)
-                    if ((y >= yOffset & y < (yOffset + image.GetLength(0) / cutFactor)) | !(x >= xOffset & x < (xOffset + image.GetLength(1) / cutFactor)))
+                    if (!(!(y >= yOffset & y < (yOffset + image.GetLength(0) / cutFactor)) | !(x >= xOffset & x < (xOffset + image.GetLength(1) / cutFactor))))
                         image[y, x] = 0.0f;
         }
 
@@ -65,6 +65,19 @@ namespace SingleMachineRuns.ImageGeneration
                     for (int j = 0; j < image.GetLength(1); j++)
                         line[j] = image[i, j];
                     writer.WriteLine(string.Join(";", line));
+                }
+            }
+        }
+
+        public static void WriteToMeltCSV(float[,] image, string file)
+        {
+            using (var writer = new StreamWriter(file))
+            {
+                writer.WriteLine("y;x;intensity");
+                for (int i = 0; i < image.GetLength(0); i++)
+                {
+                    for (int j = 0; j < image.GetLength(1); j++)
+                        writer.WriteLine(i +";" + j + ";" + image[i,j]);
                 }
             }
         }
