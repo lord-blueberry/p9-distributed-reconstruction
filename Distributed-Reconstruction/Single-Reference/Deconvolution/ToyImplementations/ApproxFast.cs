@@ -244,8 +244,6 @@ namespace Single_Reference.Deconvolution
                         for (int x = xPixel; x < xPixel + xBlockSize; x++)
                         {
                             var lipschitz = lipschitzMap[y, x];
-                            if (y == 2314  && x == 2340)
-                                Console.WriteLine("");
                             var tmp = gExplore[y, x] + xExplore[y, x] * lipschitz;
                             tmp = ElasticNet.ProximalOperator(tmp, lipschitz, lambda, alpha);
                             if (0.0f < Math.Abs(tmp - xExplore[y, x]))
@@ -715,10 +713,7 @@ namespace Single_Reference.Deconvolution
         }
 
 
-
         #region Testing
-
-
         public class TestingData
         {
             public List<Tuple<int, double, double, double,double, double>> Lines;
