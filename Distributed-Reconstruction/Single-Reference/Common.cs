@@ -218,7 +218,7 @@ namespace Single_Reference
 
         public class Residuals
         {
-            public static float[,] CalcBMap(float[,] residuals, Complex[,] psfCorrelation, Rectangle psfSize)
+            public static float[,] CalcGradientMap(float[,] residuals, Complex[,] psfCorrelation, Rectangle psfSize)
             {
                 var yPadding = psfSize.YEnd;
                 var xPadding = psfSize.XEnd;

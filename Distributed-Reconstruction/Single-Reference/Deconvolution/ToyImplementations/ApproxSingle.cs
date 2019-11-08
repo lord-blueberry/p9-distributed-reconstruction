@@ -24,7 +24,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
         {
             var xOld = Copy(xImage);
             var corrKernel = PSF.CalcPaddedFourierCorrelation(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
-            var gradients = Residuals.CalcBMap(residuals, corrKernel, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1))); 
+            var gradients = Residuals.CalcGradientMap(residuals, corrKernel, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1))); 
 
             var lipschitz = (float)PSF.CalcMaxLipschitz(psf) * xImage.Length;
             for(int i = 0; i < xImage.GetLength(0); i++)
@@ -60,7 +60,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var PSFCorr = PSF.CalcPaddedFourierCorrelation(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
 
             //calculate gradients for each pixel
-            var gExplore = Residuals.CalcBMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            var gExplore = Residuals.CalcGradientMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var gCorrection = new float[residuals.GetLength(0), residuals.GetLength(1)];
             var psf2 = PSF.CalcPSFSquared(psf);
             FitsIO.Write(gExplore, "gExplore.fits");
@@ -235,7 +235,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
             var PSFCorr = PSF.CalcPaddedFourierCorrelation(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
 
             //calculate gradients for each pixel
-            var gExplore = Residuals.CalcBMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            var gExplore = Residuals.CalcGradientMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var gCorrection = new float[residuals.GetLength(0), residuals.GetLength(1)];
             var psf2 = PSF.CalcPSFSquared(psf);
 

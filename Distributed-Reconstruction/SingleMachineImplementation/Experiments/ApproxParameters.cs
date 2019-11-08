@@ -19,7 +19,7 @@ namespace SingleMachineRuns.Experiments
         static float LAMBDA = 1.0f;
         static float ALPHA = 0.01f;
 
-        private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated, float randomPercent, float searchPercent)
+        private static void Reconstruct(InputData input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated, float randomPercent, float searchPercent)
         {
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var psfCut = PSF.Cut(fullPsf, cutFactor);
@@ -143,7 +143,7 @@ namespace SingleMachineRuns.Experiments
                 }
             }*/
 
-            var searchPercent = new float[] { 0.05f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f };
+            var searchPercent = new float[] {0.01f, /*0.05f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f,*/ 0.8f, 0.9f };
             foreach (var search in searchPercent)
             {
                 var file = "Grid_cpu" + 8 + "block" + 1+"search"+search;
@@ -152,14 +152,7 @@ namespace SingleMachineRuns.Experiments
                 Reconstruct(data, 8, psf, currentFolder, file, 8, 1, true, 0f, search);
             }
             
-            var randomPercentage = new float[] { 0, 0.25f, 0.5f, 0.75f };
-            foreach (var random in randomPercentage)
-            {
-                var file = "Grid_cpu" + 8 + "block" + 1 +"random"+ random;
-                var currentFolder = outFolder + file;
-                Directory.CreateDirectory(currentFolder);
-                Reconstruct(data, 8, psf, currentFolder, file, 8, 1, true, random, 0.25f);
-            }
+
         }
 
         public static void ActiveSetDebug()
@@ -173,7 +166,7 @@ namespace SingleMachineRuns.Experiments
 
             var totalSize = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
             var PSFCorr = PSF.CalcPaddedFourierCorrelation(psfCut, new Rectangle(0, 0, dirty.GetLength(0), dirty.GetLength(1)));
-            var gExplore = Residuals.CalcBMap(dirty, PSFCorr, new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
+            var gExplore = Residuals.CalcGradientMap(dirty, PSFCorr, new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             FitsIO.Write(gExplore, "bMapDebug.fits");
             ApproxFast.GetActiveSet(xImage, gExplore, 8, 8, lambda, ALPHA, PSF.CalcAMap(psf, totalSize));
         }

@@ -233,28 +233,10 @@ namespace Single_Reference
             return output;
         }
 
-        public static void Shift(double[,,] grid)
-        {
-            for (int k = 0; k < grid.GetLength(0); k++)
-            {
-                // Interchange entries in 4 quadrants, 1 <--> 3 and 2 <--> 4
-                var n2 = grid.GetLength(1) / 2;
-                for (int i = 0; i < n2; i++)
-                {
-                    for (int j = 0; j < n2; j++)
-                    {
-                        var tmp13 = grid[k, i, j];
-                        grid[k, i, j] = grid[k, i + n2, j + n2];
-                        grid[k, i + n2, j + n2] = tmp13;
-
-                        var tmp24 = grid[k, i + n2, j];
-                        grid[k, i + n2, j] = grid[k, i, j + n2];
-                        grid[k, i, j + n2] = tmp24;
-                    }
-                }
-            }
-        }
-
+        /// <summary>
+        /// W-stacking shift
+        /// </summary>
+        /// <param name="grid"></param>
         public static void Shift(List<Complex[,]> grid)
         {
             for (int k = 0; k < grid.Count; k++)

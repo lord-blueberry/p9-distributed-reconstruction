@@ -35,7 +35,7 @@ namespace Single_Reference.Deconvolution.ToyImplementations
 
             //calculate gradients for each pixel
             var PSFCorr = PSF.CalcPaddedFourierCorrelation(psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
-            var gExplore = Residuals.CalcBMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
+            var gExplore = Residuals.CalcGradientMap(residuals, PSFCorr, new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
             var gCorrection = new float[residuals.GetLength(0), residuals.GetLength(1)];
             var psf2 = PSF.CalcPSFSquared(psf);
 

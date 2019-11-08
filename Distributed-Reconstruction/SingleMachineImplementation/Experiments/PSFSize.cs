@@ -56,7 +56,7 @@ namespace SingleMachineRuns.Experiments
             }
         }
 
-        private static ReconstructionInfo ReconstructGradientApprox(Data input, float[,] fullPsf, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon)
+        private static ReconstructionInfo ReconstructGradientApprox(SingleMachineRuns.InputData input, float[,] fullPsf, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon)
         {
             var info = new ReconstructionInfo();
             var psfCut = PSF.Cut(fullPsf, cutFactor);
@@ -164,7 +164,7 @@ namespace SingleMachineRuns.Experiments
             return info;
         }
 
-        private static ReconstructionInfo ReconstructSimple(Data input, float[,] fullPsf, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon, bool startWithFullPSF)
+        private static ReconstructionInfo ReconstructSimple(SingleMachineRuns.InputData input, float[,] fullPsf, string folder, int cutFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon, bool startWithFullPSF)
         {
             var info = new ReconstructionInfo();
             var psfCut = PSF.Cut(fullPsf, cutFactor);

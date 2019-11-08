@@ -11,8 +11,8 @@ namespace SingleMachineRuns
             //Experiments.PSFSize.RunSpeedLarge();
             //Experiments.PSFSize.RunPSFSize();
 
-            
 
+            ImageGeneration.Generator.GenerateAll();
 
             //Experiments.PSFMask.Run();
             Experiments.ApproxParameters.Run();
