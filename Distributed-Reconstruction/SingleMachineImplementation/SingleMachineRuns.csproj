@@ -10,8 +10,4 @@
     <ProjectReference Include="..\Single-Reference\Single-Reference.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="ImageGeneration\Simulated\" />
-  </ItemGroup>
-
 </Project>

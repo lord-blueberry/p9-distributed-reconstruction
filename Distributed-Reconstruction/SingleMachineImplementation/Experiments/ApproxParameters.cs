@@ -19,7 +19,7 @@ namespace SingleMachineRuns.Experiments
         static float LAMBDA = 1.0f;
         static float ALPHA = 0.01f;
 
-        private static void Reconstruct(InputData input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated, float randomPercent, float searchPercent)
+        private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated, float randomPercent, float searchPercent)
         {
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var psfCut = PSF.Cut(fullPsf, cutFactor);

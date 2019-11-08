@@ -8,7 +8,7 @@ using Single_Reference.IDGSequential;
 
 namespace SingleMachineRuns
 {
-    class InputData
+    class MeasurementData
     {
         public Complex[,,] Visibilities { get; private set; }
         public double[,,] UVW { get; private set; }
@@ -16,7 +16,7 @@ namespace SingleMachineRuns
         public bool[,,] Flags { get; private set; }
         public long VisibilitiesCount { get; private set; }
 
-        public InputData(Complex[,,] vis, double[,,] uvw, double[] freq, bool[,,] flags)
+        public MeasurementData(Complex[,,] vis, double[,,] uvw, double[] freq, bool[,,] flags)
         {
             Visibilities = vis;
             UVW = uvw;
@@ -31,7 +31,7 @@ namespace SingleMachineRuns
                             VisibilitiesCount++;
         }
 
-        public static InputData LoadLMC(string folder)
+        public static MeasurementData LoadLMC(string folder)
         {
             var frequencies = FitsIO.ReadFrequencies(Path.Combine(folder, "freq.fits"));
             var uvw = FitsIO.ReadUVW(Path.Combine(folder, "uvw0.fits"));
@@ -49,10 +49,10 @@ namespace SingleMachineRuns
                 visibilities = FitsIO.Stitch(visibilities, visibilities0);
             }
 
-            return new InputData(visibilities, uvw, frequencies, flags);
+            return new MeasurementData(visibilities, uvw, frequencies, flags);
         }
 
-        public static InputData LoadSimulatedPoints(string folder)
+        public static MeasurementData LoadSimulatedPoints(string folder)
         {
             var frequencies = FitsIO.ReadFrequencies(Path.Combine(folder, "freq.fits"));
             var uvw = FitsIO.ReadUVW(Path.Combine(folder, "uvw.fits"));
@@ -60,7 +60,7 @@ namespace SingleMachineRuns
             double norm = 2.0;
             var visibilities = FitsIO.ReadVisibilities(Path.Combine(folder, "vis.fits"), uvw.GetLength(0), uvw.GetLength(1), frequencies.Length, norm);
 
-            return new InputData(visibilities, uvw, frequencies, flags);
+            return new MeasurementData(visibilities, uvw, frequencies, flags);
         }
 
         public static GriddingConstants CreateSimulatedStandardParams(long visibilitiesCount)

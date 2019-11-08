@@ -11,8 +11,8 @@ namespace SingleMachineRuns.ImageGeneration.Simulated
     {
         public static void GeneratePSFs(string simulatedLocation, string outputFolder)
         {
-            var data = InputData.LoadSimulatedPoints(simulatedLocation);
-            var c = InputData.CreateSimulatedStandardParams(data.VisibilitiesCount);
+            var data = MeasurementData.LoadSimulatedPoints(simulatedLocation);
+            var c = MeasurementData.CreateSimulatedStandardParams(data.VisibilitiesCount);
             var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
 
             var psfGrid = IDG.GridPSF(c, metadata, data.UVW, data.Flags, data.Frequencies);
@@ -21,6 +21,7 @@ namespace SingleMachineRuns.ImageGeneration.Simulated
 
             Directory.CreateDirectory(outputFolder);
 
+            Tools.WriteToCSV(psf, Path.Combine(outputFolder, "psf.csv"));
         }
     }
 }

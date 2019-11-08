@@ -16,7 +16,7 @@ namespace SingleMachineRuns.Experiments
 {
     class PSFMask
     {
-        private static ReconstructionInfo Reconstruct(InputData input, float fullLipschitz, float[,] maskedPsf, string folder, float maskFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon, bool maskPsf2)
+        private static ReconstructionInfo Reconstruct(Data input, float fullLipschitz, float[,] maskedPsf, string folder, float maskFactor, int maxMajor, string dirtyPrefix, string xImagePrefix, StreamWriter writer, double objectiveCutoff, float epsilon, bool maskPsf2)
         {
             var info = new ReconstructionInfo();
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);

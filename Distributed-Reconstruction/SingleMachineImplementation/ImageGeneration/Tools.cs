@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.IO;
 using static Single_Reference.Common;
 
 namespace SingleMachineRuns.ImageGeneration
@@ -54,9 +55,18 @@ namespace SingleMachineRuns.ImageGeneration
                         image[y, x] = 0.0f;
         }
 
-        public static void WriteToCSV(float[,] image, string path)
+        public static void WriteToCSV(float[,] image, string file)
         {
-
+            using(var writer = new StreamWriter(file))
+            {
+                var line = new float[image.GetLength(1)];
+                for(int i = 0; i < image.GetLength(0);i++)
+                {
+                    for (int j = 0; j < image.GetLength(1); j++)
+                        line[j] = image[i, j];
+                    writer.WriteLine(string.Join(";", line));
+                }
+            }
         }
 
     }

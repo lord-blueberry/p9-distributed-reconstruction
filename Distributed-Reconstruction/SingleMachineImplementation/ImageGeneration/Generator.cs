@@ -6,11 +6,13 @@ namespace SingleMachineRuns.ImageGeneration
 {
     class Generator
     {
-        //generate images needed for the documentation
+        /// <summary>
+        /// Generate images needed for the documentation
+        /// </summary>
         public static void GenerateAll()
         {
-            var simulated = "";
-            var outputFolder = "";
+            var simulated = @"C:\dev\GitHub\p9-data\small\fits\simulation_point\";
+            var outputFolder = "images/simulated";
             Simulated.Generator.GeneratePSFs(simulated, outputFolder);
         }
     }
