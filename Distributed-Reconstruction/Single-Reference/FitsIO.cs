@@ -131,6 +131,24 @@ namespace Single_Reference
         #endregion
 
         #region reading
+        public static float[,] ReadCASAFits(string file)
+        {
+            Fits f = new Fits(file);
+            ImageHDU h = (ImageHDU)f.ReadHDU();
+            var imgRaw = (Array[])h.Kernel;
+            imgRaw = (Array[])imgRaw[0];
+            imgRaw = (Array[])imgRaw[0];
+
+            var output = new float[imgRaw.Length, imgRaw[0].Length];
+            for (int i = 0; i < imgRaw.Length; i++)
+            {
+                var row = (float[])imgRaw[i];
+                for (int j = 0; j < row.Length; j++)
+                    output[i, j] = row[j];
+            }
+            return output;
+        }
+
         public static float[,] ReadImage(string file)
         {
             Fits f = new Fits(file);

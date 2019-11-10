@@ -10,26 +10,30 @@ namespace SingleMachineRuns.ImageGeneration
     {
         public static class LMC
         {
-            public static float[,] CutN132Remnant(float[,] image)
+            public static Tuple<float[,], int,int> CutN132Remnant(float[,] image)
             {
-                var rectangle = new Rectangle(1768, 1183, 1768 + 90, 1183 + 90);
+                var yOffset = 1765;
+                var xOffset = 1180;
+                var rectangle = new Rectangle(yOffset, xOffset, yOffset + 95, xOffset + 95);
                 var output = new float[rectangle.YExtent(), rectangle.XExtent()];
                 for (int y = rectangle.Y; y < rectangle.YEnd; y++)
                     for (int x = rectangle.X; x < rectangle.XEnd; x++)
                         output[y - rectangle.Y, x - rectangle.X] = image[y, x];
 
-                return output;
+                return new Tuple<float[,], int, int>(output, yOffset, xOffset);
             }
 
-            public static float[,] CutCalibration(float[,] image)
+            public static Tuple<float[,], int, int> CutCalibration(float[,] image)
             {
-                var rectangle = new Rectangle(1635, 2330, 1635 + 350, 2330 + 350);
+                var yOffset = 1615;
+                var xOffset = 2315;
+                var rectangle = new Rectangle(yOffset, xOffset, yOffset + 370, xOffset + 370);
                 var output = new float[rectangle.YExtent(), rectangle.XExtent()];
                 for (int y = rectangle.Y; y < rectangle.YEnd; y++)
                     for (int x = rectangle.X; x < rectangle.XEnd; x++)
                         output[y - rectangle.Y, x - rectangle.X] = image[y, x];
 
-                return output;
+                return new Tuple<float[,], int, int>(output, yOffset, xOffset); 
             }
         }
         
@@ -69,7 +73,7 @@ namespace SingleMachineRuns.ImageGeneration
             }
         }
 
-        public static void WriteToMeltCSV(float[,] image, string file)
+        public static void WriteToMeltCSV(float[,] image, string file, int yOffset = 0, int xOffset = 0)
         {
             using (var writer = new StreamWriter(file))
             {
@@ -77,7 +81,12 @@ namespace SingleMachineRuns.ImageGeneration
                 for (int i = 0; i < image.GetLength(0); i++)
                 {
                     for (int j = 0; j < image.GetLength(1); j++)
-                        writer.WriteLine(i +";" + j + ";" + image[i,j]);
+                    {
+                        var y = i + yOffset;
+                        var x = j + xOffset;
+                        writer.WriteLine(y + ";" + x + ";" + image[i, j]);
+                    }
+                        
                 }
             }
         }

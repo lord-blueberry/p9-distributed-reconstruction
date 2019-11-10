@@ -416,6 +416,7 @@ namespace Single_Reference.Deconvolution
                 xDiffMax = 0.0f;
                 var continueAsync = Thread.VolatileRead(ref shared.asyncFinished) == 0;
                 for (int inner = 0; inner < shared.MaxConcurrentIterations & continueAsync; inner++)
+                //for (int inner = 0; inner < shared.MaxConcurrentIterations; inner++)
                 {
                     continueAsync = Thread.VolatileRead(ref shared.asyncFinished) == 0;
                     var stepFactor = (float)beta * Theta / shared.theta0;
@@ -478,6 +479,7 @@ namespace Single_Reference.Deconvolution
                 }
 
                 Thread.VolatileWrite(ref shared.asyncFinished, 1);
+                Console.WriteLine("Deconvolver finished " + id);
             }
 
             private int GetPseudoRandomBlock(float stepFactor, float theta2)
@@ -765,7 +767,7 @@ namespace Single_Reference.Deconvolution
             shared.ActiveSet = GetActiveSet(xExplore, gExplore, shared.YBlockSize, shared.XBlockSize, lambda, alpha, shared.AMap);
             shared.BlockLock = new int[shared.ActiveSet.Count];
             shared.maxLipschitz = MaxLipschitz;
-            shared.MaxConcurrentIterations = 600;
+            shared.MaxConcurrentIterations = 2000;
 
             var objectivesFirst = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, shared.XExpl, LAMBDA_TEST, ALPHA_TEST, psf, shared.GExpl);
             var timeOffset = data.Lines.Count == 0 ? 0.0 : data.Lines.Last().Item2;
@@ -865,8 +867,8 @@ namespace Single_Reference.Deconvolution
                 var gCorr2 = Residuals.CalcPenalty(shared.GCorr);
                 var dataPoint = new Tuple<int, double, double, double, double, double>(cycle, timeOffset + watch.Elapsed.TotalSeconds, objectives.Item1, objectives.Item2, deconvolvers.Max(d => d.xDiffMax), GetAbsMax(shared.XExpl, shared.GExpl, shared.AMap, shared.Lambda, shared.Alpha));
                 data.Write(dataPoint);
-                FitsIO.Write(shared.XExpl, "intermediate"+iter+".fits");
-                FitsIO.Write(shared.XCorr, "intermediateCorr.fits");
+                //FitsIO.Write(shared.XExpl, "intermediate"+iter+".fits");
+                //FitsIO.Write(shared.XCorr, "intermediateCorr.fits");
 
                 if (shared.testRestart > 0.0f)
                 {

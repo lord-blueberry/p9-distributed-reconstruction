@@ -143,7 +143,7 @@ namespace SingleMachineRuns.Experiments
                 }
             }*/
 
-            var searchPercent = new float[] {0.01f, /*0.05f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f,*/ 0.8f, 0.9f };
+            var searchPercent = new float[] {0f, /*0.01f, 0.05f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f */};
             foreach (var search in searchPercent)
             {
                 var file = "Grid_cpu" + 8 + "block" + 1+"search"+search;
