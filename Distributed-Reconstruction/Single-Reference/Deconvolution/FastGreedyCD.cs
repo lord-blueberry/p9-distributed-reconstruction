@@ -122,6 +122,11 @@ namespace Single_Reference.Deconvolution
         }
         #endregion
 
+        public float GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
+        {
+            return GetAbsMax(this.patch, xImage, bMap, lambda, alpha).PixelMaxDiff;
+        }
+
         private Pixel GetAbsMax(Rectangle subpatch, float[,] xImage, float[,] bMap, float lambda, float alpha)
         {
             var maxPixels = new Pixel[subpatch.YExtent()];

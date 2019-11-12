@@ -9,6 +9,13 @@ namespace Single_Reference
 {
     public static class Common
     {
+        /// <summary>
+        /// Calculate estimated seperability overapproximation (ESO). Used for the Approx algorithms.
+        /// </summary>
+        /// <param name="processorCount"></param>
+        /// <param name="degreeOfSep"></param>
+        /// <param name="blockCount"></param>
+        /// <returns></returns>
         public static double CalcESO(int processorCount, int degreeOfSep, int blockCount) => 1.0 + (degreeOfSep - 1.0) * (processorCount - 1.0) / (Math.Max(1.0, (blockCount - 1)));
 
         public static float ElasticNetPenalty(float value, float alpha) => 1.0f / 2.0f * (1 - alpha) * (value * value) + alpha * Math.Abs(value);
@@ -121,7 +128,7 @@ namespace Single_Reference
                 var xPsfHalf = xPadding / 2;
                 for (int y = 0; y < psf.GetLength(0); y++)
                     for (int x = 0; x < psf.GetLength(1); x++)
-                        if (y + +yPsfHalf + 1 < psfPadded.GetLength(0) & x + xPsfHalf + 1 < psfPadded.GetLength(1))
+                        if (y + yPsfHalf + 1 < psfPadded.GetLength(0) & x + xPsfHalf + 1 < psfPadded.GetLength(1))
                             psfPadded[y + yPsfHalf + 1, x + xPsfHalf + 1] = psf[psf.GetLength(0) - y - 1, psf.GetLength(1) - x - 1];
                 FFT.Shift(psfPadded);
                 var PSFPadded = FFT.Forward(psfPadded, 1.0);

@@ -79,7 +79,7 @@ namespace SingleMachineRuns.Experiments
                 var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
-                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
+                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + ";" + fastCD.GetAbsMax(xImage, bMap, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";"); ;
                 writer.Flush();
 
                 //check wether we can minimize the objective further with the current psf
@@ -184,7 +184,7 @@ namespace SingleMachineRuns.Experiments
                 var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
-                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
+                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + fastCD.GetAbsMax(xImage, dirtyImage, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
                 writer.Flush();
 
                 //check wether we can minimize the objective further with the current psf
@@ -221,7 +221,7 @@ namespace SingleMachineRuns.Experiments
             return info;
         }
 
-        public static void RunPSFSize()
+        public static void RunApproximationMethods()
         {
             var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
             var data = LMC.Load(folder);
@@ -270,9 +270,9 @@ namespace SingleMachineRuns.Experiments
             FitsIO.Write(psf, "psfFull.fits");
 
             //reconstruct with full psf and find reference objective value
-            var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
+            var fileHeader = "cycle;lambda;sidelobe;maxPixel;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
             var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
-            var recalculateFullPSF = false;
+            var recalculateFullPSF = true;
             if (recalculateFullPSF)
             {
                 ReconstructionInfo referenceInfo = null;
@@ -288,7 +288,7 @@ namespace SingleMachineRuns.Experiments
            
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 16 };
+            var psfCuts = new int[] { 16, 32 };
             var outFolder = "cutPsf";
             Directory.CreateDirectory(outFolder);
             outFolder += @"\";
@@ -374,7 +374,6 @@ namespace SingleMachineRuns.Experiments
             var psfGrid = IDG.GridW(data.c, data.metadata, psfVis, data.uvw, data.frequencies);
             var psf = FFT.WStackIFFTFloat(psfGrid, data.c.VisibilitiesCount);
             FFT.Shift(psf);
-            var objectiveCutoff = REFERENCE_L2_PENALTY + REFERENCE_ELASTIC_PENALTY;
 
             Directory.CreateDirectory("PSFSpeedExperimentApproxDeconv");
             FitsIO.Write(psf, "psfFull.fits");
@@ -382,10 +381,10 @@ namespace SingleMachineRuns.Experiments
 
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
-            var psfCuts = new int[] { 2, 8, 16, 32, 64, 128};
+            var psfCuts = new int[] { 2, 8, 16, 32, 64};
             var outFolder = "PSFSpeedExperimentApproxDeconv";
             outFolder += @"\";
-            var fileHeader = "cycle;lambda;sidelobe;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
+            var fileHeader = "cycle;lambda;sidelobe;maxPixel;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
             /*
             foreach (var cut in psfCuts)
             {

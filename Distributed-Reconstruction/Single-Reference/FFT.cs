@@ -30,22 +30,6 @@ namespace Single_Reference
             ifft = FftwPlanC2C.Create(FourierBuffer, ImageBuffer, DftDirection.Backwards, PlannerFlags.Default, nCores);
         }
 
-        public void CopyToImageBuffer(float[,] image)
-        {
-            for (int i = 0; i < image.GetLength(0); i++)
-                for (int j = 0; j < image.GetLength(1); i++)
-                    ImageBuffer[i, j] = image[i, j];
-        }
-
-        public Complex[,] CopyFromFourierBuffer()
-        {
-            var output = new Complex[FourierBuffer.GetLength(0), FourierBuffer.GetLength(1)];
-            for (int i = 0; i < output.GetLength(0); i++)
-                for (int j = 0; j < output.GetLength(1); i++)
-                    output[i, j] = FourierBuffer[i, j];
-            return output;
-        }
-
         /// <summary>
         /// overwrites FourierBuffer
         /// </summary>
@@ -102,7 +86,7 @@ namespace Single_Reference
                     for (int x = 0; x < image.GetLength(1); x++)
                         imageSpace[y, x] = image[y, x];
 
-                DFT.FFT(imageSpace, fourierSpace);
+                DFT.FFT(imageSpace, fourierSpace, PlannerFlags.Default, Environment.ProcessorCount);
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
@@ -142,7 +126,7 @@ namespace Single_Reference
                     for (int x = 0; x < image.GetLength(1); x++)
                         imageSpace[y, x] = image[y, x];
 
-                DFT.IFFT(imageSpace, fourierSpace);
+                DFT.IFFT(imageSpace, fourierSpace, PlannerFlags.Default, Environment.ProcessorCount);
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
@@ -162,7 +146,7 @@ namespace Single_Reference
                     for (int x = 0; x < image.GetLength(1); x++)
                         imageSpace[y, x] = image[y, x];
 
-                DFT.IFFT(imageSpace, fourierSpace);
+                DFT.IFFT(imageSpace, fourierSpace, PlannerFlags.Default, Environment.ProcessorCount);
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
@@ -186,7 +170,7 @@ namespace Single_Reference
                     }
                 }
 
-                DFT.IFFT(fourierSpace, imageSpace);
+                DFT.IFFT(fourierSpace, imageSpace, PlannerFlags.Default, Environment.ProcessorCount);
 
                 for (int y = 0; y < grid.GetLength(0); y++)
                 {
@@ -201,7 +185,6 @@ namespace Single_Reference
         }
 
         #region w-stacking methods
-
         public static float[,] WStackIFFTFloat(List<Complex[,]> grid, long visibilityCount)
         {
             var output = new float[grid[0].GetLength(0), grid[0].GetLength(1)];
@@ -210,23 +193,21 @@ namespace Single_Reference
             {
                 for (int k = 0; k < grid.Count; k++)
                 {
-                    for (int y = 0; y < grid[0].GetLength(0); y++)
+                    Parallel.For(0, grid[0].GetLength(0), (y) =>
                     {
                         for (int x = 0; x < grid[0].GetLength(1); x++)
-                        {
                             fourierSpace[y, x] = grid[k][y, x];
-                        }
-                    }
 
-                    DFT.IFFT(fourierSpace, imageSpace);
+                    });
 
-                    for (int y = 0; y < grid[0].GetLength(0); y++)
+                    DFT.IFFT(fourierSpace, imageSpace, PlannerFlags.Default, Environment.ProcessorCount);
+
+                    Parallel.For(0, grid[0].GetLength(0), (y) =>
                     {
                         for (int x = 0; x < grid[0].GetLength(1); x++)
-                        {
                             output[y, x] += (float)(imageSpace[y, x].Real / visibilityCount);
-                        }
-                    }
+                        
+                    });
                 }
             }
 
@@ -239,24 +220,24 @@ namespace Single_Reference
         /// <param name="grid"></param>
         public static void Shift(List<Complex[,]> grid)
         {
-            for (int k = 0; k < grid.Count; k++)
+            Parallel.For(0, grid.Count, (k) =>
             {
-                // Interchange entries in 4 quadrants, 1 <--> 3 and 2 <--> 4
+                // Interchange entries in 4 quadrants, 1 <-->  and 2 <--> 4
                 var n2 = grid[0].GetLength(0) / 2;
                 for (int i = 0; i < n2; i++)
                 {
                     for (int j = 0; j < n2; j++)
                     {
                         var tmp13 = grid[k][i, j];
-                        grid[k][ i, j] = grid[k][i + n2, j + n2];
-                        grid[k][ i + n2, j + n2] = tmp13;
+                        grid[k][i, j] = grid[k][i + n2, j + n2];
+                        grid[k][i + n2, j + n2] = tmp13;
 
-                        var tmp24 = grid[k][ i + n2, j];
-                        grid[k][ i + n2, j] = grid[k][ i, j + n2];
-                        grid[k][ i, j + n2] = tmp24;
+                        var tmp24 = grid[k][i + n2, j];
+                        grid[k][i + n2, j] = grid[k][i, j + n2];
+                        grid[k][i, j + n2] = tmp24;
                     }
                 }
-            }
+            });
         }
         #endregion
 
@@ -280,6 +261,25 @@ namespace Single_Reference
                     grid[i, j + n2] = tmp24;
                 }
             }
+        }
+
+        public static void Shift(AlignedArrayComplex grid)
+        {
+            var n2 = grid.GetLength(0) / 2;
+            for (int i = 0; i < n2; i++)
+            {
+                for (int j = 0; j < n2; j++)
+                {
+                    var tmp13 = grid[i, j];
+                    grid[i, j] = grid[i + n2, j + n2];
+                    grid[i + n2, j + n2] = tmp13;
+
+                    var tmp24 = grid[i + n2, j];
+                    grid[i + n2, j] = grid[i, j + n2];
+                    grid[i, j + n2] = tmp24;
+                }
+            }
+
         }
         #endregion
     }
