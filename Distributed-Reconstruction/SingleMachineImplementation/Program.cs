@@ -9,13 +9,13 @@ namespace SingleMachineRuns
         {
             //Experiments.GPUSpeed.Run();
             //Experiments.PSFSize.RunSpeedLarge();
-            Experiments.PSFSize.RunApproximationMethods();
+            //Experiments.PSFSize.RunApproximationMethods();
 
 
             //ImageGeneration.Generator.GenerateAll();
 
             //Experiments.PSFMask.Run();
-            //Experiments.ApproxParameters.Run();
+            Experiments.ApproxParameters.Run();
             //Experiments.ApproxParameters.ActiveSetDebug();
 
             //Single_Reference.DebugMethods.DebugILGPU();

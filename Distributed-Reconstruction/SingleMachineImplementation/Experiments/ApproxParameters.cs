@@ -27,73 +27,74 @@ namespace SingleMachineRuns.Experiments
             var psfCut = PSF.Cut(fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
-            var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
             var random = new Random(123);
             var approx = new ApproxFast(totalSize, psfCut, 8, 1, 0.1f, searchPercent, false, true);
 
-            var maxLipschitzCut = PSF.CalcMaxLipschitz(psfCut);
-            var lambda = (float)(lambdaInput * PSF.CalcMaxLipschitz(psfCut));
-            var lambdaTrue = (float)(lambdaInput * PSF.CalcMaxLipschitz(fullPsf));
-            var alpha = ALPHA;
-            ApproxFast.LAMBDA_TEST = lambdaTrue;
-            ApproxFast.ALPHA_TEST = alpha;
 
-            var switchedToOtherPsf = false;
-            var writer = new StreamWriter(folder + "/" + file + "_lambda.txt");
-            var data = new ApproxFast.TestingData(new StreamWriter(folder + "/" + file + ".txt"));
-            var xImage = new float[input.c.GridSize, input.c.GridSize];
-            var residualVis = input.visibilities;
-            for (int cycle = 0; cycle < 6; cycle++)
+            using(var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1))))
+            using (var bMapCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1))))
+            using (var residualsConvolver = new PaddedConvolver(totalSize, fullPsf))
             {
-                Console.WriteLine("cycle " + cycle);
-                var dirtyGrid = IDG.GridW(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
-                var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, input.c.VisibilitiesCount);
-                FFT.Shift(dirtyImage);
-                FitsIO.Write(dirtyImage, folder + "/dirty" + cycle + ".fits");
+                var currentBMapCalculator = bMapCalculator;
 
-                var minSidelobe = Residuals.GetMax(dirtyImage) * sidelobeHalf * maxLipschitzCut / alpha;
-                var minLambda = 0.0f;
+                var maxLipschitz = PSF.CalcMaxLipschitz(psfCut);
+                var lambda = (float)(lambdaInput * maxLipschitz);
+                var lambdaTrue = (float)(lambdaInput * PSF.CalcMaxLipschitz(fullPsf));
+                var alpha = ALPHA;
+                ApproxFast.LAMBDA_TEST = lambdaTrue;
+                ApproxFast.ALPHA_TEST = alpha;
 
-                var dirtyCopy = Copy(dirtyImage);
-                var xCopy = Copy(xImage);
-                //var residualsConvolver = new PaddedConvolver(PSF.CalcPaddedFourierConvolution(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1)));
-                var residualsConvolver = new PaddedConvolver(totalSize, fullPsf);
-                for (int minorCycle = 0; minorCycle < minorCycles; minorCycle++)
+                var switchedToOtherPsf = false;
+                var writer = new StreamWriter(folder + "/" + file + "_lambda.txt");
+                var data = new ApproxFast.TestingData(new StreamWriter(folder + "/" + file + ".txt"));
+                var xImage = new float[input.c.GridSize, input.c.GridSize];
+                var residualVis = input.visibilities;
+                for (int cycle = 0; cycle < 6; cycle++)
                 {
-                    FitsIO.Write(dirtyImage, folder + "/dirtyMinor_" + minorCycle + ".fits");
-                    var maxDirty = Residuals.GetMax(dirtyImage);
-                    var bMap = bMapCalculator.Convolve(dirtyImage);
-                    var maxB = Residuals.GetMax(bMap);
-                    var correctionFactor = Math.Max(maxB / (maxDirty * maxLipschitzCut), 1.0f);
-                    var currentSideLobe = maxB * maxSidelobe * correctionFactor;
-                    var currentLambda = (float)Math.Max(currentSideLobe / alpha, lambda);
+                    Console.WriteLine("cycle " + cycle);
+                    var dirtyGrid = IDG.GridW(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
+                    var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, input.c.VisibilitiesCount);
+                    FFT.Shift(dirtyImage);
+                    FitsIO.Write(dirtyImage, folder + "/dirty" + cycle + ".fits");
 
-                    if (minorCycle == 0) 
-                        minLambda = (float)(minSidelobe * correctionFactor);
-
-                    if (currentLambda < minLambda)
+                    var minLambda = 0.0f;
+                    var dirtyCopy = Copy(dirtyImage);
+                    var xCopy = Copy(xImage);
+                    //var residualsConvolver = new PaddedConvolver(PSF.CalcPaddedFourierConvolution(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1)));
+                    for (int minorCycle = 0; minorCycle < minorCycles; minorCycle++)
                     {
-                        currentLambda = minLambda;
-                        minorCycle = minorCycles - 1;
-                    }
-                       
+                        FitsIO.Write(dirtyImage, folder + "/dirtyMinor_" + minorCycle + ".fits");
+                        var maxDirty = Residuals.GetMax(dirtyImage);
+                        var bMap = currentBMapCalculator.Convolve(dirtyImage);
+                        var maxB = Residuals.GetMax(bMap);
+                        var correctionFactor = Math.Max(maxB / (maxDirty * maxLipschitz), 1.0f);
+                        var currentSideLobe = maxB * maxSidelobe * correctionFactor;
+                        var currentLambda = (float)Math.Max(currentSideLobe / alpha, lambda);
 
-                    writer.WriteLine("cycle" + ";" + currentLambda + ";"+ minLambda);
-                    writer.Flush();
-                    approx.DeconvolveTest(data, cycle, minorCycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 15, 1e-5f);
-                    FitsIO.Write(xImage, folder + "/xImageMinor_" + minorCycle +".fits");
+                        if (minorCycle == 0)
+                            minLambda = (float)(maxB * sidelobeHalf * correctionFactor / alpha);
 
-                    if (currentLambda == lambda & !switchedToOtherPsf)
-                    {
-                        approx.ResetAMap(fullPsf);
-                        lambda = lambdaTrue;
-                        switchedToOtherPsf = true;
-                        writer.WriteLine("switched");
+                        if (currentLambda < minLambda)
+                            currentLambda = minLambda;
+
+                        writer.WriteLine(cycle + ";" + minorCycle + ";" + currentLambda + ";" + minLambda);
                         writer.Flush();
-                    }
+                        approx.DeconvolveTest(data, cycle, minorCycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 15, 1e-5f);
+                        FitsIO.Write(xImage, folder + "/xImageMinor_" + minorCycle + ".fits");
 
-                    if(minorCycle + 1 < minorCycles)
-                    {
+                        if (currentLambda == lambda & !switchedToOtherPsf)
+                        {
+                            approx.ResetAMap(fullPsf);
+                            currentBMapCalculator = bMapCalculator2;
+                            lambda = lambdaTrue;
+                            switchedToOtherPsf = true;
+                            writer.WriteLine("switched");
+                            writer.Flush();
+                        }
+
+                        if (currentLambda == lambda | currentLambda == minLambda)
+                            break;
+
                         Console.WriteLine("resetting residuals!!");
                         //reset dirtyImage with full PSF
                         var residualsUpdate = new float[xImage.GetLength(0), xImage.GetLength(1)];
@@ -107,21 +108,21 @@ namespace SingleMachineRuns.Experiments
                         Parallel.For(0, xCopy.GetLength(0), (i) =>
                         {
                             for (int j = 0; j < xCopy.GetLength(1); j++)
-                            {
                                 dirtyImage[i, j] = dirtyCopy[i, j] - residualsUpdate[i, j];
-                            }
+                            
                         });
                     }
-                }
-                FitsIO.Write(xImage, folder + "/xImage_" + cycle + ".fits");
+                    FitsIO.Write(xImage, folder + "/xImage_" + cycle + ".fits");
 
-                FFT.Shift(xImage);
-                var xGrid = FFT.Forward(xImage);
-                FFT.Shift(xImage);
-                var modelVis = IDG.DeGridW(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
-                residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
+                    FFT.Shift(xImage);
+                    var xGrid = FFT.Forward(xImage);
+                    FFT.Shift(xImage);
+                    var modelVis = IDG.DeGridW(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
+                    residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
+                }
+
+                writer.Close();
             }
-            writer.Close();
         }
 
         private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated, float randomPercent, float searchPercent, float lambdaInput)
@@ -264,7 +265,7 @@ namespace SingleMachineRuns.Experiments
                 var file = "Grid_cpu" + 8 + "block" + 1+"search"+search;
                 var currentFolder = outFolder + file;
                 Directory.CreateDirectory(currentFolder);
-                Reconstruct(data, 32, psf, currentFolder, file, 8, 1, true, 0f, search, LAMBDA);
+                //Reconstruct(data, 32, psf, currentFolder, file, 8, 1, true, 0f, search, LAMBDA);
             }
 
             /*var lambdas = new float[] {0.8f, 0.6f, 0.4f};

@@ -731,7 +731,7 @@ namespace Single_Reference.Deconvolution
             {
                 times = new List<double>();
                 this.writer = writer;
-                writer.WriteLine("idx;cycle;minorCycle;seconds;objectiveNormal;objectiveAccelerated;L2GExp;L2GCorr;processorCount;blockSize") ;
+                writer.WriteLine("idx;cycle;minorCycle;seconds;objectiveNormal;objectiveAccelerated;L2GExp;L2GCorr;processorCount;blockSize;restarting") ;
             }
             public void Write<T>(double time, IEnumerable<T> line)
             {
@@ -748,14 +748,6 @@ namespace Single_Reference.Deconvolution
             Stopwatch watch = new Stopwatch();
             var xExplore = Copy(xImage);
             var xCorrection = new float[xImage.GetLength(0), xImage.GetLength(1)];
-            var coldStart = true;
-            for (int i = 0; i < xExplore.GetLength(0); i++)
-                for (int j = 0; j < xExplore.GetLength(1); j++)
-                    if (xExplore[i, j] != 0.0f)
-                    {
-                        coldStart = false;
-                        break;
-                    }
 
             //calculate gradients for each pixel
             var PSFCorr = PSF.CalcPaddedFourierCorrelation(this.psf, new Rectangle(0, 0, residuals.GetLength(0), residuals.GetLength(1)));
@@ -772,7 +764,7 @@ namespace Single_Reference.Deconvolution
 
             var objectivesFirst = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, shared.XExpl, LAMBDA_TEST, ALPHA_TEST, psf, shared.GExpl);
             var timeOffset = data.times.Count == 0 ? 0.0 : data.times.Last();
-            data.Write(timeOffset, new object[] { major, minor, timeOffset, objectivesFirst.Item1, objectivesFirst.Item2, Residuals.CalcPenalty(shared.GExpl), GetAbsMax(shared.XExpl, shared.GExpl, shared.AMap, shared.Lambda, shared.Alpha)});
+            data.Write(timeOffset, new object[] { major, minor, timeOffset, objectivesFirst.Item1, objectivesFirst.Item2, Residuals.CalcPenalty(shared.GExpl), GetAbsMax(shared.XExpl, shared.GExpl, shared.AMap, LAMBDA_TEST, ALPHA_TEST), false});
 
             var theta = DeconvolveConcurrentTest(data, major, minor, timeOffset, shared, maxIteration, epsilon, xImage, residuals, psf, psfFull);
 
@@ -857,8 +849,6 @@ namespace Single_Reference.Deconvolution
                 var objectives = EstimateObjectives(xImage, residuals, psfFull, shared.XExpl, xAccelerated, LAMBDA_TEST, ALPHA_TEST, psf, shared.GExpl);
                 var gExp2 = Residuals.CalcPenalty(shared.GExpl);
                 var gCorr2 = Residuals.CalcPenalty(shared.GCorr);
-                data.Write(timeOffset + watch.Elapsed.TotalSeconds, new object[] { major, minor, timeOffset + watch.Elapsed.TotalSeconds, objectives.Item1, objectives.Item2, deconvolvers.Max(d => d.xDiffMax), GetAbsMax(shared.XExpl, shared.GExpl, shared.AMap, shared.Lambda, shared.Alpha) });
-                Console.WriteLine("absMaxFactor = " + lastAbsMax / deconvolvers.Max(d => d.xDiffMax));
                 //FitsIO.Write(shared.XExpl, "intermediate"+iter+".fits");
                 //FitsIO.Write(shared.XCorr, "intermediateCorr.fits");
                 var currentAbsMax = GetAbsMax(shared.XExpl, shared.GExpl, shared.AMap, shared.Lambda, shared.Alpha);
@@ -866,6 +856,9 @@ namespace Single_Reference.Deconvolution
                 //check whether the active set probably contains all pixel values
                 var activeSetValid = currentAbsMax > lastAbsMax && lastAbsMax / deconvolvers.Max(d => d.xDiffMax) > concurrentFactor;
                 activeSetValid |=  lastAbsMax / deconvolvers.Max(d => d.xDiffMax) > concurrentFactor * 2;
+
+                data.Write(timeOffset + watch.Elapsed.TotalSeconds, new object[] { major, minor, timeOffset + watch.Elapsed.TotalSeconds, objectives.Item1, objectives.Item2, deconvolvers.Max(d => d.xDiffMax), currentAbsMax, shared.testRestart > 0.0f | activeSetValid });
+                Console.WriteLine("absMaxFactor = " + lastAbsMax / deconvolvers.Max(d => d.xDiffMax));
 
                 //restart acceleration if the acceleration benefits from it (.testRestart > 0.0) or if the active set is not valid anymore
                 if (shared.testRestart > 0.0f | activeSetValid)
