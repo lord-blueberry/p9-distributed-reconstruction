@@ -155,7 +155,12 @@ namespace SingleMachineRuns.Experiments
                 fastCD.ResetAMap(fullPsf, cutFactor);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
-            var lambda = LAMBDA_GLOBAL * fastCD.MaxLipschitz;
+            Console.WriteLine("LipschitzConstants");
+            Console.WriteLine(fastCD.MaxLipschitz);
+            Console.WriteLine(PSF.CalcMaxLipschitz(fullPsf));
+            Console.WriteLine(PSF.CalcMaxLipschitz(psfBMap));
+
+            var lambda = (float)(LAMBDA_GLOBAL * PSF.CalcMaxLipschitz(psfBMap));
             var lambdaTrue =(float)(LAMBDA_GLOBAL * PSF.CalcMaxLipschitz(fullPsf));
 
             var xImage = new float[input.c.GridSize, input.c.GridSize];
@@ -223,6 +228,7 @@ namespace SingleMachineRuns.Experiments
 
         public static void RunApproximationMethods()
         {
+            
             var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
             var data = LMC.Load(folder);
             var rootFolder = Directory.GetCurrentDirectory();
@@ -247,6 +253,7 @@ namespace SingleMachineRuns.Experiments
             double cellSize = 1.5 / 3600.0 * PI / 180.0;
             int wLayerCount = 24;
             double wStep = maxW / (wLayerCount);
+
             data.c = new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
             data.metadata = Partitioner.CreatePartition(data.c, data.uvw, data.frequencies);
             data.visibilitiesCount = visibilitiesCount;
@@ -265,9 +272,14 @@ namespace SingleMachineRuns.Experiments
             var psf = FFT.WStackIFFTFloat(psfGrid, data.c.VisibilitiesCount);
             FFT.Shift(psf);
 
+
+
             Directory.CreateDirectory("PSFSizeExperimentLarge");
             Directory.SetCurrentDirectory("PSFSizeExperimentLarge");
             FitsIO.Write(psf, "psfFull.fits");
+
+            Console.WriteLine(PSF.CalcMaxLipschitz(psf));
+            Console.WriteLine(visCount2);
 
             //reconstruct with full psf and find reference objective value
             var fileHeader = "cycle;lambda;sidelobe;maxPixel;dataPenalty;regPenalty;currentRegPenalty;converged;iterCount;ElapsedTime";
@@ -285,7 +297,6 @@ namespace SingleMachineRuns.Experiments
                 objectiveCutoff = referenceInfo.lastDataPenalty + referenceInfo.lastRegPenalty;
             }
 
-           
             //tryout with simply cutting the PSF
             ReconstructionInfo experimentInfo = null;
             var psfCuts = new int[] { 16, 32 };
@@ -357,8 +368,9 @@ namespace SingleMachineRuns.Experiments
                     for (int k = 0; k < data.flags.GetLength(2); k++)
                         if (!data.flags[i, j, k])
                             visCount2++;
+            double wStep = maxW / (wLayerCount);
 
-            data.c = new GriddingConstants(data.visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, maxW);
+            data.c = new GriddingConstants(data.visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
             data.metadata = Partitioner.CreatePartition(data.c, data.uvw, data.frequencies);
 
             var psfVis = new Complex[data.uvw.GetLength(0), data.uvw.GetLength(1), data.frequencies.Length];

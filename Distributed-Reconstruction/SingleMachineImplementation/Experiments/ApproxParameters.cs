@@ -18,7 +18,6 @@ namespace SingleMachineRuns.Experiments
     class ApproxParameters
     {
         static float LAMBDA = 1.0f;
-        //static float LAMBDA = 0.8f;
         static float ALPHA = 0.01f;
 
         private static void ReconstructMinorCycle(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int minorCycles, float searchPercent, float lambdaInput)
@@ -29,7 +28,6 @@ namespace SingleMachineRuns.Experiments
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
             var random = new Random(123);
             var approx = new ApproxFast(totalSize, psfCut, 8, 1, 0.1f, searchPercent, false, true);
-
 
             using(var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1))))
             using (var bMapCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1))))
@@ -60,6 +58,7 @@ namespace SingleMachineRuns.Experiments
                     var minLambda = 0.0f;
                     var dirtyCopy = Copy(dirtyImage);
                     var xCopy = Copy(xImage);
+                    var currentLambda = 0f;
                     //var residualsConvolver = new PaddedConvolver(PSF.CalcPaddedFourierConvolution(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1)));
                     for (int minorCycle = 0; minorCycle < minorCycles; minorCycle++)
                     {
@@ -69,7 +68,7 @@ namespace SingleMachineRuns.Experiments
                         var maxB = Residuals.GetMax(bMap);
                         var correctionFactor = Math.Max(maxB / (maxDirty * maxLipschitz), 1.0f);
                         var currentSideLobe = maxB * maxSidelobe * correctionFactor;
-                        var currentLambda = (float)Math.Max(currentSideLobe / alpha, lambda);
+                        currentLambda = (float)Math.Max(currentSideLobe / alpha, lambda);
 
                         if (minorCycle == 0)
                             minLambda = (float)(maxB * sidelobeHalf * correctionFactor / alpha);
@@ -81,16 +80,6 @@ namespace SingleMachineRuns.Experiments
                         writer.Flush();
                         approx.DeconvolveTest(data, cycle, minorCycle, xImage, dirtyImage, psfCut, fullPsf, currentLambda, alpha, random, 15, 1e-5f);
                         FitsIO.Write(xImage, folder + "/xImageMinor_" + minorCycle + ".fits");
-
-                        if (currentLambda == lambda & !switchedToOtherPsf)
-                        {
-                            approx.ResetAMap(fullPsf);
-                            currentBMapCalculator = bMapCalculator2;
-                            lambda = lambdaTrue;
-                            switchedToOtherPsf = true;
-                            writer.WriteLine("switched");
-                            writer.Flush();
-                        }
 
                         if (currentLambda == lambda | currentLambda == minLambda)
                             break;
@@ -112,6 +101,17 @@ namespace SingleMachineRuns.Experiments
                             
                         });
                     }
+
+                    if (currentLambda == lambda & !switchedToOtherPsf)
+                    {
+                        approx.ResetAMap(fullPsf);
+                        currentBMapCalculator = bMapCalculator2;
+                        lambda = lambdaTrue;
+                        switchedToOtherPsf = true;
+                        writer.WriteLine("switched");
+                        writer.Flush();
+                    }
+
                     FitsIO.Write(xImage, folder + "/xImage_" + cycle + ".fits");
 
                     FFT.Shift(xImage);
@@ -204,15 +204,9 @@ namespace SingleMachineRuns.Experiments
                 for (int j = 0; j < data.uvw.GetLength(1); j++)
                     maxW = Math.Max(maxW, Math.Abs(data.uvw[i, j, 2]));
             maxW = Partitioner.MetersToLambda(maxW, data.frequencies[data.frequencies.Length - 1]);
+            double wStep = maxW / (wLayerCount);
 
-            var visCount2 = 0;
-            for (int i = 0; i < data.flags.GetLength(0); i++)
-                for (int j = 0; j < data.flags.GetLength(1); j++)
-                    for (int k = 0; k < data.flags.GetLength(2); k++)
-                        if (!data.flags[i, j, k])
-                            visCount2++;
-
-            data.c = new GriddingConstants(data.visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, maxW);
+            data.c = new GriddingConstants(data.visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
             data.metadata = Partitioner.CreatePartition(data.c, data.uvw, data.frequencies);
 
             var psfVis = new Complex[data.uvw.GetLength(0), data.uvw.GetLength(1), data.frequencies.Length];
@@ -228,10 +222,9 @@ namespace SingleMachineRuns.Experiments
             var psfGrid = IDG.GridW(data.c, data.metadata, psfVis, data.uvw, data.frequencies);
             var psf = FFT.WStackIFFTFloat(psfGrid, data.c.VisibilitiesCount);
             FFT.Shift(psf);
-            
 
             Directory.CreateDirectory("ApproxTest/cpu");
-            FitsIO.Write(psf, "psfFull.fits");
+            FitsIO.Write(psf, "psfFull_approx.fits");
 
             //tryout with simply cutting the PSF
             var outFolder = "ApproxTest/";
@@ -278,22 +271,6 @@ namespace SingleMachineRuns.Experiments
             }*/
 
 
-        }
-
-        public static void ActiveSetDebug()
-        {
-            
-            var psf = FitsIO.ReadImage("ApproxTest/psfFull.fits");
-            var dirty = FitsIO.ReadImage("ApproxTest/dirty7.fits");
-            var xImage = FitsIO.ReadImage("ApproxTest/xImage_7.fits");
-            var psfCut = PSF.Cut(psf, 8);
-            var lambda = 130.84416f;
-
-            var totalSize = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
-            var PSFCorr = PSF.CalcPaddedFourierCorrelation(psfCut, new Rectangle(0, 0, dirty.GetLength(0), dirty.GetLength(1)));
-            var gExplore = Residuals.CalcGradientMap(dirty, PSFCorr, new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
-            FitsIO.Write(gExplore, "bMapDebug.fits");
-            ApproxFast.GetActiveSet(xImage, gExplore, 8, 8, lambda, ALPHA, PSF.CalcAMap(psf, totalSize));
         }
     }
 }
