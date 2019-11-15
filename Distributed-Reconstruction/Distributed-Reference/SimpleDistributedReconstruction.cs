@@ -106,7 +106,7 @@ namespace DistributedReconstruction
                 comm.Broadcast(ref modelGrid, 0);
 
                 var modelVis = IDG.DeGrid(c, metadata, modelGrid, local.UVW, local.Frequencies);
-                residualVis = IDG.Substract(local.Visibilities, modelVis, local.Flags);
+                residualVis = Visibilities.Substract(local.Visibilities, modelVis, local.Flags);
             }
             writer.Close();
 

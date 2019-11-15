@@ -10,15 +10,17 @@ namespace Single_Reference
     public static class Common
     {
         /// <summary>
-        /// Calculate estimated seperability overapproximation (ESO). Used for the Approx algorithms.
+        /// Calculate estimated seperability overapproximation (ESO). Used for the Approx/PCDM algorithms.
         /// </summary>
         /// <param name="processorCount"></param>
         /// <param name="degreeOfSep"></param>
         /// <param name="blockCount"></param>
         /// <returns></returns>
-        public static double CalcESO(int processorCount, int degreeOfSep, int blockCount) => 1.0 + (degreeOfSep - 1.0) * (processorCount - 1.0) / (Math.Max(1.0, (blockCount - 1)));
+        public static double CalcESO(int processorCount, int degreeOfSep, int blockCount) => 
+            1.0 + (degreeOfSep - 1.0) * (processorCount - 1.0) / (Math.Max(1.0, (blockCount - 1)));
 
-        public static double ElasticNetPenalty(float value, float alpha) => 1.0f / 2.0f * (1 - alpha) * (value * value) + alpha * Math.Abs(value);
+        public static double ElasticNetPenalty(float value, float alpha) => 
+            1.0f / 2.0f * (1 - alpha) * (value * value) + alpha * Math.Abs(value);
 
         public static class ElasticNet
         {
@@ -343,6 +345,7 @@ namespace Single_Reference
                     output[i, j] = image[i, j];
             return output;
         }
+
         private static float[,] Pad(float[,] image, int yPadding, int xPadding)
         {
             var yPsfHalf = yPadding / 2;

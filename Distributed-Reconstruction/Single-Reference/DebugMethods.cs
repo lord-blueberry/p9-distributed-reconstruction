@@ -100,7 +100,7 @@ namespace Single_Reference
 
                 watchBackwards.Start();
                 var modelVis = IDG.ToVisibilities(c, metadata, xImage, uvw, frequencies);
-                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                residualVis = Visibilities.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
             }
             watchBackwards.Stop();
@@ -173,7 +173,7 @@ namespace Single_Reference
 
                 watchBackwards.Start();
                 var modelVis = IDG.ToVisibilities(c, metadata, xImage, uvw, frequencies);
-                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                residualVis = Visibilities.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
             }
             watchBackwards.Stop();
@@ -274,7 +274,7 @@ namespace Single_Reference
                 var xGrid = FFT.Forward(xImage);
                 FFT.Shift(xImage);
                 var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
-                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                residualVis = Visibilities.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
             }
             
@@ -372,7 +372,7 @@ namespace Single_Reference
                 var xGrid = FFT.Forward(xImage);
                 FFT.Shift(xImage);
                 var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
-                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                residualVis = Visibilities.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
 
                 var hello = FFT.Forward(xImage, 1.0);

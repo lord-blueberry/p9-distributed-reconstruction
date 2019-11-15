@@ -112,30 +112,6 @@ namespace Single_Reference.IDGSequential
             return visibilities;
         }
 
-        public static Complex[,,] Substract(Complex[,,] vis0, Complex[,,] vis1, bool[,,] flag)
-        {
-            var residualVis = new Complex[vis0.GetLength(0), vis0.GetLength(1), vis0.GetLength(2)];
-            for (int i = 0; i < vis0.GetLength(0); i++)
-                for (int j = 0; j < vis0.GetLength(1); j++)
-                    for (int k = 0; k < vis0.GetLength(2); k++)
-                        if (!flag[i, j, k])
-                            residualVis[i, j, k] = vis0[i, j, k] - vis1[i, j, k];
-                        else
-                            residualVis[i, j, k] = 0;
-
-            return residualVis;
-        }
-
-        public static Complex[,] Multiply(Complex[,] visGrid0, Complex[,] visGrid1)
-        {
-            var outputVis = new Complex[visGrid0.GetLength(0), visGrid0.GetLength(1)];
-            for (int i = 0; i < visGrid0.GetLength(0); i++)
-                for (int j = 0; j < visGrid0.GetLength(1); j++)
-                            outputVis[i, j] = visGrid0[i, j] * visGrid1[i, j];
-
-            return outputVis;
-        }
-
         public static List<Complex[,]> GridW(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);

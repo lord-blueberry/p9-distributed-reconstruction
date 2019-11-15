@@ -122,7 +122,7 @@ namespace SingleMachineRuns.Experiments
                     var xGrid = FFT.Forward(xImage);
                     FFT.Shift(xImage);
                     var modelVis = IDG.DeGridW(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
-                    residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
+                    residualVis = Visibilities.Substract(input.visibilities, modelVis, input.flags);
                 }
                 else
                 {
@@ -154,11 +154,6 @@ namespace SingleMachineRuns.Experiments
             if(startWithFullPSF)
                 fastCD.ResetAMap(fullPsf, cutFactor);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
-
-            Console.WriteLine("LipschitzConstants");
-            Console.WriteLine(fastCD.MaxLipschitz);
-            Console.WriteLine(PSF.CalcMaxLipschitz(fullPsf));
-            Console.WriteLine(PSF.CalcMaxLipschitz(psfBMap));
 
             var lambda = (float)(LAMBDA_GLOBAL * PSF.CalcMaxLipschitz(psfBMap));
             var lambdaTrue =(float)(LAMBDA_GLOBAL * PSF.CalcMaxLipschitz(fullPsf));
@@ -209,7 +204,7 @@ namespace SingleMachineRuns.Experiments
                     var xGrid = FFT.Forward(xImage);
                     FFT.Shift(xImage);
                     var modelVis = IDG.DeGridW(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
-                    residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
+                    residualVis = Visibilities.Substract(input.visibilities, modelVis, input.flags);
                 }
                 else
                 {
