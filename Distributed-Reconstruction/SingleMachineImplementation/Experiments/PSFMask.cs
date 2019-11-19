@@ -77,7 +77,7 @@ namespace SingleMachineRuns.Experiments
                     var xGrid = FFT.Forward(xImage);
                     FFT.Shift(xImage);
                     var modelVis = IDG.DeGridW(input.c, input.metadata, xGrid, input.uvw, input.frequencies);
-                    residualVis = IDG.Substract(input.visibilities, modelVis, input.flags);
+                    residualVis = Visibilities.Substract(input.visibilities, modelVis, input.flags);
                 }
                 else
                 {

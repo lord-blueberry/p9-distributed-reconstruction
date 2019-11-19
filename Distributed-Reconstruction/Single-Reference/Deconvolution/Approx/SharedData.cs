@@ -9,10 +9,6 @@ namespace Single_Reference.Deconvolution.Approx
         public float Lambda { get; set; }
         public float Alpha { get; set; }
 
-        public float Alpha2 { get; set; }
-
-        public int YBlockSize { get; set; }
-        public int XBlockSize { get; set; }
         public int ProcessorCount { get; private set; }
 
         public int DegreeOfSeperability { get; private set; }
@@ -24,21 +20,17 @@ namespace Single_Reference.Deconvolution.Approx
         public float[,] GExpl { get; private set; }
         public float[,] GCorr { get; private set; }
 
-        public Random Random { get; private set; }
         public List<Tuple<int, int>> ActiveSet { get; set; }
         public int[] BlockLock { get; set; }
 
         public int MaxConcurrentIterations { get; set; }
-        public float testRestart;
-        public float maxLipschitz;
-        public float theta0;
-        public int asyncFinished = 0;
+        public float TestRestart;
+        public float Theta0 { get; set; }
+        public int AsyncFinished = 0;
 
         public SharedData(
             float lambda,
             float alpha,
-            int yBlockSize,
-            int xBlockSize,
             int processorCount,
 
             int degreeOfSep,
@@ -48,14 +40,10 @@ namespace Single_Reference.Deconvolution.Approx
             float[,] xExpl,
             float[,] xCorr,
             float[,] gExpl,
-            float[,] gCorr,
-
-            Random rand)
+            float[,] gCorr)
         {
             Lambda = lambda;
             Alpha = alpha;
-            YBlockSize = yBlockSize;
-            XBlockSize = xBlockSize;
             ProcessorCount = processorCount;
 
             DegreeOfSeperability = degreeOfSep;
@@ -66,9 +54,6 @@ namespace Single_Reference.Deconvolution.Approx
             XCorr = xCorr;
             GExpl = gExpl;
             GCorr = gCorr;
-            Random = rand;
-
-            this.Alpha2 = 0f;
         }
     }
 }

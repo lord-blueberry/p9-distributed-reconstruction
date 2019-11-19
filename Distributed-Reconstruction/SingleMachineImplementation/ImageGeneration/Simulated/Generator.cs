@@ -85,7 +85,7 @@ namespace SingleMachineRuns.ImageGeneration.Simulated
                 var xGrid = FFT.Forward(reconstruction);
                 FFT.Shift(reconstruction);
                 var modelVis = IDG.DeGrid(c, metadata, xGrid, data.UVW, data.Frequencies);
-                residualVis = IDG.Substract(data.Visibilities, modelVis, data.Flags);
+                residualVis = Visibilities.Substract(data.Visibilities, modelVis, data.Flags);
             }
 
             //FitsIO.Write(reconstruction, Path.Combine(outputFolder,"xImage.fits"));

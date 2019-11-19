@@ -472,7 +472,7 @@ namespace Single_Reference
                 var model = FFT.WStackIFFTFloat(modelGrid, c.VisibilitiesCount);
                 FFT.Shift(model);
                 FitsIO.Write(model, "model_" + cycle + ".fits");
-                residualVis = IDG.Substract(visibilities, modelVis, flags);
+                residualVis = Visibilities.Substract(visibilities, modelVis, flags);
             }
         }
         #endregion

@@ -16,7 +16,8 @@ namespace Single_Reference.Deconvolution.Approx
         readonly int id;
         readonly int totalNodes;
         float searchPercentage;
-        public float xDiffMax { get; set; }
+        public float DiffMax { get; set; }
+        public int AsyncIterations { get; set; }
 
         readonly Random random;
 
@@ -39,15 +40,15 @@ namespace Single_Reference.Deconvolution.Approx
         {
             var update = 0.0f;
             var blockCount = shared.XExpl.Length;
-            //var blockCount = shared.ActiveSet.Count;
             float eta = 1.0f / blockCount;
+            DiffMax = 0.0f;
 
             var beta = CalcESO(shared.ProcessorCount, shared.DegreeOfSeperability, blockCount);
-            var continueAsync = Thread.VolatileRead(ref shared.asyncFinished) == 0;
+            var continueAsync = Thread.VolatileRead(ref shared.AsyncFinished) == 0;
             for (int inner = 0; inner < shared.MaxConcurrentIterations & continueAsync; inner++)
             {
-                continueAsync = Thread.VolatileRead(ref shared.asyncFinished) == 0;
-                var stepFactor = (float)beta * Theta / shared.theta0;
+                continueAsync = Thread.VolatileRead(ref shared.AsyncFinished) == 0;
+                var stepFactor = (float)beta * Theta / shared.Theta0;
                 var theta2 = Theta * Theta;
                 var blockIdx = GetPseudoRandomBlock(stepFactor, theta2);
                 var blockSample = shared.ActiveSet[blockIdx];
@@ -55,12 +56,12 @@ namespace Single_Reference.Deconvolution.Approx
                 var xPixel = blockSample.Item2;
                 var step = shared.AMap[yPixel, xPixel] * stepFactor;
 
-                var correctionFactor = -(1.0f - Theta / shared.theta0) / theta2;
+                var correctionFactor = -(1.0f - Theta / shared.Theta0) / theta2;
 
                 var xExpl = Thread.VolatileRead(ref shared.XExpl[yPixel, xPixel]);
                 update = theta2 * Thread.VolatileRead(ref shared.GCorr[yPixel, xPixel]) + Thread.VolatileRead(ref shared.GExpl[yPixel, xPixel]) + xExpl * step;
                 update = ElasticNet.ProximalOperator(update, step, shared.Lambda, shared.Alpha) - xExpl;
-                xDiffMax = Math.Max(xDiffMax, Math.Abs(update));
+                DiffMax = Math.Max(DiffMax, Math.Abs(update));
 
                 //update gradients
                 if (0.0f != Math.Abs(update))
@@ -71,19 +72,20 @@ namespace Single_Reference.Deconvolution.Approx
                     var newXExplore = oldExplore + update;
 
                     Thread.VolatileWrite(ref shared.XExpl[yPixel, xPixel], shared.XExpl[yPixel, xPixel] + update);
-                    Thread.VolatileWrite(ref shared.XCorr[yPixel, xPixel], shared.XCorr[yPixel, xPixel] + update * correctionFactor);
+                    //Thread.VolatileWrite(ref shared.XCorr[yPixel, xPixel], shared.XCorr[yPixel, xPixel] + update * correctionFactor);
 
                     //not 100% sure this is the correct generalization from single pixel thread rule to block rule
                     var testRestartUpdate = (update) * (newXExplore - (theta2 * oldXCorr + oldExplore));
-                    ConcurrentUpdateTestRestart(ref shared.testRestart, eta, testRestartUpdate);
+                    //ConcurrentUpdateTestRestart(ref shared.TestRestart, eta, testRestartUpdate);
                 }
 
+                AsyncIterations++;
                 //unlockBlock
                 Thread.VolatileWrite(ref shared.BlockLock[blockIdx], 0);
                 Theta = (float)(Math.Sqrt((theta2 * theta2) + 4 * (theta2)) - theta2) / 2.0f;
             }
 
-            Thread.VolatileWrite(ref shared.asyncFinished, 1);
+            Thread.VolatileWrite(ref shared.AsyncFinished, 1);
         }
 
         private int GetPseudoRandomBlock(float stepFactor, float theta2)

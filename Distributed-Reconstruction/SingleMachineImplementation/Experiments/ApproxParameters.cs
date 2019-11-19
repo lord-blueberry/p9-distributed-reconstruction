@@ -17,17 +17,17 @@ namespace SingleMachineRuns.Experiments
 {
     class ApproxParameters
     {
-        static float LAMBDA = 1.0f;
-        static float ALPHA = 0.01f;
+        const float LAMBDA = 1.0f;
+        const float ALPHA = 0.01f;
 
-        private static void ReconstructMinorCycle(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int minorCycles, float searchPercent, float lambdaInput)
+        private static void ReconstructMinorCycle(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int minorCycles, float searchPercent, bool useAccelerated = true)
         {
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var psfCut = PSF.Cut(fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
             var random = new Random(123);
-            var approx = new ApproxFast(totalSize, psfCut, 8, 1, 0.1f, searchPercent, false, true);
+            var approx = new ApproxFast(totalSize, psfCut, 8, 4, 0.1f, searchPercent, false, useAccelerated);
 
             using(var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1))))
             using (var bMapCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1))))
@@ -36,8 +36,8 @@ namespace SingleMachineRuns.Experiments
                 var currentBMapCalculator = bMapCalculator;
 
                 var maxLipschitz = PSF.CalcMaxLipschitz(psfCut);
-                var lambda = (float)(lambdaInput * maxLipschitz);
-                var lambdaTrue = (float)(lambdaInput * PSF.CalcMaxLipschitz(fullPsf));
+                var lambda = (float)(LAMBDA * maxLipschitz);
+                var lambdaTrue = (float)(LAMBDA * PSF.CalcMaxLipschitz(fullPsf));
                 var alpha = ALPHA;
                 ApproxFast.LAMBDA_TEST = lambdaTrue;
                 ApproxFast.ALPHA_TEST = alpha;
@@ -125,7 +125,7 @@ namespace SingleMachineRuns.Experiments
             }
         }
 
-        private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated, float randomPercent, float searchPercent, float lambdaInput)
+        private static void Reconstruct(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int threads, int blockSize, bool accelerated, float randomPercent, float searchPercent)
         {
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var psfCut = PSF.Cut(fullPsf, cutFactor);
@@ -135,8 +135,8 @@ namespace SingleMachineRuns.Experiments
             var approx = new ApproxFast(totalSize, psfCut, threads, blockSize, randomPercent, searchPercent, false, true);
 
             var maxLipschitzCut = PSF.CalcMaxLipschitz(psfCut);
-            var lambda = (float)(lambdaInput * PSF.CalcMaxLipschitz(psfCut));
-            var lambdaTrue = (float)(lambdaInput * PSF.CalcMaxLipschitz(fullPsf));
+            var lambda = (float)(LAMBDA * PSF.CalcMaxLipschitz(psfCut));
+            var lambdaTrue = (float)(LAMBDA * PSF.CalcMaxLipschitz(fullPsf));
             var alpha = ALPHA;
             ApproxFast.LAMBDA_TEST = lambdaTrue;
             ApproxFast.ALPHA_TEST = alpha;
@@ -186,6 +186,63 @@ namespace SingleMachineRuns.Experiments
 
         }
 
+        private static void RunProcessor(Data input,float[,] fullPsf, string outFolder)
+        {
+            var cpus = new int[] { 4, 8, 16, 32 };
+            foreach (var cpu in cpus)
+            {
+                var file = "cpu" + cpu;
+                var currentFolder = Path.Combine(outFolder, "CPU");
+                Directory.CreateDirectory(currentFolder);
+                Reconstruct(input, cpu, fullPsf, currentFolder, file, 8, 1, true, 0f, 0.1f);
+            }
+        }
+
+        private static void RunPsfSize(Data input, float[,] fullPsf, string outFolder)
+        {
+            var psfTest = new int[] { 8, 16, 32 };
+            foreach (var psfSize in psfTest)
+            {
+                var file = "PsfSize" + psfSize;
+                var currentFolder = Path.Combine(outFolder, "PsfSize");
+                Directory.CreateDirectory(currentFolder);
+                Reconstruct(input, psfSize, fullPsf, currentFolder, file, 8, 1, true, 0f, 0.1f);
+            }
+        }
+
+        private static void RunBlocksize(Data input, float[,] fullPsf, string outFolder)
+        {
+            var blockTest = new int[] { 1, 4, 8, 16 };
+            foreach (var block in blockTest)
+            {
+                var file = "block" + block;
+                var currentFolder = Path.Combine(outFolder, "BlockSize");
+                Directory.CreateDirectory(currentFolder);
+                Reconstruct(input, 8, fullPsf, currentFolder, file, 8, block, true, 0f, 0.1f);
+            }
+        }
+
+        private static void RunSearchPercent(Data input, float[,] fullPsf, string outFolder)
+        {
+            var searchPercent = new float[] { 0.01f, 0.05f, 0.1f, 0.2f, 0.4f };
+            foreach (var percent in searchPercent)
+            {
+                var file = "SearchPercent" + percent;
+                var currentFolder = Path.Combine(outFolder, "Search");
+                Directory.CreateDirectory(currentFolder);
+                ReconstructMinorCycle(input, 32, fullPsf, currentFolder, file, 3, percent);
+            }
+        }
+
+        private static void RunNotAccelerated(Data input, float[,] fullPsf, string outFolder)
+        {
+
+            var file = "TestNotAccelerated";
+            var currentFolder = Path.Combine(outFolder, "NotAccelerated");
+            Directory.CreateDirectory(currentFolder);
+            ReconstructMinorCycle(input, 32, fullPsf, currentFolder, file, 3, 0.1f, false);
+        }
+
         public static void Run()
         {
             var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
@@ -222,54 +279,15 @@ namespace SingleMachineRuns.Experiments
             var psf = FFT.WStackIFFTFloat(psfGrid, data.c.VisibilitiesCount);
             FFT.Shift(psf);
 
-            Directory.CreateDirectory("ApproxTest/cpu");
-            FitsIO.Write(psf, "psfFull_approx.fits");
+            var outFolder = "ApproxExperiment";
+            Directory.CreateDirectory(outFolder);
+            FitsIO.Write(psf, Path.Combine(outFolder, "psfFull.fits"));
 
             //tryout with simply cutting the PSF
-            var outFolder = "ApproxTest/";
-
-            /*
-            var cpuTest = new int[] { 8 };
-            var blockTest = new int[] { 1, 4, 8, 16};
-            foreach(var cpu in cpuTest)
-            {
-                foreach(var block in blockTest)
-                {
-                    var file = "Grid_cpu"+ cpu + "block" + block;
-                    var currentFolder = outFolder + file;
-                    Directory.CreateDirectory(currentFolder);
-                    Reconstruct(data, 16, psf, currentFolder, file, cpu, block, true, 0f, 0.25f);
-                }
-            }*/
-
-            var psfSizes = new int[] {32};
-            foreach (var size in psfSizes)
-            {
-                var file = "Grid_cpu" + 8 + "block" + 1 + "psf" + size;
-                var currentFolder = outFolder + file;
-                Directory.CreateDirectory(currentFolder);
-                ReconstructMinorCycle(data, size, psf, currentFolder, file, 3, 0.1f, LAMBDA);
-            }
-
-            var searchPercent = new float[] {/*0.01f, 0.05f,*/ 0.1f, /*0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f*/};
-            foreach (var search in searchPercent)
-            {
-                var file = "Grid_cpu" + 8 + "block" + 1+"search"+search;
-                var currentFolder = outFolder + file;
-                Directory.CreateDirectory(currentFolder);
-                //Reconstruct(data, 32, psf, currentFolder, file, 8, 1, true, 0f, search, LAMBDA);
-            }
-
-            /*var lambdas = new float[] {0.8f, 0.6f, 0.4f};
-            foreach (var lambda in lambdas)
-            {
-                var file = "Grid_cpu" + 8 + "block" + 1 + "lambda" + lambda;
-                var currentFolder = outFolder + file;
-                Directory.CreateDirectory(currentFolder);
-                Reconstruct(data, 16, psf, currentFolder, file, 8, 1, true, 0f, 0.1f, lambda);
-            }*/
-
-
+            RunBlocksize(data, psf, outFolder);
+            RunPsfSize(data, psf, outFolder);
+            RunSearchPercent(data, psf, outFolder);
+            RunNotAccelerated(data, psf, outFolder);
         }
     }
 }
