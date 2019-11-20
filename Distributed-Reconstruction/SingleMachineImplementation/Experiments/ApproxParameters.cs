@@ -284,7 +284,7 @@ namespace SingleMachineRuns.Experiments
             FitsIO.Write(psf, Path.Combine(outFolder, "psfFull.fits"));
 
             //tryout with simply cutting the PSF
-            RunBlocksize(data, psf, outFolder);
+            //RunBlocksize(data, psf, outFolder);
             RunPsfSize(data, psf, outFolder);
             RunSearchPercent(data, psf, outFolder);
             RunNotAccelerated(data, psf, outFolder);

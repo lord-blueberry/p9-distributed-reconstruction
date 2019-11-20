@@ -18,22 +18,15 @@ namespace SingleMachineRuns
         {
             //Experiments.GPUSpeed.Run();
             //Experiments.PSFSize.RunSpeedLarge();
-
-            Experiments.PCDMComparison.Run();
-
-            //ImageGeneration.ApproxImages.Generator.Generate();
             //Experiments.PSFSize.RunApproximationMethods();
             //Experiments.ApproxParameters.Run();
+            Experiments.PCDMComparison.Run();
 
             //ImageGeneration.Generator.GenerateAll();
-            //Experiments.ApproxParameters.ActiveSetDebug();
+            //ImageGeneration.ApproxImages.Generator.Generate();
 
             //Single_Reference.DebugMethods.DebugILGPU();
             //Single_Reference.DebugMethods.DebugSimulatedApprox();
-
-            //Experiments.PSFSize.DebugConvergence();
-            //Experiments.PSFSize.DebugConvergence2();
-
 
 
             //

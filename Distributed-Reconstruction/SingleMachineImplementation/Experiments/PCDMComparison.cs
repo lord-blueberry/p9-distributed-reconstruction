@@ -9,7 +9,7 @@ using Single_Reference;
 using Single_Reference.IDGSequential;
 using Single_Reference.Deconvolution;
 using static Single_Reference.Common;
-using Single_Reference.Deconvolution.Approx;
+using Single_Reference.Deconvolution.ParallelDeconvolution;
 
 namespace SingleMachineRuns.Experiments
 {
@@ -24,13 +24,14 @@ namespace SingleMachineRuns.Experiments
         private static void ReconstructPCDM(MeasurementData input, GriddingConstants c, float[,] fullPsf, string folder, string file, int minorCycles, float searchPercent)
         {
             var totalWatch = new Stopwatch();
+            var currentWatch = new Stopwatch();
 
             var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
             var psfCut = PSF.Cut(fullPsf, CUT_FACTOR_PCDM);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, CUT_FACTOR_PCDM);
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
             var random = new Random(123);
-            var pcdm = new Approx(totalSize, psfCut, 8, 1000, 0.1f);
+            var pcdm = new Deconvolver(totalSize, psfCut, 8, 1000, 0.1f);
 
             var metadata = Partitioner.CreatePartition(c, input.UVW, input.Frequencies);
 
@@ -49,7 +50,7 @@ namespace SingleMachineRuns.Experiments
                 var writer = new StreamWriter(folder + "/" + file + ".txt");
                 var xImage = new float[c.GridSize, c.GridSize];
                 var residualVis = input.Visibilities;
-                Approx.DeconvolutionResult lastResult = null;
+                Deconvolver.DeconvolutionResult lastResult = null;
                 for (int cycle = 0; cycle < 6; cycle++)
                 {
                     Console.WriteLine("cycle " + cycle);
@@ -58,7 +59,7 @@ namespace SingleMachineRuns.Experiments
                     FFT.Shift(dirtyImage);
                     FitsIO.Write(dirtyImage, folder + "/dirty" + cycle + ".fits");
 
-                    var startElapsed = totalWatch.Elapsed;
+                    currentWatch.Restart();
                     totalWatch.Start();
 
                     var breakMajor = false;
@@ -67,6 +68,7 @@ namespace SingleMachineRuns.Experiments
                     var xCopy = Copy(xImage);
                     var currentLambda = 0f;
                     var currentObjective = 0.0;
+                    var absMax = 0.0f;
                     for (int minorCycle = 0; minorCycle < minorCycles; minorCycle++)
                     {
                         var maxDirty = Residuals.GetMax(dirtyImage);
@@ -81,15 +83,16 @@ namespace SingleMachineRuns.Experiments
                         if (currentLambda < minLambda)
                             currentLambda = minLambda;
                         currentObjective = Residuals.CalcPenalty(dirtyImage) + ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
+                        absMax = pcdm.GetAbsMax(xImage, bMap, lambdaTrue, alpha);
                         if (pcdm.GetAbsMax(xImage, bMap, lambdaTrue, alpha) < MAJOR_STOP)
                             breakMajor = true;
-
-                        lastResult = pcdm.Deconvolve(xImage, bMap, currentLambda, alpha, 15, 1e-5f);
+      
+                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 15, 1e-5f);
 
                         if (currentLambda == lambda | currentLambda == minLambda)
                             break;
 
-                        Console.WriteLine("resetting residuals!!");
+                        Console.WriteLine("Done Minorcycle residuals!!");
                         var residualsUpdate = new float[xImage.GetLength(0), xImage.GetLength(1)];
                         Parallel.For(0, xCopy.GetLength(0), (i) =>
                         {
@@ -104,12 +107,14 @@ namespace SingleMachineRuns.Experiments
                         });
                     }
 
+                    currentWatch.Stop();
                     totalWatch.Stop();
-                    writer.WriteLine(cycle + ";" + currentLambda + ";" + currentObjective + ";" + lastResult.IterationCount + ";" + totalWatch.Elapsed.Seconds + ";" + (totalWatch.Elapsed.Seconds - startElapsed.Seconds) + "\n");
+                    writer.WriteLine(cycle + ";" + currentLambda + ";" + currentObjective + ";" + lastResult.IterationCount + ";" + absMax + ";" + totalWatch.Elapsed.TotalSeconds + ";" + currentWatch.Elapsed.TotalSeconds);
                     writer.Flush();
 
                     if (breakMajor)
                         break;
+
                     if (currentLambda == lambda & !switchedToOtherPsf)
                     {
                         pcdm.ResetAMap(fullPsf);
@@ -120,7 +125,7 @@ namespace SingleMachineRuns.Experiments
                         writer.Flush();
                     }
 
-                    FitsIO.Write(xImage, folder + "/xImage_" + cycle + ".fits");
+                    FitsIO.Write(xImage, folder + "/xImage_pcdm_" + cycle + ".fits");
 
                     FFT.Shift(xImage);
                     var xGrid = FFT.Forward(xImage);
@@ -181,8 +186,8 @@ namespace SingleMachineRuns.Experiments
                     writer.Write(cycle + ";" + currentLambda + ";" + objective + ";");
                     writer.Flush();
                     totalWatch.Start();
-
-                    if (fastCD.GetAbsMax(xImage, bMap, lambdaTrue, alpha) < MAJOR_STOP)
+                    var maxAbs = fastCD.GetAbsMax(xImage, bMap, lambdaTrue, alpha);
+                    if (maxAbs < MAJOR_STOP)
                         break;
 
                     lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 30000, 1e-5f);
@@ -195,7 +200,7 @@ namespace SingleMachineRuns.Experiments
                     }
 
                     totalWatch.Stop();
-                    writer.Write(lastResult.IterationCount + ";" + totalWatch.Elapsed.Seconds + ";" + (totalWatch.Elapsed.Seconds - startElapsed.Seconds) + "\n");
+                    writer.Write(lastResult.IterationCount + ";" + totalWatch.Elapsed.TotalSeconds + ";" + maxAbs +";" + (totalWatch.Elapsed.TotalSeconds - startElapsed.TotalSeconds) + "\n");
                     writer.Flush();
 
                     FFT.Shift(xImage);
@@ -253,7 +258,7 @@ namespace SingleMachineRuns.Experiments
 
             Directory.CreateDirectory("PCDMComparison");
             ReconstructPCDM(data, c, psf, "PCDMComparison", "pcdm", 3, 0.1f);
-            ReconstructSerial(data, c, psf, "PCDMComparison", "serial");
+            //ReconstructSerial(data, c, psf, "PCDMComparison", "serial");
         }
     }
 }

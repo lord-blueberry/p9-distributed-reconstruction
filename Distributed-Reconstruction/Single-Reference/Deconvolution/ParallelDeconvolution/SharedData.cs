@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Single_Reference.Deconvolution.Approx
+namespace Single_Reference.Deconvolution.ParallelDeconvolution
 {
     class SharedData
     {

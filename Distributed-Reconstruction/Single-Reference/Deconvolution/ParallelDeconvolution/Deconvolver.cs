@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 
 using static Single_Reference.Common;
 
-namespace Single_Reference.Deconvolution.Approx
+namespace Single_Reference.Deconvolution.ParallelDeconvolution
 {
-    public class Approx
+    public class Deconvolver
     {
         int threadCount;
         int concurrentIterations;
@@ -20,7 +20,7 @@ namespace Single_Reference.Deconvolution.Approx
         float[,] psf2;
         Rectangle totalSize;
 
-        public Approx(Rectangle totalSize, float[,] psf, int threadCount = 8, int maxConcurrent = 1000,  float searchFraction = 0.1f)
+        public Deconvolver(Rectangle totalSize, float[,] psf, int threadCount = 8, int maxConcurrent = 1000,  float searchFraction = 0.1f)
         {
             this.totalSize = totalSize;
             this.psf = psf;
@@ -47,7 +47,6 @@ namespace Single_Reference.Deconvolution.Approx
 
         private static List<Tuple<int, int>> GetActiveSet(float[,] xExplore, float[,] gExplore, float lambda, float alpha, float[,] lipschitzMap)
         {
-            var debug = new float[xExplore.GetLength(0), xExplore.GetLength(1)];
             var output = new List<Tuple<int, int>>();
             for (int y = 0; y < xExplore.GetLength(0); y++)
                 for (int x = 0; x < xExplore.GetLength(1); x++)
@@ -58,10 +57,8 @@ namespace Single_Reference.Deconvolution.Approx
                     if (0.0f < Math.Abs(tmp - xExplore[y, x]))
                     {
                         output.Add(new Tuple<int, int>(y, x));
-                        debug[y, x] = 1.0f;
                     }
                 }
-            FitsIO.Write(debug, "activeSet.fits");
             return output;
         }
 
@@ -95,7 +92,8 @@ namespace Single_Reference.Deconvolution.Approx
             return maxPixel;
         }
 
-        public DeconvolutionResult Deconvolve(float[,] xImage, float[,] gradients, float lambda, float alpha, int maxIteration = 100, float epsilon = 1e-4f)
+        #region deconvolveApprox
+        public DeconvolutionResult DeconvolveApprox(float[,] xImage, float[,] gradients, float lambda, float alpha, int maxIteration = 100, float epsilon = 1e-4f)
         {
             Stopwatch watch = new Stopwatch();
             var xExplore = Copy(xImage);
@@ -110,7 +108,7 @@ namespace Single_Reference.Deconvolution.Approx
             shared.BlockLock = new int[shared.ActiveSet.Count];
             shared.MaxConcurrentIterations = concurrentIterations;
 
-            var output = DeconvolveConcurrent(shared, maxIteration, epsilon);
+            var output = DeconvolveApproxConcurrent(shared, maxIteration, epsilon);
 
             var theta0 = shared.ProcessorCount / (shared.XExpl.Length);
             var theta = output.Theta;
@@ -122,7 +120,7 @@ namespace Single_Reference.Deconvolution.Approx
             return output;
         }
 
-        private DeconvolutionResult DeconvolveConcurrent(SharedData shared, int activeSetIterations, float epsilon)
+        private DeconvolutionResult DeconvolveApproxConcurrent(SharedData shared, int activeSetIterations, float epsilon)
         {
             var watch = new Stopwatch();
 
@@ -134,9 +132,9 @@ namespace Single_Reference.Deconvolution.Approx
             shared.Theta0 = theta0;
 
             var xDiffs = new float[shared.ProcessorCount];
-            var deconvolvers = new List<AsyncDeconvolver>(shared.ProcessorCount);
+            var deconvolvers = new List<AsyncDeconvolver.Approx>(shared.ProcessorCount);
             for (int i = 0; i < shared.ProcessorCount; i++)
-                deconvolvers.Add(new AsyncDeconvolver(shared, i + 1, shared.ProcessorCount, searchFraction, theta0));
+                deconvolvers.Add(new AsyncDeconvolver.Approx(shared, i + 1, shared.ProcessorCount, searchFraction, theta0));
 
             int iter = 0;
             var converged = false;
@@ -198,7 +196,7 @@ namespace Single_Reference.Deconvolution.Approx
                     if (GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha) < epsilon)
                     {
                         converged = true;
-                        
+
                     }
                 }
 
@@ -208,6 +206,92 @@ namespace Single_Reference.Deconvolution.Approx
 
             return new DeconvolutionResult(converged, deconvolvers.Sum(x => x.AsyncIterations), deconvolvers[0].Theta);
         }
+        #endregion
+
+        #region deconvolve PCDM
+        public DeconvolutionResult DeconvolvePCDM(float[,] xImage, float[,] gradients, float lambda, float alpha, int maxIteration = 100, float epsilon = 1e-4f)
+        {
+            var shared = new SharedData(lambda, alpha, threadCount,
+                CountNonZero(psf), psf2, aMap,
+                xImage, null, gradients, null);
+            shared.ActiveSet = GetActiveSet(xImage, gradients, lambda, alpha, shared.AMap);
+            shared.BlockLock = new int[shared.ActiveSet.Count];
+            shared.MaxConcurrentIterations = concurrentIterations;
+
+            var output = DeconvolvePCDMConcurrent(shared, maxIteration, epsilon);
+
+            return output;
+        }
+
+        private DeconvolutionResult DeconvolvePCDMConcurrent(SharedData shared, int activeSetIterations, float epsilon)
+        {
+            var watch = new Stopwatch();
+
+            var blockCount = shared.XExpl.Length;
+            //var blockCount = shared.ActiveSet.Count;
+            var theta0 = shared.ProcessorCount / (float)blockCount;
+            float eta = 1.0f / blockCount;
+            shared.TestRestart = 0.0f;
+            shared.Theta0 = theta0;
+
+            var xDiffs = new float[shared.ProcessorCount];
+            var deconvolvers = new List<AsyncDeconvolver.PCDM>(shared.ProcessorCount);
+            for (int i = 0; i < shared.ProcessorCount; i++)
+                deconvolvers.Add(new AsyncDeconvolver.PCDM(shared, i + 1, shared.ProcessorCount, searchFraction));
+
+            int iter = 0;
+            var converged = false;
+            var lastAbsMax = GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha);
+            var concurrentFactor = -1f;
+            Console.WriteLine("Starting Active Set iterations with " + shared.ActiveSet.Count + " blocks");
+            while (iter < activeSetIterations & !converged)
+            {
+                shared.AsyncFinished = 0;
+                watch.Start();
+                //async iterations
+                Parallel.For(0, deconvolvers.Count, (i) =>
+                {
+                    deconvolvers[i].Deconvolve();
+                });
+                watch.Stop();
+
+                if (concurrentFactor == -1f)
+                    concurrentFactor = lastAbsMax / deconvolvers.Max(d => d.DiffMax);
+
+                var currentAbsMax = GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha);
+                var activeSetValid = currentAbsMax > lastAbsMax && lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor;
+                activeSetValid |= lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor * 2;
+                Console.WriteLine("LastAbsMaxFactor = " + lastAbsMax);
+                Console.WriteLine("deconvolvers = " + deconvolvers.Max(d => d.DiffMax));
+                Console.WriteLine("absMaxFactor = " + lastAbsMax / deconvolvers.Max(d => d.DiffMax));
+
+                if (shared.TestRestart > 0.0f | activeSetValid)
+                {
+                    Console.WriteLine("restarting");
+                    concurrentFactor = -1f;
+
+                    //new active set
+                    shared.ActiveSet = GetActiveSet(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha, shared.AMap);
+                    shared.BlockLock = new int[shared.ActiveSet.Count];
+                    blockCount = shared.XExpl.Length;
+                }
+
+                lastAbsMax = currentAbsMax;
+                if (deconvolvers.Max(d => d.DiffMax) < epsilon)
+                {
+                    if (GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha) < epsilon)
+                    {
+                        converged = true;
+                    }
+                }
+
+                Console.WriteLine("Done Active Set iteration " + iter);
+                iter++;
+            }
+
+            return new DeconvolutionResult(converged, deconvolvers.Sum(x => x.AsyncIterations), 0f);
+        }
+        #endregion
 
         public class DeconvolutionResult
         {
