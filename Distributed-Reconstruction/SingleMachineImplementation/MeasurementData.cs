@@ -73,5 +73,18 @@ namespace SingleMachineRuns
 
             return new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
         }
+
+        public static GriddingConstants CreateLMCStandardParams(long visibilitiesCount)
+        {
+            int gridSize = 256;
+            int subgridsize = 8;
+            int kernelSize = 4;
+            int max_nr_timesteps = 1024;
+            double cellSize = 1.0 / 3600.0 * Math.PI / 180.0;
+
+            return new GriddingConstants(visibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
+        }
+
+
     }
 }

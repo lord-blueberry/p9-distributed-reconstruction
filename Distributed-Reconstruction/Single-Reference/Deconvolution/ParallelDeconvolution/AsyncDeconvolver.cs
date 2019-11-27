@@ -171,7 +171,6 @@ namespace Single_Reference.Deconvolution.ParallelDeconvolution
         public class PCDM
         {
             readonly SharedData shared;
-            readonly float[] updateCache;
 
             //configuration for pseudo random block selection
             readonly int id;
@@ -190,7 +189,6 @@ namespace Single_Reference.Deconvolution.ParallelDeconvolution
                 this.shared = shared;
 
                 this.random = new Random();
-                this.updateCache = new float[shared.Psf2.GetLength(1)];
             }
 
             public void Deconvolve()
@@ -218,7 +216,7 @@ namespace Single_Reference.Deconvolution.ParallelDeconvolution
                     //update gradients
                     if (0.0f != Math.Abs(update))
                     {
-                        UpdateGradients(shared.GExpl, shared.Psf2, updateCache, yPixel, xPixel, update);
+                        UpdateGradients(shared.GExpl, shared.Psf2, yPixel, xPixel, update);
                         Thread.VolatileWrite(ref shared.XExpl[yPixel, xPixel], shared.XExpl[yPixel, xPixel] + update);
                     }
 
@@ -278,7 +276,7 @@ namespace Single_Reference.Deconvolution.ParallelDeconvolution
                 return Math.Abs(update);
             }
 
-            private static void UpdateGradients(float[,] gExplore, float[,] psf2, float[] lineCache, int yPixel, int xPixel, float update)
+            private static void UpdateGradients(float[,] gExplore, float[,] psf2, int yPixel, int xPixel, float update)
             {
                 var yPsf2Half = psf2.GetLength(0) / 2;
                 var xPsf2Half = psf2.GetLength(1) / 2;
@@ -293,15 +291,7 @@ namespace Single_Reference.Deconvolution.ParallelDeconvolution
                     for (int x = xMin; x < xMax; x++)
                     {
                         var xPsfIdx = x + xPsf2Half - xPixel;
-                        lineCache[xPsfIdx] = psf2[yPsfIdx, xPsfIdx] * update;
-                    }
-
-                    for (int x = xMin; x < xMax; x++)
-                    {
-                        var xPsfIdx = x + xPsf2Half - xPixel;
-
-                        var exploreUpdate = lineCache[xPsfIdx];
-                        ConcurrentSubtract(gExplore, y, x, exploreUpdate);
+                        ConcurrentSubtract(gExplore, y, x, psf2[yPsfIdx, xPsfIdx] * update);
                     }
                 }
             }

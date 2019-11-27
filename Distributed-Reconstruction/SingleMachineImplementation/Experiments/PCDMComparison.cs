@@ -31,7 +31,7 @@ namespace SingleMachineRuns.Experiments
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, CUT_FACTOR_PCDM);
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
             var random = new Random(123);
-            var pcdm = new Deconvolver(totalSize, psfCut, 8, 1000, 0.1f);
+            var pcdm = new Deconvolver(totalSize, psfCut, 8, 1000, searchPercent);
 
             var metadata = Partitioner.CreatePartition(c, input.UVW, input.Frequencies);
 
@@ -84,10 +84,13 @@ namespace SingleMachineRuns.Experiments
                             currentLambda = minLambda;
                         currentObjective = Residuals.CalcPenalty(dirtyImage) + ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
                         absMax = pcdm.GetAbsMax(xImage, bMap, lambdaTrue, alpha);
-                        if (pcdm.GetAbsMax(xImage, bMap, lambdaTrue, alpha) < MAJOR_STOP)
+                        if (absMax < MAJOR_STOP)
+                        {
                             breakMajor = true;
-      
-                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 15, 1e-5f);
+                            break;
+                        }
+                            
+                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 40, 1e-5f);
 
                         if (currentLambda == lambda | currentLambda == minLambda)
                             break;
@@ -109,12 +112,11 @@ namespace SingleMachineRuns.Experiments
 
                     currentWatch.Stop();
                     totalWatch.Stop();
-                    writer.WriteLine(cycle + ";" + currentLambda + ";" + currentObjective + ";" + lastResult.IterationCount + ";" + absMax + ";" + totalWatch.Elapsed.TotalSeconds + ";" + currentWatch.Elapsed.TotalSeconds);
+                    writer.WriteLine(cycle + ";" + currentLambda + ";" + currentObjective + ";" + absMax + ";" + lastResult.IterationCount + ";"  + totalWatch.Elapsed.TotalSeconds + ";" + currentWatch.Elapsed.TotalSeconds);
                     writer.Flush();
 
                     if (breakMajor)
                         break;
-
                     if (currentLambda == lambda & !switchedToOtherPsf)
                     {
                         pcdm.ResetAMap(fullPsf);
@@ -141,6 +143,7 @@ namespace SingleMachineRuns.Experiments
         private static void ReconstructSerial(MeasurementData input, GriddingConstants c, float[,] fullPsf, string folder, string file)
         {
             var totalWatch = new Stopwatch();
+            var currentWatch = new Stopwatch();
 
             var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
             var psfCut = PSF.Cut(fullPsf, CUT_FACTOR_SERIAL);
@@ -172,7 +175,7 @@ namespace SingleMachineRuns.Experiments
                     FFT.Shift(dirtyImage);
                     FitsIO.Write(dirtyImage, folder + "/dirty" + cycle + ".fits");
 
-                    var startElapsed = totalWatch.Elapsed;
+                    currentWatch.Restart();
                     totalWatch.Start();
                     var maxDirty = Residuals.GetMax(dirtyImage);
                     var bMap = bMapCalculator.Convolve(dirtyImage);
@@ -181,16 +184,13 @@ namespace SingleMachineRuns.Experiments
                     var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                     var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
-                    totalWatch.Stop();
+                    
                     var objective = Residuals.CalcPenalty(dirtyImage) + ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
-                    writer.Write(cycle + ";" + currentLambda + ";" + objective + ";");
-                    writer.Flush();
-                    totalWatch.Start();
-                    var maxAbs = fastCD.GetAbsMax(xImage, bMap, lambdaTrue, alpha);
-                    if (maxAbs < MAJOR_STOP)
-                        break;
-
-                    lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 30000, 1e-5f);
+                    
+                    var absMax = fastCD.GetAbsMax(xImage, bMap, lambdaTrue, alpha);
+                    
+                    if (absMax >= MAJOR_STOP)
+                        lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 30000, 1e-5f);
 
                     if (lambda == currentLambda & !switchedToOtherPsf)
                     {
@@ -199,9 +199,13 @@ namespace SingleMachineRuns.Experiments
                         switchedToOtherPsf = true;
                     }
 
+                    currentWatch.Stop();
                     totalWatch.Stop();
-                    writer.Write(lastResult.IterationCount + ";" + totalWatch.Elapsed.TotalSeconds + ";" + maxAbs +";" + (totalWatch.Elapsed.TotalSeconds - startElapsed.TotalSeconds) + "\n");
+                    writer.WriteLine(cycle + ";" + currentLambda + ";" + objective + ";" + absMax + ";" + lastResult.IterationCount + ";" + totalWatch.Elapsed.TotalSeconds + ";" + currentWatch.Elapsed.TotalSeconds);
                     writer.Flush();
+
+                    if (absMax < MAJOR_STOP)
+                        break;
 
                     FFT.Shift(xImage);
                     var xGrid = FFT.Forward(xImage);

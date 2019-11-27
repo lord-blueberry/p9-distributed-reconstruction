@@ -90,7 +90,74 @@ namespace SingleMachineRuns.ImageGeneration.Simulated
 
             //FitsIO.Write(reconstruction, Path.Combine(outputFolder,"xImage.fits"));
             Tools.WriteToMeltCSV(reconstruction, Path.Combine(outputFolder, "elasticNet.csv"));
+        }
 
+        public static void GenerateCLEANExample(string simulatedLocation, string outputFolder)
+        {
+            var data = MeasurementData.LoadSimulatedPoints(simulatedLocation);
+            var cellSize = 2.0 / 3600.0 * Math.PI / 180.0;
+            var c = new GriddingConstants(data.VisibilitiesCount, 128, 8, 4, 512, (float)cellSize, 1, 0.0);
+            var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
+
+            var psfGrid = IDG.GridPSF(c, metadata, data.UVW, data.Flags, data.Frequencies);
+            var psf = FFT.BackwardFloat(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+
+            Directory.CreateDirectory(outputFolder);
+
+            var reconstruction = new float[c.GridSize, c.GridSize];
+
+            var residualVis = data.Visibilities;
+            for (int cycle = 0; cycle < 4; cycle++)
+            {
+                Console.WriteLine("in cycle " + cycle);
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, data.UVW, data.Frequencies);
+                var dirtyImage = FFT.BackwardFloat(dirtyGrid, c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                FitsIO.Write(dirtyImage, Path.Combine(outputFolder, "dirty_CLEAN_" + cycle + ".fits"));
+                Tools.WriteToMeltCSV(dirtyImage, Path.Combine(outputFolder, "dirty_CLEAN_" + cycle + ".csv"));
+
+                var maxY = -1;
+                var maxX = -1;
+                var max = 0.0f;
+                for(int y = 0; y < dirtyImage.GetLength(0); y++)
+                    for(int x = 0; x < dirtyImage.GetLength(1); x++)
+                        if(max < Math.Abs(dirtyImage[y, x]))
+                        {
+                            maxY = y;
+                            maxX = x;
+                            max = Math.Abs(dirtyImage[y, x]);
+                        }
+
+                FitsIO.Write(reconstruction, Path.Combine(outputFolder, "model_CLEAN_" + cycle + ".fits"));
+                Tools.WriteToMeltCSV(reconstruction, Path.Combine(outputFolder, "model_CLEAN_" + cycle + ".csv"));
+
+                reconstruction[maxY, maxX] = 0.5f * dirtyImage[maxY, maxX];
+                
+                FFT.Shift(reconstruction);
+                var xGrid = FFT.Forward(reconstruction);
+                FFT.Shift(reconstruction);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, data.UVW, data.Frequencies);
+                residualVis = Visibilities.Substract(data.Visibilities, modelVis, data.Flags);
+            }
+
+            var cleanbeam = new float[128, 128];
+            var x0 = 64;
+            var y0 = 64;
+            for (int y = 0; y < cleanbeam.GetLength(0); y++)
+                for (int x = 0; x < cleanbeam.GetLength(1); x++)
+                    cleanbeam[y, x] = (float)(1.0 * Math.Exp(-(Math.Pow(x0 - x, 2) / 4 + Math.Pow(y0 - y, 2) / 4)));
+
+            FitsIO.Write(cleanbeam, Path.Combine(outputFolder, "clbeam.fits"));
+
+            FFT.Shift(cleanbeam);
+            var CL = FFT.Forward(cleanbeam);
+            var REC = FFT.Forward(reconstruction);
+            var CONF = Common.Fourier2D.Multiply(REC, CL);
+            var cleaned = FFT.BackwardFloat(CONF, reconstruction.Length);
+            //FFT.Shift(cleaned);
+            FitsIO.Write(cleaned, Path.Combine(outputFolder, "rec_CLEAN.fits"));
+            Tools.WriteToMeltCSV(cleaned, Path.Combine(outputFolder, "rec_CLEAN.csv"));
         }
     }
 }

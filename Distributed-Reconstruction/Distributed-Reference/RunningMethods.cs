@@ -63,7 +63,7 @@ namespace DistributedReconstruction
 
                 var lambda = 0.4f;
                 var alpha = 0.1f;
-                var reconstruction = SimpleDistributedReconstruction.Reconstruct(comm, data, c, 2, lambda, alpha, 10000);
+                var reconstruction = MPIReconstruction.Reconstruct(comm, data, c, 2, lambda, alpha, 10000);
 
                 if (comm.Rank == 0)
                     FitsIO.Write(reconstruction, "tinyMeerKATReconstruction.fits");
@@ -100,7 +100,7 @@ namespace DistributedReconstruction
                 if (comm.Rank == 0)
                     Console.WriteLine("Done Reading, Starting reconstruction");
 
-                var reconstruction = SimpleDistributedReconstruction.Reconstruct(comm, data, c, 1, 0.5f, 0.8f, 1000);
+                var reconstruction = MPIReconstruction.Reconstruct(comm, data, c, 1, 0.5f, 0.8f, 1000);
 
                 if (comm.Rank == 0)
                     FitsIO.Write(reconstruction, "simulatedReconstruction.fits");

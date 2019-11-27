@@ -13,7 +13,7 @@ using System.IO;
 
 namespace DistributedReconstruction
 {
-    class SimpleDistributedReconstruction
+    class MPIReconstruction
     {
         private class DirtyImage
         {
@@ -128,7 +128,7 @@ namespace DistributedReconstruction
             writer.Flush();
         }
 
-        public static Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
+        private static Rectangle CalculateLocalImageSection(int nodeId, int nodeCount, int ySize, int xSize)
         {
             var yPatchCount = (int)Math.Floor(Math.Sqrt(nodeCount));
             var xPatchCount = (nodeCount / yPatchCount);
@@ -202,7 +202,7 @@ namespace DistributedReconstruction
             }
         }
 
-        public static float[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
+        private static float[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             float[,] psf = null;
             var localGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);

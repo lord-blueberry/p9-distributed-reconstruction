@@ -146,7 +146,7 @@ namespace SingleMachineRuns.Experiments
             var data = new ApproxFast.TestingData(new StreamWriter(folder+ "/" + file + ".txt"));
             var xImage = new float[input.c.GridSize, input.c.GridSize];
             var residualVis = input.visibilities;
-            for (int cycle = 0; cycle < 6; cycle++)
+            for (int cycle = 0; cycle < 7; cycle++)
             {
                 Console.WriteLine("cycle " + cycle);
                 var dirtyGrid = IDG.GridW(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
@@ -200,7 +200,7 @@ namespace SingleMachineRuns.Experiments
 
         private static void RunPsfSize(Data input, float[,] fullPsf, string outFolder)
         {
-            var psfTest = new int[] { 8, 16, 32 };
+            var psfTest = new int[] {4 , 8, 16, 32, 64 };
             foreach (var psfSize in psfTest)
             {
                 var file = "PsfSize" + psfSize;
@@ -212,19 +212,19 @@ namespace SingleMachineRuns.Experiments
 
         private static void RunBlocksize(Data input, float[,] fullPsf, string outFolder)
         {
-            var blockTest = new int[] { 1, 4, 8, 16 };
+            var blockTest = new int[] { 2, 4, 8 };
             foreach (var block in blockTest)
             {
                 var file = "block" + block;
                 var currentFolder = Path.Combine(outFolder, "BlockSize");
                 Directory.CreateDirectory(currentFolder);
-                Reconstruct(input, 8, fullPsf, currentFolder, file, 8, block, true, 0f, 0.1f);
+                Reconstruct(input, 32, fullPsf, currentFolder, file, 8, block, true, 0f, 0.1f);
             }
         }
 
         private static void RunSearchPercent(Data input, float[,] fullPsf, string outFolder)
         {
-            var searchPercent = new float[] { 0.01f, 0.05f, 0.1f, 0.2f, 0.4f };
+            var searchPercent = new float[] { 0.01f, 0.05f, 0.1f, 0.2f, 0.4f, 0.6f, 0.8f };
             foreach (var percent in searchPercent)
             {
                 var file = "SearchPercent" + percent;
@@ -284,8 +284,8 @@ namespace SingleMachineRuns.Experiments
             FitsIO.Write(psf, Path.Combine(outFolder, "psfFull.fits"));
 
             //tryout with simply cutting the PSF
+            //RunPsfSize(data, psf, outFolder);
             //RunBlocksize(data, psf, outFolder);
-            RunPsfSize(data, psf, outFolder);
             RunSearchPercent(data, psf, outFolder);
             RunNotAccelerated(data, psf, outFolder);
         }
