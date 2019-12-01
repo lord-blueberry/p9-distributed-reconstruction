@@ -45,7 +45,7 @@ namespace SingleMachineRuns.Experiments
             var bMapCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
             var fastCD2 = new FastGreedyCD(totalSize, psfCut);
-            fastCD2.ResetAMap(fullPsf, cutFactor);
+            fastCD2.ResetLipschitzMap(fullPsf);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
             var lambda = LAMBDA_GLOBAL * fastCD.MaxLipschitz;
@@ -79,7 +79,7 @@ namespace SingleMachineRuns.Experiments
                 var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
-                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + ";" + fastCD.GetAbsMax(xImage, bMap, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";"); ;
+                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + ";" + fastCD.GetAbsMaxDiff(xImage, bMap, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";"); ;
                 writer.Flush();
 
                 //check wether we can minimize the objective further with the current psf
@@ -152,7 +152,7 @@ namespace SingleMachineRuns.Experiments
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
             if(startWithFullPSF)
-                fastCD.ResetAMap(fullPsf, cutFactor);
+                fastCD.ResetLipschitzMap(fullPsf);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
             var lambda = (float)(LAMBDA_GLOBAL * PSF.CalcMaxLipschitz(psfBMap));
@@ -184,7 +184,7 @@ namespace SingleMachineRuns.Experiments
                 var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
-                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + fastCD.GetAbsMax(xImage, dirtyImage, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
+                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + fastCD.GetAbsMaxDiff(xImage, dirtyImage, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
                 writer.Flush();
 
                 //check wether we can minimize the objective further with the current psf

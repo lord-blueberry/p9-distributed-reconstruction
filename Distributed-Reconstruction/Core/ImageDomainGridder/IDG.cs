@@ -65,8 +65,6 @@ namespace Core.ImageDomainGridder
             return Grid(c, metadata, visibilities, uvw, frequencies);
         }
 
-
-
         public static double[,] ToImage(GriddingConstants c, List<List<Subgrid>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
             var gridded = Gridder.Forward(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);

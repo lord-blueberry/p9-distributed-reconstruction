@@ -187,7 +187,7 @@ namespace SingleMachineRuns.Experiments
                     
                     var objective = Residuals.CalcPenalty(dirtyImage) + ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
                     
-                    var absMax = fastCD.GetAbsMax(xImage, bMap, lambdaTrue, alpha);
+                    var absMax = fastCD.GetAbsMaxDiff(xImage, bMap, lambdaTrue, alpha);
                     
                     if (absMax >= MAJOR_STOP)
                         lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 30000, 1e-5f);

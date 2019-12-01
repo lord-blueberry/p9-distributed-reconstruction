@@ -52,7 +52,7 @@ namespace SingleReconstruction.Experiments
                 for (int cycle = 0; cycle < maxCycle; cycle++)
                 {
                     Console.WriteLine("cycle " + cycle);
-                    var dirtyGrid = IDG.GridW(c, input, residualVis, input.UVW, input.Frequencies);
+                    var dirtyGrid = IDG.GridW(c, metadata, residualVis, input.UVW, input.Frequencies);
                     var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, c.VisibilitiesCount);
                     FFT.Shift(dirtyImage);
                     FitsIO.Write(dirtyImage, folder + "/dirty" + cycle + ".fits");

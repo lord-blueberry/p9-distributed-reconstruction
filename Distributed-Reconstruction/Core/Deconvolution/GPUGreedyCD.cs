@@ -3,13 +3,16 @@ using System.Collections.Generic;
 using System.Text;
 using System.Numerics;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 
 using ILGPU;
 using ILGPU.AtomicOperations;
 using ILGPU.Runtime;
 using ILGPU.Runtime.CPU;
-using System.Linq;
+
 using ILGPU.Runtime.Cuda;
+
 
 using static Core.Common;
 
@@ -40,31 +43,35 @@ namespace Core.Deconvolution
         public bool RunsOnGPU { get; }
         readonly Context c;
         readonly Accelerator accelerator;
-        readonly Rectangle imageSection;
-        readonly Rectangle psfSize;
+        readonly Rectangle totalSize;
         readonly float[,] psf2;
-        readonly float[,] aMap;
+        float[,] aMap;
         readonly int batchIterations;
 
-        public GPUGreedyCD(Rectangle totalSize, float[,] psf, int nrBatchIterations) :
-            this(totalSize, totalSize, psf, PSF.CalcPSFSquared(psf), nrBatchIterations)
-        {
+        public float MaxLipschitz { get; private set; }
 
-        }
-
-        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, int nrBatchIterations) :
-            this(totalSize, imageSection, psf, PSF.CalcPSFSquared(psf), nrBatchIterations)
+        public static bool IsGPUSupported()
         {
+            var c = new Context(ContextFlags.FastMath);
             
+            var gpuIds = Accelerator.Accelerators.Where(id => id.AcceleratorType != AcceleratorType.CPU);
+            var GPUSupported = gpuIds.Any();
+
+            return GPUSupported;
         }
 
-        public GPUGreedyCD(Rectangle totalSize, Rectangle imageSection, float[,] psf, float[,] psfSquared, int nrBatchIterations)
+        public GPUGreedyCD(Rectangle totalSize, float[,] psf, int nrBatchIterations) :
+            this(totalSize, psf, PSF.CalcPSFSquared(psf), nrBatchIterations)
         {
-            this.imageSection = imageSection;
-            psfSize = new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1));
- 
+
+        }
+
+        public GPUGreedyCD(Rectangle totalSize, float[,] psf, float[,] psfSquared, int nrBatchIterations)
+        {
+            this.totalSize = totalSize;
             psf2 = psfSquared;
-            aMap = PSF.CalcAMap(psf, totalSize, imageSection);
+            aMap = PSF.CalcAMap(psf, totalSize);
+            MaxLipschitz = Residuals.GetMax(psfSquared);
             batchIterations = nrBatchIterations;
 
             c = new Context(ContextFlags.FastMath);
@@ -85,6 +92,7 @@ namespace Core.Deconvolution
             updateX = accelerator.LoadAutoGroupedStreamKernel<ILGPU.Index, ArrayView2D<float>, ArrayView<Pixel>>(UpdateXKernel);
             updateB = accelerator.LoadAutoGroupedStreamKernel<Index2, ArrayView2D<float>, ArrayView2D<float>, ArrayView<Pixel>>(UpdateBKernel);
         }
+
 
 
         #region IDeconvolver implementation
@@ -114,7 +122,7 @@ namespace Core.Deconvolution
                 int i = 0;
                 for (i = 0; i < maxIteration; i += batchIterations)
                 {
-                    DeconvolutionBatchIterations(batchIterations);
+                    DeconvolveBatch(batchIterations);
                     var lastPixel = maxPixelGPU.GetAsArray()[0];
                     if (lastPixel.AbsDiff < epsilon)
                     {
@@ -146,7 +154,7 @@ namespace Core.Deconvolution
             int iter = 0;
             while (!converged & iter < maxIteration)
             {
-                DeconvolutionBatchIterations(batchIterations);
+                DeconvolveBatch(batchIterations);
                 var lastPixel = maxPixelGPU.GetAsArray()[0];
                 if (lastPixel.AbsDiff < epsilon)
                 {
@@ -163,6 +171,49 @@ namespace Core.Deconvolution
 
             return new DeconvolutionResult(converged, iter, watch.Elapsed);
         }
+
+        public void ResetLipschitzMap(float[,] psf)
+        {
+            var psf2Local = PSF.CalcPSFSquared(psf);
+            var maxFull = Residuals.GetMax(psf2Local);
+            MaxLipschitz = maxFull;
+            aMap = PSF.CalcAMap(psf, totalSize);
+
+            var maxCut = Residuals.GetMax(psf2);
+            for (int i = 0; i < psf2.GetLength(0); i++)
+                for (int j = 0; j < psf2.GetLength(1); j++)
+                    psf2[i, j] *= (maxFull / maxCut);
+        }
+
+        public float GetAbsMaxDiff(float[,] xImage, float[,] gradients, float lambda, float alpha)
+        {
+            var maxPixels = new float[xImage.GetLength(0)];
+            Parallel.For(0, xImage.GetLength(0), (y) =>
+            {
+                var yLocal = y;
+
+                var currentMax = 0.0f;
+                for (int x = 0; x < xImage.GetLength(1); x++)
+                {
+                    var xLocal = x;
+                    var L = aMap[yLocal, xLocal];
+                    var old = xImage[yLocal, xLocal];
+                    var xTmp = ElasticNet.ProximalOperator(old * L + gradients[y, x], L, lambda, alpha);
+                    var xDiff = old - xTmp;
+
+                    if (currentMax < Math.Abs(xDiff))
+                        currentMax = Math.Abs(xDiff);
+                }
+                maxPixels[yLocal] = currentMax;
+            });
+
+            var maxPixel = 0.0f;
+            for (int i = 0; i < maxPixels.Length; i++)
+                if (maxPixel < maxPixels[i])
+                    maxPixel = maxPixels[i];
+
+            return maxPixel;
+        }
         #endregion
 
         /// <summary>
@@ -170,7 +221,7 @@ namespace Core.Deconvolution
         /// </summary>
         /// <param name="batchIterations"></param>
         /// <returns></returns>
-        private void DeconvolutionBatchIterations(int batchIterations)
+        private void DeconvolveBatch(int batchIterations)
         {
             for(int i = 0; i < batchIterations; i++)
             {

@@ -8,7 +8,7 @@ using static Core.Common;
 
 namespace Core.Deconvolution
 {
-    public class FastGreedyCD : IDeconvolver, ISubpatchDeconvolver
+    public class FastGreedyCD : IDeconvolver
     {
         /*
          * ImageSize, patchSize and subPatchSize. Only relevant for ISubpatchDeconvolver
@@ -21,36 +21,25 @@ namespace Core.Deconvolution
         readonly Rectangle patch;
         float[,] psf2;
         float[,] aMap;
+        ParallelOptions parallelOptions;
+
         public float MaxLipschitz { get; private set; }
 
-        public FastGreedyCD(Rectangle imageSize, float[,] psf) :
-            this(imageSize, imageSize, psf, PSF.CalcPSFSquared(psf))
+        public FastGreedyCD(Rectangle totalSize, float[,] psf, int processorLimit = -1) :
+            this(totalSize, totalSize, psf, PSF.CalcPSFSquared(psf), processorLimit)
         {
-
+            
         }
 
-        public FastGreedyCD(Rectangle imageSize, Rectangle patchSize, float[,] psf, float[,] psfSquared)
+        public FastGreedyCD(Rectangle totalSize, Rectangle patchSize, float[,] psf, float[,] psfSquared, int processorLimit = -1)
         {
             this.patch = patchSize;
             psf2 = psfSquared;
-            aMap = PSF.CalcAMap(psf, imageSize, patchSize);
+            aMap = PSF.CalcAMap(psf, totalSize, patchSize);
             MaxLipschitz = Residuals.GetMax(psfSquared);
-            //FitsIO.Write(aMap, "aMapDebug" + psf.GetLength(0) + ".fits");
-            //FitsIO.Write(psfSquared, "psfSquaredDebug" + psf.GetLength(0) + ".fits");
-        }
 
-        public void ResetAMap(float[,] psf, int cutFactor)
-        {
-            var psf2Local = PSF.CalcPSFSquared(psf);
-            var maxFull = Residuals.GetMax(psf2Local);
-            MaxLipschitz = maxFull;
-            aMap = PSF.CalcAMap(psf, patch, patch);
-            //psf2 = PSF.Cut(psf2Local, cutFactor);
-
-            var maxCut = Residuals.GetMax(psf2);
-            for (int i = 0; i < psf2.GetLength(0); i++)
-                for (int j = 0; j < psf2.GetLength(1); j++)
-                    psf2[i, j] *= (maxFull / maxCut);
+            parallelOptions = new ParallelOptions();
+            parallelOptions.MaxDegreeOfParallelism = processorLimit;
         }
 
         #region ISubpatchDeconvolver implementation
@@ -62,7 +51,7 @@ namespace Core.Deconvolution
             totalTime.Start();
             for (int pathIter = 0; pathIter < maxPathIteration; pathIter++)
             {
-                var max = GetAbsMax(subpatch, reconstruction, bMap, 0.0f, 1.0f);
+                var max = GetAbsMax(subpatch, reconstruction, bMap, parallelOptions, 0.0f, 1.0f);
 
                 var lambdaMax = 1 / alpha * max.PixelMaxDiff;
                 var lambdaCurrent = lambdaMax / lambdaFactor;
@@ -90,7 +79,7 @@ namespace Core.Deconvolution
             int iter = 0;
             while (!converged & iter < iterations)
             {
-                var maxPixel = GetAbsMax(subpatch, reconstruction, bMap, lambda, alpha);
+                var maxPixel = GetAbsMax(subpatch, reconstruction, bMap, parallelOptions, lambda, alpha);
                 converged = maxPixel.PixelMaxDiff < epsilon;
                 if (!converged)
                 {
@@ -98,7 +87,7 @@ namespace Core.Deconvolution
                     var xLocal = maxPixel.X - patch.X;
                     var pixelOld = reconstruction[yLocal, xLocal];
                     reconstruction[yLocal, xLocal] = maxPixel.PixelNew;
-                    UpdateB(bMap, psf2, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
+                    UpdateGradients(bMap, psf2, parallelOptions, maxPixel.Y, maxPixel.X, pixelOld - maxPixel.PixelNew);
                     if (iter % 50 == 0)
                         Console.WriteLine("iter\t" + iter + "\tcurrentUpdate\t" + Math.Abs(maxPixel.PixelNew - pixelOld));
                     iter++;
@@ -120,17 +109,30 @@ namespace Core.Deconvolution
         {
             return Deconvolve(patch, xImage, bMap, lambda, alpha, maxIteration, epsilon);
         }
-        #endregion
 
-        public float GetAbsMax(float[,] xImage, float[,] bMap, float lambda, float alpha)
+        public void ResetLipschitzMap(float[,] psf)
         {
-            return GetAbsMax(this.patch, xImage, bMap, lambda, alpha).PixelMaxDiff;
+            var psf2Local = PSF.CalcPSFSquared(psf);
+            var maxFull = Residuals.GetMax(psf2Local);
+            MaxLipschitz = maxFull;
+            aMap = PSF.CalcAMap(psf, patch);
+
+            var maxCut = Residuals.GetMax(psf2);
+            for (int i = 0; i < psf2.GetLength(0); i++)
+                for (int j = 0; j < psf2.GetLength(1); j++)
+                    psf2[i, j] *= (maxFull / maxCut);
         }
 
-        private Pixel GetAbsMax(Rectangle subpatch, float[,] xImage, float[,] bMap, float lambda, float alpha)
+        public float GetAbsMaxDiff(float[,] xImage, float[,] gradients, float lambda, float alpha)
+        {
+            return GetAbsMax(this.patch, xImage, gradients, this.parallelOptions, lambda, alpha).PixelMaxDiff;
+        }
+        #endregion
+
+        private Pixel GetAbsMax(Rectangle subpatch, float[,] xImage, float[,] gradients, ParallelOptions options, float lambda, float alpha)
         {
             var maxPixels = new Pixel[subpatch.YExtent()];
-            Parallel.For(subpatch.Y, subpatch.YEnd, (y) =>
+            Parallel.For(subpatch.Y, subpatch.YEnd, options, (y) =>
             {
                 var yLocal = y;
 
@@ -142,7 +144,7 @@ namespace Core.Deconvolution
                     var old = xImage[yLocal, xLocal];
                     //var xTmp = old + bMap[y, x] / currentA;
                     //xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
-                    var xTmp = ElasticNet.ProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
+                    var xTmp = ElasticNet.ProximalOperator(old * currentA + gradients[y, x], currentA, lambda, alpha);
                     var xDiff = old - xTmp;
 
                     if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
@@ -164,7 +166,7 @@ namespace Core.Deconvolution
             return maxPixel;
         }
 
-        private Pixel GetAbsMaxSingle(Rectangle subpatch, float[,] xImage, float[,] bMap, float lambda, float alpha)
+        private Pixel GetAbsMaxSingle(Rectangle subpatch, float[,] xImage, float[,] gradients, float lambda, float alpha)
         {
             var maxPixels = new Pixel[subpatch.YExtent()];
             for(int y = subpatch.Y; y < subpatch.YEnd; y++)
@@ -179,7 +181,7 @@ namespace Core.Deconvolution
                     var old = xImage[yLocal, xLocal];
                     //var xTmp = old + bMap[y, x] / currentA;
                     //xTmp = ShrinkElasticNet(xTmp, lambda, alpha);
-                    var xTmp = ElasticNet.ProximalOperator(old * currentA + bMap[y, x], currentA, lambda, alpha);
+                    var xTmp = ElasticNet.ProximalOperator(old * currentA + gradients[y, x], currentA, lambda, alpha);
                     var xDiff = old - xTmp;
 
                     if (currentMax.PixelMaxDiff < Math.Abs(xDiff))
@@ -201,40 +203,40 @@ namespace Core.Deconvolution
             return maxPixel;
         }
 
-        private static void UpdateBSingle(float[,] bMap, float[,] psf2, int yPixel, int xPixel, float xDiff)
+        private static void UpdateGradientsSingle(float[,] gradients, float[,] psf2, int yPixel, int xPixel, float xDiff)
         {
             var yPsf2Half = psf2.GetLength(0) / 2;
             var xPsf2Half = psf2.GetLength(1) / 2;
 
             var yMin = Math.Max(yPixel - yPsf2Half, 0);
             var xMin = Math.Max(xPixel - xPsf2Half, 0);
-            var yMax = Math.Min(yPixel - yPsf2Half + psf2.GetLength(0), bMap.GetLength(0));
-            var xMax = Math.Min(xPixel - xPsf2Half + psf2.GetLength(1), bMap.GetLength(1));
+            var yMax = Math.Min(yPixel - yPsf2Half + psf2.GetLength(0), gradients.GetLength(0));
+            var xMax = Math.Min(xPixel - xPsf2Half + psf2.GetLength(1), gradients.GetLength(1));
             for (int i = yMin; i < yMax; i++)
                 for (int j = xMin; j < xMax; j++)
                 {
                     var yBUpdate = i + yPsf2Half - yPixel;
                     var xBUpdate = j + xPsf2Half - xPixel;
-                    bMap[i, j] += psf2[yBUpdate, xBUpdate] * xDiff;
+                    gradients[i, j] += psf2[yBUpdate, xBUpdate] * xDiff;
                 }
         }
 
-        private static void UpdateB(float[,] bMap, float[,] psf2,  int yPixel, int xPixel, float xDiff)
+        private static void UpdateGradients(float[,] gradients, float[,] psf2, ParallelOptions options,  int yPixel, int xPixel, float xDiff)
         {
             var yPsf2Half = psf2.GetLength(0) / 2;
             var xPsf2Half = psf2.GetLength(1) / 2;
 
             var yMin = Math.Max(yPixel - yPsf2Half, 0);
             var xMin = Math.Max(xPixel - xPsf2Half, 0);
-            var yMax = Math.Min(yPixel - yPsf2Half + psf2.GetLength(0), bMap.GetLength(0));
-            var xMax = Math.Min(xPixel - xPsf2Half + psf2.GetLength(1), bMap.GetLength(1));
-            Parallel.For(yMin, yMax, (i) =>
+            var yMax = Math.Min(yPixel - yPsf2Half + psf2.GetLength(0), gradients.GetLength(0));
+            var xMax = Math.Min(xPixel - xPsf2Half + psf2.GetLength(1), gradients.GetLength(1));
+            Parallel.For(yMin, yMax, options, (i) =>
             {
                 for (int j = xMin; j < xMax; j++)
                 {
                     var yBUpdate = i + yPsf2Half - yPixel;
                     var xBUpdate = j + xPsf2Half - xPixel;
-                    bMap[i, j] += psf2[yBUpdate, xBUpdate] * xDiff;
+                    gradients[i, j] += psf2[yBUpdate, xBUpdate] * xDiff;
                 }
             });
         }

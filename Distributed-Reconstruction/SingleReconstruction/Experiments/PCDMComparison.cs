@@ -53,7 +53,7 @@ namespace SingleReconstruction.Experiments
                 Deconvolver.DeconvolutionResult lastResult = null;
                 for (int cycle = 0; cycle < 6; cycle++)
                 {
-                    Console.WriteLine("cycle " + cycle);
+                    Console.WriteLine("Beginning Major cycle " + cycle);
                     var dirtyGrid = IDG.GridW(c, metadata, residualVis, input.UVW, input.Frequencies);
                     var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, c.VisibilitiesCount);
                     FFT.Shift(dirtyImage);
@@ -71,6 +71,7 @@ namespace SingleReconstruction.Experiments
                     var absMax = 0.0f;
                     for (int minorCycle = 0; minorCycle < minorCycles; minorCycle++)
                     {
+                        Console.WriteLine("Beginning Minor Cycle "+ minorCycle);
                         var maxDirty = Residuals.GetMax(dirtyImage);
                         var bMap = currentBMapCalculator.Convolve(dirtyImage);
                         var maxB = Residuals.GetMax(bMap);
@@ -95,7 +96,6 @@ namespace SingleReconstruction.Experiments
                         if (currentLambda == lambda | currentLambda == minLambda)
                             break;
 
-                        Console.WriteLine("Done Minorcycle residuals!!");
                         var residualsUpdate = new float[xImage.GetLength(0), xImage.GetLength(1)];
                         Parallel.For(0, xCopy.GetLength(0), (i) =>
                         {
@@ -187,7 +187,7 @@ namespace SingleReconstruction.Experiments
                     
                     var objective = Residuals.CalcPenalty(dirtyImage) + ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
                     
-                    var absMax = fastCD.GetAbsMax(xImage, bMap, lambdaTrue, alpha);
+                    var absMax = fastCD.GetAbsMaxDiff(xImage, bMap, lambdaTrue, alpha);
                     
                     if (absMax >= MAJOR_STOP)
                         lastResult = fastCD.Deconvolve(xImage, bMap, currentLambda, alpha, 30000, 1e-5f);
@@ -262,7 +262,7 @@ namespace SingleReconstruction.Experiments
 
             Directory.CreateDirectory("PCDMComparison");
             ReconstructPCDM(data, c, psf, "PCDMComparison", "pcdm", 3, 0.1f);
-            //ReconstructSerial(data, c, psf, "PCDMComparison", "serial");
+            ReconstructSerial(data, c, psf, "PCDMComparison", "serial");
         }
     }
 }

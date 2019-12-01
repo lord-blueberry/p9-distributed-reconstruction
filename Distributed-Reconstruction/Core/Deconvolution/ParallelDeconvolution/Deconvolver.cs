@@ -158,10 +158,11 @@ namespace Core.Deconvolution.ParallelDeconvolution
                 var currentAbsMax = GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha);
                 var activeSetValid = currentAbsMax > lastAbsMax && lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor;
                 activeSetValid |= lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor * 2;
-                Console.WriteLine("LastAbsMaxFactor = " + lastAbsMax);
-                Console.WriteLine("deconvolvers = " + deconvolvers.Max(d => d.DiffMax));
-                Console.WriteLine("absMaxFactor = " + lastAbsMax / deconvolvers.Max(d => d.DiffMax));
-
+                //Console.WriteLine("LastAbsMaxFactor = " + lastAbsMax);
+                //Console.WriteLine("deconvolvers = " + deconvolvers.Max(d => d.DiffMax));
+                //Console.WriteLine("absMaxFactor = " + lastAbsMax / deconvolvers.Max(d => d.DiffMax));
+                Console.WriteLine("active set iteration: " + iter + " current max pixel: " + currentAbsMax);
+                
                 if (shared.TestRestart > 0.0f | activeSetValid)
                 {
                     Console.WriteLine("restarting");
@@ -200,7 +201,6 @@ namespace Core.Deconvolution.ParallelDeconvolution
                     }
                 }
 
-                Console.WriteLine("Done Active Set iteration " + iter);
                 iter++;
             }
 
