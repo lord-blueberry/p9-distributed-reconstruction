@@ -12,7 +12,7 @@ namespace Core.ImageDomainGridder
     {
 
         #region Grid
-        public static List<List<Complex[,]>> ForwardHack(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, Complex[,,] visibilities, double[] frequencies, float[,] spheroidal)
+        public static List<List<Complex[,]>> Forward(GriddingConstants c, List<List<Subgrid>> metadata, double[,,] uvw, Complex[,,] visibilities, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = MathFunctions.FrequencyToWavenumber(frequencies);
             var imagesize = c.ScaleArcSec * c.GridSize;
@@ -88,7 +88,7 @@ namespace Core.ImageDomainGridder
         #endregion
 
         #region De-grid
-        public static Complex[,,] BackwardsHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)
+        public static Complex[,,] Backwards(GriddingConstants c, List<List<Subgrid>> metadata, List<List<Complex[,]>> subgridData, double[,,] uvw, double[] frequencies, float[,] spheroidal)
         {
             var wavenumbers = MathFunctions.FrequencyToWavenumber(frequencies);
             var imagesize = c.ScaleArcSec * c.GridSize;
@@ -169,7 +169,6 @@ namespace Core.ImageDomainGridder
         {
             //evaluate n = 1.0f - sqrt(1.0 - (l * l) - (m * m))
             //accurately for small values of l and m
-            //TODO: rework the c++ version of this snipped into here
             var tmp = (l * l) + (m * m);
             return tmp / ((float)(tmp / 1.0f + Sqrt(1.0 - tmp)));
         }

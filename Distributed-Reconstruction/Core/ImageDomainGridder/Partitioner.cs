@@ -17,13 +17,13 @@ namespace Core.ImageDomainGridder
         /// <param name="uvw"></param>
         /// <param name="frequencies"></param>
         /// <returns></returns>
-        public static List<List<SubgridHack>> CreatePartition(GriddingConstants c, double[,,] uvw, double[] frequencies)
+        public static List<List<ImageDomainGridder.Subgrid>> CreatePartition(GriddingConstants c, double[,,] uvw, double[] frequencies)
         {
             var imagesize = c.ScaleArcSec * c.GridSize;
-            List<List<SubgridHack>> outputGrids = new List<List<SubgridHack>>(uvw.GetLength(0));
+            List<List<ImageDomainGridder.Subgrid>> outputGrids = new List<List<ImageDomainGridder.Subgrid>>(uvw.GetLength(0));
             for(int baseline = 0; baseline < uvw.GetLength(0); baseline++)
             {
-                var baselineOutput = new List<SubgridHack>(uvw.GetLength(1));
+                var baselineOutput = new List<ImageDomainGridder.Subgrid>(uvw.GetLength(1));
                 outputGrids.Add(baselineOutput);
                 //idg checks a-terms bins we ignore the a-term correction here, so we can simplify and only iterate over 
 
@@ -102,7 +102,7 @@ namespace Core.ImageDomainGridder
                     if (subgrid.InRange())
                     {
                         //TODO: Fix hack and hand over data properly
-                        var data = new SubgridHack();
+                        var data = new ImageDomainGridder.Subgrid();
                         data.timeSampleCount = timeSamplePerSubgrid;
                         data.timeSampleStart = time - timeSamplePerSubgrid;
                         data.baselineIdx = baseline;

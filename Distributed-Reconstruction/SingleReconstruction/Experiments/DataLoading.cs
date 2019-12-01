@@ -13,7 +13,7 @@ namespace SingleReconstruction.Experiments
         public class Data
         {
             public GriddingConstants c;
-            public List<List<SubgridHack>> metadata;
+            public List<List<Subgrid>> metadata;
             public double[] frequencies;
             public Complex[,,] visibilities;
             public double[,,] uvw;

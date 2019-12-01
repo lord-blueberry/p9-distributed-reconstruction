@@ -9,17 +9,47 @@ namespace Core.ImageDomainGridder
 {
     public class IDG
     {
-        public static Complex[,] Grid(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
+        public static Complex[,] Grid(GriddingConstants c, List<List<Subgrid>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
-            var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
+            var gridded = Gridder.Forward(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
             var ftgridded = SubgridFFT.Forward(c, gridded);
-            var grid = Adder.AddHack(c, metadata, ftgridded);
+            var grid = Adder.Add(c, metadata, ftgridded);
             FFT.Shift(grid);
 
             return grid;
         }
 
-        public static Complex[,] GridPSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
+        public static Complex[,,] DeGrid(GriddingConstants c, List<List<Subgrid>> metadata, Complex[,] grid, double[,,] uvw, double[] frequencies)
+        {
+            FFT.Shift(grid);
+            var ftGridded = Adder.Split(c, metadata, grid);
+            var gridded = SubgridFFT.Backward(c, ftGridded);
+            var visibilities = Gridder.Backwards(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
+
+            return visibilities;
+        }
+
+        public static List<Complex[,]> GridW(GriddingConstants c, List<List<Subgrid>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
+        {
+            var gridded = Gridder.Forward(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
+            var ftgridded = SubgridFFT.Forward(c, gridded);
+            var grid = AdderWStack.Add(c, metadata, ftgridded);
+            FFT.Shift(grid);
+
+            return grid;
+        }
+
+        public static Complex[,,] DeGridW(GriddingConstants c, List<List<Subgrid>> metadata, Complex[,] grid, double[,,] uvw, double[] frequencies)
+        {
+            FFT.Shift(grid);
+            var ftGridded = AdderWStack.Split(c, metadata, grid);
+            var gridded = SubgridFFT.Backward(c, ftGridded);
+            var visibilities = Gridder.Backwards(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
+
+            return visibilities;
+        }
+
+        public static Complex[,] GridPSF(GriddingConstants c, List<List<Subgrid>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             var visibilities = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             for (int i = 0; i < visibilities.GetLength(0); i++)
@@ -35,21 +65,13 @@ namespace Core.ImageDomainGridder
             return Grid(c, metadata, visibilities, uvw, frequencies);
         }
 
-        public static Complex[,,] DeGrid(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,] grid, double[,,] uvw, double[] frequencies)
-        {
-            FFT.Shift(grid);
-            var ftGridded = Adder.SplitHack(c, metadata, grid);
-            var gridded = SubgridFFT.Backward(c, ftGridded);
-            var visibilities = Gridder.BackwardsHack(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
 
-            return visibilities;
-        }
 
-        public static double[,] ToImage(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
+        public static double[,] ToImage(GriddingConstants c, List<List<Subgrid>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
         {
-            var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
+            var gridded = Gridder.Forward(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
             var ftgridded = SubgridFFT.Forward(c, gridded);
-            var grid = Adder.AddHack(c, metadata, ftgridded);
+            var grid = Adder.Add(c, metadata, ftgridded);
             FFT.Shift(grid);
             var img = FFT.Backward(grid, c.VisibilitiesCount);
             FFT.Shift(img);
@@ -62,7 +84,7 @@ namespace Core.ImageDomainGridder
             return img;
         }
 
-        public static double[,] CalculatePSF(GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
+        public static double[,] CalculatePSF(GriddingConstants c, List<List<Subgrid>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             var visibilities = new Complex[uvw.GetLength(0), uvw.GetLength(1), frequencies.Length];
             for (int i = 0; i < visibilities.GetLength(0); i++)
@@ -78,9 +100,9 @@ namespace Core.ImageDomainGridder
                     }
                         
             
-            var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
+            var gridded = Gridder.Forward(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
             var ftgridded = SubgridFFT.Forward(c, gridded);
-            var grid = Adder.AddHack(c, metadata, ftgridded);
+            var grid = Adder.Add(c, metadata, ftgridded);
             FFT.Shift(grid);
             var psf = FFT.Backward(grid, c.VisibilitiesCount);
             FFT.Shift(psf);
@@ -91,45 +113,6 @@ namespace Core.ImageDomainGridder
                     psf[y, x] = psf[y, x] / c.GridSpheroidal[y, x];*/
 
             return psf;
-        }
-
-        public static Complex[,,] ToVisibilities(GriddingConstants c, List<List<SubgridHack>> metadata, double[,] image, double[,,] uvw, double[] frequencies)
-        {
-            //add spheroidal to grid?
-            for (int i = 0; i < image.GetLength(0); i++)
-                for (int j = 0; j < image.GetLength(1); j++)
-                    image[i, j] = image[i, j] / c.GridSpheroidal[i, j];
-
-            FFT.Shift(image);
-            var grid = FFT.Forward(image);
-            FFT.Shift(image);
-
-            FFT.Shift(grid);
-            var ftGridded = Adder.SplitHack(c, metadata, grid);
-            var gridded = SubgridFFT.Backward(c, ftGridded);
-            var visibilities = Gridder.BackwardsHack(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
-
-            return visibilities;
-        }
-
-        public static List<Complex[,]> GridW(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies)
-        {
-            var gridded = Gridder.ForwardHack(c, metadata, uvw, visibilities, frequencies, c.SubgridSpheroidal);
-            var ftgridded = SubgridFFT.Forward(c, gridded);
-            var grid = AdderWStack.AddHack(c, metadata, ftgridded);
-            FFT.Shift(grid);
-
-            return grid;
-        }
-
-        public static Complex[,,] DeGridW(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,] grid, double[,,] uvw, double[] frequencies)
-        {
-            FFT.Shift(grid);
-            var ftGridded = AdderWStack.SplitHack(c, metadata, grid);
-            var gridded = SubgridFFT.Backward(c, ftGridded);
-            var visibilities = Gridder.BackwardsHack(c, metadata, gridded, uvw, frequencies, c.SubgridSpheroidal);
-
-            return visibilities;
         }
     }
 }

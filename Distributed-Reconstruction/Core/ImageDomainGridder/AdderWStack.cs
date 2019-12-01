@@ -8,7 +8,7 @@ namespace Core.ImageDomainGridder
 {
     class AdderWStack
     {
-        public static List<Complex[,]> AddHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgrids)
+        public static List<Complex[,]> Add(GriddingConstants c, List<List<Subgrid>> metadata, List<List<Complex[,]>> subgrids)
         {
             var grid = new List<Complex[,]>(c.WLayerCount);
             for (int i = 0; i < c.WLayerCount; i++)
@@ -78,7 +78,7 @@ namespace Core.ImageDomainGridder
         }
 
 
-        public static List<List<Complex[,]>> SplitHack(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,] grid)
+        public static List<List<Complex[,]>> Split(GriddingConstants c, List<List<Subgrid>> metadata, Complex[,] grid)
         {
             var phasorPrecomputed = new Complex[c.SubgridSize, c.SubgridSize];
             Parallel.For(0, phasorPrecomputed.GetLength(0), (y) =>

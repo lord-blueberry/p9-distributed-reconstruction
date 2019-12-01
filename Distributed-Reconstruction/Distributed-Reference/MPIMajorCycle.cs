@@ -158,7 +158,7 @@ namespace DistributedReconstruction
             return bLocal;
         }
 
-        private static DirtyImage ForwardCalculateB(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, Complex[,] PsfCorrelation, float[,] psfCut, float maxSidelobe, Stopwatch watchIdg)
+        private static DirtyImage ForwardCalculateB(Intracommunicator comm, GriddingConstants c, List<List<Subgrid>> metadata, Complex[,,] visibilities, double[,,] uvw, double[] frequencies, Complex[,] PsfCorrelation, float[,] psfCut, float maxSidelobe, Stopwatch watchIdg)
         {
             Stopwatch another = new Stopwatch();
             comm.Barrier();
@@ -202,7 +202,7 @@ namespace DistributedReconstruction
             }
         }
 
-        private static float[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<SubgridHack>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
+        private static float[,] CalculatePSF(Intracommunicator comm, GriddingConstants c, List<List<Subgrid>> metadata, double[,,] uvw, bool[,,] flags, double[] frequencies)
         {
             float[,] psf = null;
             var localGrid = IDG.GridPSF(c, metadata, uvw, flags, frequencies);

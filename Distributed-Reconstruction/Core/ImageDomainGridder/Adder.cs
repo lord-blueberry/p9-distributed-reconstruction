@@ -10,7 +10,7 @@ namespace Core.ImageDomainGridder
 {
     class Adder
     {
-        public static Complex[,] AddHack(GriddingConstants c, List<List<SubgridHack>> metadata, List<List<Complex[,]>> subgrids)
+        public static Complex[,] Add(GriddingConstants c, List<List<Subgrid>> metadata, List<List<Complex[,]>> subgrids)
         {
             var grid = new Complex[c.GridSize, c.GridSize];
 
@@ -54,7 +54,7 @@ namespace Core.ImageDomainGridder
             return grid;
         }
 
-        public static List<List<Complex[,]>> SplitHack(GriddingConstants c, List<List<SubgridHack>> metadata, Complex[,] grid)
+        public static List<List<Complex[,]>> Split(GriddingConstants c, List<List<Subgrid>> metadata, Complex[,] grid)
         {
             var subgrids = new List<List<Complex[,]>>(metadata.Count);
 

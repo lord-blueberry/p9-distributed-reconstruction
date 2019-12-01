@@ -99,7 +99,10 @@ namespace Core
                 FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
 
                 watchBackwards.Start();
-                var modelVis = IDG.ToVisibilities(c, metadata, xImage, uvw, frequencies);
+                FFT.Shift(xImage);
+                var xGrid = FFT.Forward(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
                 residualVis = Visibilities.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
             }
@@ -172,7 +175,10 @@ namespace Core
                 FitsIO.Write(xImage, "xImage_" + cycle + ".fits");
 
                 watchBackwards.Start();
-                var modelVis = IDG.ToVisibilities(c, metadata, xImage, uvw, frequencies);
+                FFT.Shift(xImage);
+                var xGrid = FFT.Forward(xImage);
+                FFT.Shift(xImage);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, uvw, frequencies);
                 residualVis = Visibilities.Substract(visibilities, modelVis, flags);
                 watchBackwards.Stop();
             }

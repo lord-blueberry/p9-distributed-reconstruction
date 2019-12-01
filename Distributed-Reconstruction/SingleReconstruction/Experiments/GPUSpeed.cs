@@ -6,8 +6,6 @@ using Core;
 using Core.Deconvolution;
 using Core.ImageDomainGridder;
 using static Core.Common;
-using static SingleReconstruction.Experiments.PSFSize;
-using static SingleReconstruction.Experiments.DataLoading;
 
 namespace SingleReconstruction.Experiments
 {
