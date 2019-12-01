@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Numerics;
 using MPI;
-using Single_Reference;
+using Core;
 using System.IO;
 
 namespace DistributedReconstruction

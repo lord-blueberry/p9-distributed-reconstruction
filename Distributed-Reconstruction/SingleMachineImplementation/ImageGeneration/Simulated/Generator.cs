@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using System.Numerics;
-using Single_Reference;
-using Single_Reference.IDGSequential;
-using Single_Reference.Deconvolution;
+using Core;
+using Core.ImageDomainGridder;
+using Core.Deconvolution;
 
-using static Single_Reference.Common;
+using static Core.Common;
 
 namespace SingleMachineRuns.ImageGeneration.Simulated
 {

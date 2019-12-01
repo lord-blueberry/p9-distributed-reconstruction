@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
-using Single_Reference;
-using Single_Reference.Deconvolution;
-using Single_Reference.IDGSequential;
-using static Single_Reference.Common;
+using Core;
+using Core.Deconvolution;
+using Core.ImageDomainGridder;
+using static Core.Common;
 using static SingleMachineRuns.Experiments.PSFSize;
 using static SingleMachineRuns.Experiments.DataLoading;
 

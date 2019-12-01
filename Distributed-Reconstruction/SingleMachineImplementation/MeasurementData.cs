@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using System.Numerics;
-using Single_Reference;
-using Single_Reference.IDGSequential;
+using Core;
+using Core.ImageDomainGridder;
 
 namespace SingleMachineRuns
 {

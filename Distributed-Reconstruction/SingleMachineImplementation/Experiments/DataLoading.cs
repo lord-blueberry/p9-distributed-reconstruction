@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Single_Reference.IDGSequential;
+using Core.ImageDomainGridder;
 using System.IO;
 using System.Numerics;
-using Single_Reference;
+using Core;
 
 namespace SingleMachineRuns.Experiments
 {

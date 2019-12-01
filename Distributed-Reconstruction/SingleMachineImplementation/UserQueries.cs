@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Single_Reference.IDGSequential;
+using Core.ImageDomainGridder;
 
 namespace SingleMachineRuns
 {

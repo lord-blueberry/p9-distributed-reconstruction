@@ -5,11 +5,11 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Numerics;
 
-using Single_Reference;
-using Single_Reference.IDGSequential;
-using Single_Reference.Deconvolution;
-using static Single_Reference.Common;
-using Single_Reference.Deconvolution.ParallelDeconvolution;
+using Core;
+using Core.ImageDomainGridder;
+using Core.Deconvolution;
+using static Core.Common;
+using Core.Deconvolution.ParallelDeconvolution;
 
 namespace SingleMachineRuns.Experiments
 {

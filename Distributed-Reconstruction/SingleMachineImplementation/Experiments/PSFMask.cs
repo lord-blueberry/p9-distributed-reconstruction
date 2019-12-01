@@ -5,10 +5,10 @@ using System.Numerics;
 using System.IO;
 using static System.Math;
 
-using Single_Reference;
-using Single_Reference.IDGSequential;
-using Single_Reference.Deconvolution;
-using static Single_Reference.Common;
+using Core;
+using Core.ImageDomainGridder;
+using Core.Deconvolution;
+using static Core.Common;
 using static SingleMachineRuns.Experiments.PSFSize;
 using static SingleMachineRuns.Experiments.DataLoading;
 

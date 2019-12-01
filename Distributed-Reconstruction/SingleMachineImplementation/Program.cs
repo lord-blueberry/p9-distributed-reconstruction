@@ -1,13 +1,12 @@
 ﻿using System;
-using Single_Reference;
 
 using System.IO;
 using System.Numerics;
 using static System.Math;
-using Single_Reference;
-using Single_Reference.IDGSequential;
-using Single_Reference.Deconvolution;
-using static Single_Reference.Common;
+using Core;
+using Core.ImageDomainGridder;
+using Core.Deconvolution;
+using static Core.Common;
 using static SingleMachineRuns.Experiments.DataLoading;
 
 namespace SingleMachineRuns

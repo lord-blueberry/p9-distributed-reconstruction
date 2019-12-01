@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
-using static Single_Reference.Common;
+using static Core.Common;
 
 namespace SingleMachineRuns.ImageGeneration
 {

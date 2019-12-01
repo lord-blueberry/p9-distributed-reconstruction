@@ -2,15 +2,15 @@
 using MPI;
 using System.Diagnostics;
 
-using Single_Reference;
 using static System.Math;
 using System.Numerics;
 using System.Collections.Generic;
 using System.IO;
 
-using Single_Reference.IDGSequential;
-using Single_Reference.Deconvolution;
-using static Single_Reference.Common;
+using Core;
+using Core.ImageDomainGridder;
+using Core.Deconvolution;
+using static Core.Common;
 
 namespace DistributedReconstruction
 {
@@ -63,7 +63,7 @@ namespace DistributedReconstruction
 
                 var lambda = 0.4f;
                 var alpha = 0.1f;
-                var reconstruction = MPIReconstruction.Reconstruct(comm, data, c, 2, lambda, alpha, 10000);
+                var reconstruction = MPIMajorCycle.Reconstruct(comm, data, c, 2, lambda, alpha, 10000);
 
                 if (comm.Rank == 0)
                     FitsIO.Write(reconstruction, "tinyMeerKATReconstruction.fits");
@@ -100,7 +100,7 @@ namespace DistributedReconstruction
                 if (comm.Rank == 0)
                     Console.WriteLine("Done Reading, Starting reconstruction");
 
-                var reconstruction = MPIReconstruction.Reconstruct(comm, data, c, 1, 0.5f, 0.8f, 1000);
+                var reconstruction = MPIMajorCycle.Reconstruct(comm, data, c, 1, 0.5f, 0.8f, 1000);
 
                 if (comm.Rank == 0)
                     FitsIO.Write(reconstruction, "simulatedReconstruction.fits");

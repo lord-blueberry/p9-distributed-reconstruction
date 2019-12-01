@@ -9,7 +9,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DistributedReconstruction",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DependencyTest", "DependencyTest\DependencyTest.csproj", "{B7B2DFBB-34E3-4228-A4EC-FFAE29463891}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SingleMachineRuns", "SingleMachineImplementation\SingleMachineRuns.csproj", "{0784CCAE-089D-4CDD-8023-F9249EDCE40E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SingleMachineRuns", "SingleMachineImplementation\SingleMachineRuns.csproj", "{0784CCAE-089D-4CDD-8023-F9249EDCE40E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "Core\Core.csproj", "{81469C4F-B5B3-4304-AF89-FF28D5017236}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SingleReconstruction", "SingleReconstruction\SingleReconstruction.csproj", "{69805EDD-B6FF-4353-A686-5AD89105B776}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +37,14 @@ Global
 		{0784CCAE-089D-4CDD-8023-F9249EDCE40E}.Debug|AnyCPU.Build.0 = Debug|Any CPU
 		{0784CCAE-089D-4CDD-8023-F9249EDCE40E}.Release|AnyCPU.ActiveCfg = Release|Any CPU
 		{0784CCAE-089D-4CDD-8023-F9249EDCE40E}.Release|AnyCPU.Build.0 = Release|Any CPU
+		{81469C4F-B5B3-4304-AF89-FF28D5017236}.Debug|AnyCPU.ActiveCfg = Debug|Any CPU
+		{81469C4F-B5B3-4304-AF89-FF28D5017236}.Debug|AnyCPU.Build.0 = Debug|Any CPU
+		{81469C4F-B5B3-4304-AF89-FF28D5017236}.Release|AnyCPU.ActiveCfg = Release|Any CPU
+		{81469C4F-B5B3-4304-AF89-FF28D5017236}.Release|AnyCPU.Build.0 = Release|Any CPU
+		{69805EDD-B6FF-4353-A686-5AD89105B776}.Debug|AnyCPU.ActiveCfg = Debug|Any CPU
+		{69805EDD-B6FF-4353-A686-5AD89105B776}.Debug|AnyCPU.Build.0 = Debug|Any CPU
+		{69805EDD-B6FF-4353-A686-5AD89105B776}.Release|AnyCPU.ActiveCfg = Release|Any CPU
+		{69805EDD-B6FF-4353-A686-5AD89105B776}.Release|AnyCPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using static Single_Reference.Common;
+using static Core.Common;
 
 using MPI;
 

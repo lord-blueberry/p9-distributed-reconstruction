@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CSharpFITS" Version="1.1.0" />
+    <PackageReference Include="FFTW.NET" Version="1.0.1" />
+    <PackageReference Include="ILGPU" Version="0.6.0" />
+    <PackageReference Include="ILGPU.Lightning" Version="0.3.0" />
+    <PackageReference Include="MathNet.Numerics" Version="4.8.1" />
+  </ItemGroup>
+
+</Project>

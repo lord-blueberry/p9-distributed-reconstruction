@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Text;
 using System.Numerics;
 using System.IO;
-using Single_Reference;
-using Single_Reference.IDGSequential;
-using Single_Reference.Deconvolution;
-using static Single_Reference.Common;
+using Core;
+using Core.ImageDomainGridder;
+using Core.Deconvolution;
+using static Core.Common;
 using static System.Math;
 using static SingleMachineRuns.Experiments.DataLoading;
 
