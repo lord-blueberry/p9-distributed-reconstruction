@@ -16,6 +16,7 @@ namespace SingleReconstruction
     {
         static void Main(string[] args)
         {
+            Reconstruction.Start.StartReconstruction();
             //Experiments.GPUSpeed.Run();
             //Experiments.PSFSize.RunSpeedLarge();
             //Experiments.PSFSize.RunApproximationMethods();

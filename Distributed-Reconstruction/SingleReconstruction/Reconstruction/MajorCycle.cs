@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Numerics;
 
 using Core;
 using static Core.Common;
 using Core.Deconvolution;
+using Core.Deconvolution.ParallelDeconvolution;
 using Core.ImageDomainGridder;
 
 namespace SingleReconstruction.Reconstruction
@@ -15,7 +17,110 @@ namespace SingleReconstruction.Reconstruction
     {
         const float MAJOR_EPSILON = 1e-4f;
 
-        private static void Reconstruct(MeasurementData data, GriddingConstants c, IDeconvolver deconvolver, int psfCutFactor, int maxMajorCycle, float lambda, float alpha, int deconvIterations, float deconvEpsilon)
+        public static void ReconstructSerialCD(MeasurementData data, GriddingConstants c, bool useGPU, int psfCutFactor, int maxMajorCycle, float lambda, float alpha, int deconvIterations, float deconvEpsilon)
+        {
+            var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
+            var psfVis = new Complex[data.UVW.GetLength(0), data.UVW.GetLength(1), data.Frequencies.Length];
+            for (int i = 0; i < data.Visibilities.GetLength(0); i++)
+                for (int j = 0; j < data.Visibilities.GetLength(1); j++)
+                    for (int k = 0; k < data.Visibilities.GetLength(2); k++)
+                        if (!data.Flags[i, j, k])
+                            psfVis[i, j, k] = new Complex(1.0, 0);
+                        else
+                            psfVis[i, j, k] = new Complex(0, 0);
+
+            Console.WriteLine("gridding psf");
+            var psfGrid = IDG.GridW(c, metadata, psfVis, data.UVW, data.Frequencies);
+            var psf = FFT.WStackIFFTFloat(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+
+            var totalWatch = new Stopwatch();
+            var currentWatch = new Stopwatch();
+
+            var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
+            var psfCut = PSF.Cut(psf, psfCutFactor);
+            var maxSidelobe = PSF.CalcMaxSidelobe(psf, psfCutFactor);
+
+            IDeconvolver deconvolver = null;
+            if (useGPU & GPUGreedyCD.IsGPUSupported())
+            {
+                deconvolver = new GPUGreedyCD(totalSize, psfCut, 1000);
+            }
+            else if(useGPU & !GPUGreedyCD.IsGPUSupported())
+            {
+                Console.WriteLine("GPU not supported by library. Switching to CPU implementation");
+                deconvolver = new FastGreedyCD(totalSize, psfCut);
+            }
+            else
+            {
+                deconvolver = new FastGreedyCD(totalSize, psfCut);
+            }
+
+            var psfBMap = psfCut;
+            using (var gCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1))))
+            using (var gCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psf, totalSize), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1))))
+            {
+                var currentGCalculator = gCalculator;
+                var maxLipschitz = PSF.CalcMaxLipschitz(psfCut);
+                var lambdaLipschitz = (float)(lambda * maxLipschitz);
+                var lambdaTrue = (float)(lambda * PSF.CalcMaxLipschitz(psf));
+                var switchedToOtherPsf = false;
+
+                var xImage = new float[c.GridSize, c.GridSize];
+                var residualVis = data.Visibilities;
+                DeconvolutionResult lastResult = null;
+                for (int cycle = 0; cycle < maxMajorCycle; cycle++)
+                {
+                    Console.WriteLine("Beginning Major cycle " + cycle);
+                    var dirtyGrid = IDG.GridW(c, metadata, residualVis, data.UVW, data.Frequencies);
+                    var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, c.VisibilitiesCount);
+                    FFT.Shift(dirtyImage);
+                    FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
+
+                    currentWatch.Restart();
+                    totalWatch.Start();
+                    var maxDirty = Residuals.GetMax(dirtyImage);
+                    var gradients = gCalculator.Convolve(dirtyImage);
+                    var maxB = Residuals.GetMax(gradients);
+                    var correctionFactor = Math.Max(maxB / (maxDirty * maxLipschitz), 1.0f);
+                    var currentSideLobe = maxB * maxSidelobe * correctionFactor;
+                    var currentLambda = (float)Math.Max(currentSideLobe / alpha, lambdaLipschitz);
+
+                    var objective = Residuals.CalcPenalty(dirtyImage) + ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
+
+                    var absMax = deconvolver.GetAbsMaxDiff(xImage, gradients, lambdaTrue, alpha);
+
+                    if (absMax >= MAJOR_EPSILON)
+                        lastResult = deconvolver.Deconvolve(xImage, gradients, currentLambda, alpha, deconvIterations, deconvEpsilon);
+
+                    if (lambda == currentLambda & !switchedToOtherPsf)
+                    {
+                        currentGCalculator = gCalculator2;
+                        lambda = lambdaTrue;
+                        maxLipschitz = PSF.CalcMaxLipschitz(psf);
+                        switchedToOtherPsf = true;
+                    }
+
+                    FitsIO.Write(xImage, "xImage_serial_" + cycle + ".fits");
+
+                    currentWatch.Stop();
+                    totalWatch.Stop();
+
+                    if (absMax < MAJOR_EPSILON)
+                        break;
+
+                    FFT.Shift(xImage);
+                    var xGrid = FFT.Forward(xImage);
+                    FFT.Shift(xImage);
+                    var modelVis = IDG.DeGridW(c, metadata, xGrid, data.UVW, data.Frequencies);
+                    residualVis = Visibilities.Substract(data.Visibilities, modelVis, data.Flags);
+                }
+
+                Console.WriteLine("Reconstruction finished in (seconds): " + totalWatch.Elapsed.TotalSeconds);
+            }
+        }
+
+        public static void ReconstructPCDM(MeasurementData data, GriddingConstants c, int psfCutFactor, int maxMajorCycle, int maxMinorCycle, float lambda, float alpha, int deconvIterations, float deconvEpsilon)
         {
             var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
             var psfVis = new Complex[data.UVW.GetLength(0), data.UVW.GetLength(1), data.Frequencies.Length];
@@ -38,58 +143,97 @@ namespace SingleReconstruction.Reconstruction
             var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
             var psfCut = PSF.Cut(psf, psfCutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(psf, psfCutFactor);
-            
+            var sidelobeHalf = PSF.CalcMaxSidelobe(psf, 2);
 
-            var psfBMap = psfCut;
-            using (var gCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1))))
+            var pcdm = new Deconvolver(totalSize, psfCut, Environment.ProcessorCount, 1000);
+
+            using (var gCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1))))
             using (var gCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psf, totalSize), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1))))
+            using (var residualsConvolver = new PaddedConvolver(totalSize, psf))
             {
-                var currentBMapCalculator = gCalculator;
+                var currentGCalculator = gCalculator;
+
                 var maxLipschitz = PSF.CalcMaxLipschitz(psfCut);
                 var lambdaLipschitz = (float)(lambda * maxLipschitz);
                 var lambdaTrue = (float)(lambda * PSF.CalcMaxLipschitz(psf));
-                var switchedToOtherPsf = false;
 
+                var switchedToOtherPsf = false;
                 var xImage = new float[c.GridSize, c.GridSize];
                 var residualVis = data.Visibilities;
-                DeconvolutionResult lastResult = null;
+                Deconvolver.DeconvolutionResult lastResult = null;
                 for (int cycle = 0; cycle < maxMajorCycle; cycle++)
                 {
-                    Console.WriteLine("Major Cycle " + cycle);
+                    Console.WriteLine("Beginning Major cycle " + cycle);
                     var dirtyGrid = IDG.GridW(c, metadata, residualVis, data.UVW, data.Frequencies);
                     var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, c.VisibilitiesCount);
                     FFT.Shift(dirtyImage);
-                    FitsIO.Write(dirtyImage, "/dirty" + cycle + ".fits");
+                    FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
 
                     currentWatch.Restart();
                     totalWatch.Start();
-                    var maxDirty = Residuals.GetMax(dirtyImage);
-                    var gradients = gCalculator.Convolve(dirtyImage);
-                    var maxB = Residuals.GetMax(gradients);
-                    var correctionFactor = Math.Max(maxB / (maxDirty * maxLipschitz), 1.0f);
-                    var currentSideLobe = maxB * maxSidelobe * correctionFactor;
-                    var currentLambda = (float)Math.Max(currentSideLobe / alpha, lambdaLipschitz);
 
-                    var objective = Residuals.CalcPenalty(dirtyImage) + ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
-
-                    var absMax = deconvolver.GetAbsMaxDiff(xImage, gradients, lambdaTrue, alpha);
-
-                    if (absMax >= MAJOR_EPSILON)
-                        lastResult = deconvolver.Deconvolve(xImage, gradients, currentLambda, alpha, deconvIterations, deconvEpsilon);
-
-                    if (lambda == currentLambda & !switchedToOtherPsf)
+                    var breakMajor = false;
+                    var minLambda = 0.0f;
+                    var dirtyCopy = Copy(dirtyImage);
+                    var xCopy = Copy(xImage);
+                    var currentLambda = 0f;
+                    var currentObjective = 0.0;
+                    var absMax = 0.0f;
+                    for (int minorCycle = 0; minorCycle < maxMinorCycle; minorCycle++)
                     {
-                        currentBMapCalculator = gCalculator2;
-                        lambda = lambdaTrue;
-                        maxLipschitz = PSF.CalcMaxLipschitz(psf);
-                        switchedToOtherPsf = true;
+                        Console.WriteLine("Beginning Minor Cycle " + minorCycle);
+                        var maxDirty = Residuals.GetMax(dirtyImage);
+                        var bMap = currentGCalculator.Convolve(dirtyImage);
+                        var maxB = Residuals.GetMax(bMap);
+                        var correctionFactor = Math.Max(maxB / (maxDirty * maxLipschitz), 1.0f);
+                        var currentSideLobe = maxB * maxSidelobe * correctionFactor;
+                        currentLambda = (float)Math.Max(currentSideLobe / alpha, lambdaLipschitz);
+
+                        if (minorCycle == 0)
+                            minLambda = (float)(maxB * sidelobeHalf * correctionFactor / alpha);
+                        if (currentLambda < minLambda)
+                            currentLambda = minLambda;
+                        currentObjective = Residuals.CalcPenalty(dirtyImage) + ElasticNet.CalcPenalty(xImage, lambdaTrue, alpha);
+                        absMax = pcdm.GetAbsMax(xImage, bMap, lambdaTrue, alpha);
+                        if (absMax < MAJOR_EPSILON)
+                        {
+                            breakMajor = true;
+                            break;
+                        }
+
+                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 40, deconvEpsilon);
+
+                        if (currentLambda == lambda | currentLambda == minLambda)
+                            break;
+
+                        var residualsUpdate = new float[xImage.GetLength(0), xImage.GetLength(1)];
+                        Parallel.For(0, xCopy.GetLength(0), (i) =>
+                        {
+                            for (int j = 0; j < xCopy.GetLength(1); j++)
+                                residualsUpdate[i, j] = xImage[i, j] - xCopy[i, j];
+                        });
+                        residualsConvolver.ConvolveInPlace(residualsUpdate);
+                        Parallel.For(0, xCopy.GetLength(0), (i) =>
+                        {
+                            for (int j = 0; j < xCopy.GetLength(1); j++)
+                                dirtyImage[i, j] = dirtyCopy[i, j] - residualsUpdate[i, j];
+                        });
                     }
 
                     currentWatch.Stop();
                     totalWatch.Stop();
 
-                    if (absMax < MAJOR_EPSILON)
+                    if (breakMajor)
                         break;
+                    if (currentLambda == lambda & !switchedToOtherPsf)
+                    {
+                        pcdm.ResetAMap(psf);
+                        currentGCalculator = gCalculator2;
+                        lambda = lambdaTrue;
+                        switchedToOtherPsf = true;
+                    }
+
+                    FitsIO.Write(xImage, "xImage_pcdm_" + cycle + ".fits");
 
                     FFT.Shift(xImage);
                     var xGrid = FFT.Forward(xImage);
@@ -97,8 +241,10 @@ namespace SingleReconstruction.Reconstruction
                     var modelVis = IDG.DeGridW(c, metadata, xGrid, data.UVW, data.Frequencies);
                     residualVis = Visibilities.Substract(data.Visibilities, modelVis, data.Flags);
                 }
-            }
 
+                Console.WriteLine("Reconstruction finished in (seconds): " + totalWatch.Elapsed.TotalSeconds);
+            }
         }
+
     }
 }
