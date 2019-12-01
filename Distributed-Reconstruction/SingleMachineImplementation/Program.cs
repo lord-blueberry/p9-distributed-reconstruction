@@ -20,10 +20,10 @@ namespace SingleMachineRuns
             //Experiments.PSFSize.RunSpeedLarge();
             //Experiments.PSFSize.RunApproximationMethods();
             //Experiments.ApproxParameters.Run();
-            //Experiments.PCDMComparison.Run();
+            Experiments.PCDMComparison.Run();
 
 
-            ImageGeneration.Generator.GenerateAll();
+            //ImageGeneration.Generator.GenerateAll();
             //ImageGeneration.ApproxImages.Generator.Generate();
 
             //Single_Reference.DebugMethods.DebugILGPU();

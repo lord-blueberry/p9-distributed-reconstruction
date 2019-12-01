@@ -20,14 +20,14 @@ namespace SingleMachineRuns.Experiments
         const float LAMBDA = 1.0f;
         const float ALPHA = 0.01f;
 
-        private static void ReconstructMinorCycle(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int minorCycles, float searchPercent, bool useAccelerated = true)
+        private static void ReconstructMinorCycle(Data input, int cutFactor, float[,] fullPsf, string folder, string file, int minorCycles, float searchPercent, bool useAccelerated = true, int blockSize = 1, int maxCycle = 6)
         {
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var psfCut = PSF.Cut(fullPsf, cutFactor);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, cutFactor);
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
             var random = new Random(123);
-            var approx = new ApproxFast(totalSize, psfCut, 8, 4, 0.1f, searchPercent, false, useAccelerated);
+            var approx = new ApproxFast(totalSize, psfCut, 8, blockSize, 0.1f, searchPercent, false, useAccelerated);
 
             using(var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1))))
             using (var bMapCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1))))
@@ -47,7 +47,7 @@ namespace SingleMachineRuns.Experiments
                 var data = new ApproxFast.TestingData(new StreamWriter(folder + "/" + file + ".txt"));
                 var xImage = new float[input.c.GridSize, input.c.GridSize];
                 var residualVis = input.visibilities;
-                for (int cycle = 0; cycle < 6; cycle++)
+                for (int cycle = 0; cycle < maxCycle; cycle++)
                 {
                     Console.WriteLine("cycle " + cycle);
                     var dirtyGrid = IDG.GridW(input.c, input.metadata, residualVis, input.uvw, input.frequencies);
@@ -206,7 +206,7 @@ namespace SingleMachineRuns.Experiments
                 var file = "PsfSize" + psfSize;
                 var currentFolder = Path.Combine(outFolder, "PsfSize");
                 Directory.CreateDirectory(currentFolder);
-                Reconstruct(input, psfSize, fullPsf, currentFolder, file, 8, 1, true, 0f, 0.1f);
+                ReconstructMinorCycle(input, psfSize, fullPsf, currentFolder, file, 3, 0.1f);
             }
         }
 
@@ -218,13 +218,13 @@ namespace SingleMachineRuns.Experiments
                 var file = "block" + block;
                 var currentFolder = Path.Combine(outFolder, "BlockSize");
                 Directory.CreateDirectory(currentFolder);
-                Reconstruct(input, 32, fullPsf, currentFolder, file, 8, block, true, 0f, 0.1f);
+                ReconstructMinorCycle(input, 32, fullPsf, currentFolder, file, 3, 0.1f, true, block);
             }
         }
 
         private static void RunSearchPercent(Data input, float[,] fullPsf, string outFolder)
         {
-            var searchPercent = new float[] { 0.01f, 0.05f, 0.1f, 0.2f, 0.4f, 0.6f, 0.8f };
+            var searchPercent = new float[] { 0.0f, /*0.01f, 0.05f, 0.1f, 0.2f, 0.4f, 0.6f, 0.8f,*/ 1.0f };
             foreach (var percent in searchPercent)
             {
                 var file = "SearchPercent" + percent;
@@ -284,9 +284,9 @@ namespace SingleMachineRuns.Experiments
             FitsIO.Write(psf, Path.Combine(outFolder, "psfFull.fits"));
 
             //tryout with simply cutting the PSF
-            //RunPsfSize(data, psf, outFolder);
+            RunPsfSize(data, psf, outFolder);
             //RunBlocksize(data, psf, outFolder);
-            RunSearchPercent(data, psf, outFolder);
+            //RunSearchPercent(data, psf, outFolder);
             RunNotAccelerated(data, psf, outFolder);
         }
     }

@@ -611,7 +611,7 @@ namespace Single_Reference.Deconvolution
             {
                 times = new List<double>();
                 this.writer = writer;
-                writer.WriteLine("idx;cycle;minorCycle;seconds;objectiveNormal;objectiveAccelerated;L2GExp;L2GCorr;processorCount;blockSize;restarting") ;
+                writer.WriteLine("idx;cycle;minorCycle;seconds;objectiveNormal;objectiveAccelerated;approxMax;singleMax;restarting") ;
             }
             public void Write<T>(double time, IEnumerable<T> line)
             {

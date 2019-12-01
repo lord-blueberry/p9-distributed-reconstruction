@@ -259,13 +259,13 @@ namespace Single_Reference.Deconvolution.ParallelDeconvolution
                     concurrentFactor = lastAbsMax / deconvolvers.Max(d => d.DiffMax);
 
                 var currentAbsMax = GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha);
-                var activeSetValid = currentAbsMax > lastAbsMax && lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor;
-                activeSetValid |= lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor * 2;
+                var activeSetInvalid = currentAbsMax > lastAbsMax && lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor;
+                activeSetInvalid |= lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor * 2;
                 Console.WriteLine("LastAbsMaxFactor = " + lastAbsMax);
                 Console.WriteLine("deconvolvers = " + deconvolvers.Max(d => d.DiffMax));
                 Console.WriteLine("absMaxFactor = " + lastAbsMax / deconvolvers.Max(d => d.DiffMax));
 
-                if (shared.TestRestart > 0.0f | activeSetValid)
+                if (shared.TestRestart > 0.0f | activeSetInvalid)
                 {
                     Console.WriteLine("restarting");
                     concurrentFactor = -1f;
