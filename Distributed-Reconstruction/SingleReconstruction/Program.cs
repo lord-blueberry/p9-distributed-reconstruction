@@ -16,14 +16,14 @@ namespace SingleReconstruction
     {
         static void Main(string[] args)
         {
-            Reconstruction.RunningMethod.StartSimulatedReconstruction();
-            Reconstruction.RunningMethod.StartLMCReconstruction();
+            //Reconstruction.RunningMethod.StartSimulatedReconstruction();
+            //Reconstruction.RunningMethod.StartLMCReconstruction();
 
             //Experiments.GPUSpeed.Run();
             //Experiments.PSFSize.RunApproximationMethods();
             //Experiments.PSFSize.RunApproximationMethods();
             //Experiments.ApproxParameters.Run();
-            // Experiments.PCDMComparison.Run();
+            Experiments.PCDMComparison.Run();
 
 
 

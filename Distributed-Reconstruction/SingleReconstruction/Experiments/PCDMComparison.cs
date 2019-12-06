@@ -31,7 +31,7 @@ namespace SingleReconstruction.Experiments
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, CUT_FACTOR_PCDM);
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
             var random = new Random(123);
-            var pcdm = new Deconvolver(totalSize, psfCut, processorCount, 1000, searchPercent);
+            var pcdm = new Deconvolver(totalSize, psfCut, 1, 1000, searchPercent);
 
             var metadata = Partitioner.CreatePartition(c, input.UVW, input.Frequencies);
 
@@ -91,7 +91,7 @@ namespace SingleReconstruction.Experiments
                             break;
                         }
                             
-                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 40, 1e-5f);
+                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 100, 1e-5f);
 
                         if (currentLambda == lambda | currentLambda == minLambda)
                             break;
