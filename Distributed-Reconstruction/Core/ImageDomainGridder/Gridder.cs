@@ -24,8 +24,9 @@ namespace Core.ImageDomainGridder
                 var blSubgrids = new List<Complex[,]>(blMeta.Count);
                 output.Add(blSubgrids);
             }
-
-            Parallel.For(0, metadata.Count, baseline =>
+            var options = new ParallelOptions();
+            options.MaxDegreeOfParallelism = 32;
+            Parallel.For(0, metadata.Count, options, baseline =>
             {
                 var blMeta = metadata[baseline];
                 var blSubgrids = output[baseline];
@@ -93,8 +94,10 @@ namespace Core.ImageDomainGridder
             var wavenumbers = MathFunctions.FrequencyToWavenumber(frequencies);
             var imagesize = c.ScaleArcSec * c.GridSize;
 
+            var options = new ParallelOptions();
+            options.MaxDegreeOfParallelism = 32;
             var outputVis = new Complex[uvw.GetLength(0), uvw.GetLength(1), wavenumbers.Length];
-            Parallel.For(0, metadata.Count, baseline =>
+            Parallel.For(0, metadata.Count, options, baseline =>
             {
                 var blMeta = metadata[baseline];
                 var blSubgrids = subgridData[baseline];

@@ -15,6 +15,8 @@ namespace Core
         public AlignedArrayComplex ImageBuffer {get; private set;}
         public AlignedArrayComplex FourierBuffer { get; private set; }
 
+        public const int PROCESSOR_LIMIT = 32;
+
         public FFT(int ySize, int xSize)
             :this(ySize, xSize, Environment.ProcessorCount)
         {
@@ -23,6 +25,7 @@ namespace Core
 
         public FFT(int ySize, int xSize, int nCores)
         {
+            nCores = 32;
             var dims = new int[] { ySize, xSize };
             ImageBuffer = new AlignedArrayComplex(16, dims);
             FourierBuffer = new AlignedArrayComplex(16, dims);
@@ -86,7 +89,7 @@ namespace Core
                     for (int x = 0; x < image.GetLength(1); x++)
                         imageSpace[y, x] = image[y, x];
 
-                DFT.FFT(imageSpace, fourierSpace, PlannerFlags.Default, Environment.ProcessorCount);
+                DFT.FFT(imageSpace, fourierSpace, PlannerFlags.Default, PROCESSOR_LIMIT);
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
@@ -126,7 +129,7 @@ namespace Core
                     for (int x = 0; x < image.GetLength(1); x++)
                         imageSpace[y, x] = image[y, x];
 
-                DFT.IFFT(imageSpace, fourierSpace, PlannerFlags.Default, Environment.ProcessorCount);
+                DFT.IFFT(imageSpace, fourierSpace, PlannerFlags.Default, PROCESSOR_LIMIT);
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
@@ -146,7 +149,7 @@ namespace Core
                     for (int x = 0; x < image.GetLength(1); x++)
                         imageSpace[y, x] = image[y, x];
 
-                DFT.IFFT(imageSpace, fourierSpace, PlannerFlags.Default, Environment.ProcessorCount);
+                DFT.IFFT(imageSpace, fourierSpace, PlannerFlags.Default, PROCESSOR_LIMIT);
 
                 for (int y = 0; y < image.GetLength(0); y++)
                     for (int x = 0; x < image.GetLength(1); x++)
@@ -200,7 +203,7 @@ namespace Core
 
                     });
 
-                    DFT.IFFT(fourierSpace, imageSpace, PlannerFlags.Default, Environment.ProcessorCount);
+                    DFT.IFFT(fourierSpace, imageSpace, PlannerFlags.Default, PROCESSOR_LIMIT);
 
                     Parallel.For(0, grid[0].GetLength(0), (y) =>
                     {
