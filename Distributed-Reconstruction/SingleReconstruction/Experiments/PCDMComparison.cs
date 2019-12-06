@@ -268,7 +268,7 @@ namespace SingleReconstruction.Experiments
 
         public static void RunProcessorComparison()
         {
-            var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
+            var folder = "/home/jonass/meerkat_tiny/";
 
             var data = MeasurementData.LoadLMC(folder);
             int gridSize = 3072;
