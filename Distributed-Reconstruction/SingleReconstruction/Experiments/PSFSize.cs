@@ -17,10 +17,12 @@ namespace SingleReconstruction.Experiments
 {
     static class PSFSize
     {
+        
         public const double REFERENCE_L2_PENALTY = 14.522420147893078;
         public const double REFERENCE_ELASTIC_PENALTY = 79.3254261630153;
         public const float LAMBDA_GLOBAL = 1.0f;
         public const float alpha = 0.01f;
+        public const float MAJOR_EPSILON = 1e-4f;
 
         public class ReconstructionInfo
         {
@@ -79,12 +81,12 @@ namespace SingleReconstruction.Experiments
                 var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
-                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + ";" + fastCD.GetAbsMaxDiff(xImage, bMap, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";"); ;
+                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + ";" + fastCD2.GetAbsMaxDiff(xImage, bMap, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";"); ;
                 writer.Flush();
 
                 //check wether we can minimize the objective further with the current psf
                 var objectiveReached = (dataPenalty + regPenalty) < objectiveCutoff;
-                var minimumReached = (lastResult != null && lastResult.Converged && lastResult.IterationCount < 1000 && currentLambda == lambda);
+                var minimumReached = (lastResult != null && lastResult.Converged && fastCD2.GetAbsMaxDiff(xImage, dirtyImage, lambdaTrue, alpha) < MAJOR_EPSILON && currentLambda == lambda);
                 if (lambda == lastLambda & !firstTimeConverged)
                 {
                     firstTimeConverged = true;
@@ -151,8 +153,10 @@ namespace SingleReconstruction.Experiments
             var psfBMap = startWithFullPSF ? fullPsf : psfCut;
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
             var fastCD = new FastGreedyCD(totalSize, psfCut);
-            if(startWithFullPSF)
+            if (startWithFullPSF)
                 fastCD.ResetLipschitzMap(fullPsf);
+            var referenceCD = new FastGreedyCD(totalSize, psfCut);
+            referenceCD.ResetLipschitzMap(fullPsf);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
             var lambda = (float)(LAMBDA_GLOBAL * PSF.CalcMaxLipschitz(psfBMap));
@@ -184,12 +188,12 @@ namespace SingleReconstruction.Experiments
                 var currentSideLobe = maxB * maxSidelobe * correctionFactor;
                 var currentLambda = Math.Max(currentSideLobe / alpha, lambda);
 
-                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + fastCD.GetAbsMaxDiff(xImage, dirtyImage, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
+                writer.Write(cycle + ";" + currentLambda + ";" + currentSideLobe + ";" + referenceCD.GetAbsMaxDiff(xImage, dirtyImage, lambdaTrue, alpha) + ";" + dataPenalty + ";" + regPenalty + ";" + regPenaltyCurrent + ";");
                 writer.Flush();
 
                 //check wether we can minimize the objective further with the current psf
                 var objectiveReached = (dataPenalty + regPenalty) < objectiveCutoff;
-                var minimumReached = (lastResult != null && lastResult.IterationCount < 1000 && lastResult.Converged);
+                var minimumReached = (lastResult != null && referenceCD.GetAbsMaxDiff(xImage, dirtyImage, lambdaTrue, alpha) < MAJOR_EPSILON && lastResult.Converged) ;
                 if (!objectiveReached & !minimumReached)
                 {
                     info.totalDeconv.Start();
@@ -266,8 +270,6 @@ namespace SingleReconstruction.Experiments
             var psfGrid = IDG.GridW(data.c, data.metadata, psfVis, data.uvw, data.frequencies);
             var psf = FFT.WStackIFFTFloat(psfGrid, data.c.VisibilitiesCount);
             FFT.Shift(psf);
-
-
 
             Directory.CreateDirectory("PSFSizeExperimentLarge");
             Directory.SetCurrentDirectory("PSFSizeExperimentLarge");
