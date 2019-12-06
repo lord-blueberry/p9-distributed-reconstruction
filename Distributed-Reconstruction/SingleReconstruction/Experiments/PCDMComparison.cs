@@ -115,6 +115,8 @@ namespace SingleReconstruction.Experiments
                     writer.WriteLine(cycle + ";" + currentLambda + ";" + currentObjective + ";" + absMax + ";" + lastResult.IterationCount + ";"  + totalWatch.Elapsed.TotalSeconds + ";" + currentWatch.Elapsed.TotalSeconds);
                     writer.Flush();
 
+                    FitsIO.Write(xImage, folder + "/xImage_pcdm_" + cycle + ".fits");
+
                     if (breakMajor)
                         break;
                     if (currentLambda == lambda & !switchedToOtherPsf)
@@ -126,8 +128,6 @@ namespace SingleReconstruction.Experiments
                         writer.WriteLine("switched");
                         writer.Flush();
                     }
-
-                    FitsIO.Write(xImage, folder + "/xImage_pcdm_" + cycle + ".fits");
 
                     FFT.Shift(xImage);
                     var xGrid = FFT.Forward(xImage);
@@ -262,7 +262,7 @@ namespace SingleReconstruction.Experiments
 
             Directory.CreateDirectory("PCDMComparison");
             ReconstructPCDM(data, c, psf, "PCDMComparison", "pcdm", 3, 0.1f);
-            ReconstructSerial(data, c, psf, "PCDMComparison", "serial");
+            //ReconstructSerial(data, c, psf, "PCDMComparison", "serial");
         }
     }
 }

@@ -16,23 +16,22 @@ namespace SingleReconstruction
     {
         static void Main(string[] args)
         {
-            //Reconstruction.Start.StartReconstruction();
-
+            Reconstruction.RunningMethod.StartSimulatedReconstruction();
+            Reconstruction.RunningMethod.StartLMCReconstruction();
 
             //Experiments.GPUSpeed.Run();
             //Experiments.PSFSize.RunApproximationMethods();
             //Experiments.PSFSize.RunApproximationMethods();
-            Experiments.ApproxParameters.Run();
-           // Experiments.PCDMComparison.Run();
+            //Experiments.ApproxParameters.Run();
+            // Experiments.PCDMComparison.Run();
 
-            //ImageGeneration.Generator.GenerateAll();
-            //ImageGeneration.ApproxImages.Generator.Generate();
+
+
+            //FigureGeneration.Figures.GenerateAll();
+
 
             //Single_Reference.DebugMethods.DebugILGPU();
             //Single_Reference.DebugMethods.DebugSimulatedApprox();
-
-
-            //
 
             //DebugMethods.DebugSimulatedMixed();
             //Deconvolution.NaiveGreedyCD.Run();

@@ -192,14 +192,8 @@ namespace Core.Deconvolution.ParallelDeconvolution
                 }
 
                 lastAbsMax = currentAbsMax;
-                if (deconvolvers.Max(d => d.DiffMax) < epsilon)
-                {
-                    if (GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha) < epsilon)
-                    {
-                        converged = true;
-
-                    }
-                }
+                if (currentAbsMax < epsilon)
+                    converged = true;
 
                 iter++;
             }
@@ -278,15 +272,10 @@ namespace Core.Deconvolution.ParallelDeconvolution
                 }
 
                 lastAbsMax = currentAbsMax;
-                if (deconvolvers.Max(d => d.DiffMax) < epsilon)
-                {
-                    if (GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha) < epsilon)
-                    {
-                        converged = true;
-                    }
-                }
+                if (currentAbsMax < epsilon)
+                    converged = true;
+                
 
-                Console.WriteLine("Done Active Set iteration " + iter);
                 iter++;
             }
 

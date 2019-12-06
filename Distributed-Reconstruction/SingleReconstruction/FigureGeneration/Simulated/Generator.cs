@@ -9,7 +9,7 @@ using Core.Deconvolution;
 
 using static Core.Common;
 
-namespace SingleReconstruction.ImageGeneration.Simulated
+namespace SingleReconstruction.FigureGeneration.Simulated
 {
     class Generator
     {

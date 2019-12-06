@@ -4,11 +4,11 @@ using System.Text;
 using System.IO;
 using Core;
 
-namespace SingleReconstruction.ImageGeneration.MSClean
+namespace SingleReconstruction.FigureGeneration.MSClean
 {
     class Generator
     {
-        static string INPUT_DIR = "./ImageGeneration/MSClean";
+        static string INPUT_DIR = "./FigureGeneration/MSClean";
 
         public static void Generate(string outputFolder)
         {

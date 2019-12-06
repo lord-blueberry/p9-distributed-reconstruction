@@ -4,7 +4,7 @@ using System.Text;
 using System.IO;
 using static Core.Common;
 
-namespace SingleReconstruction.ImageGeneration
+namespace SingleReconstruction.FigureGeneration
 {
     class Tools
     {

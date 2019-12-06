@@ -4,11 +4,11 @@ using System.Text;
 using System.IO;
 using Core;
 
-namespace SingleReconstruction.ImageGeneration.SerialCD
+namespace SingleReconstruction.FigureGeneration.SerialCD
 {
     class Generator
     {
-        static string INPUT_DIR = "./ImageGeneration/SerialCD";
+        static string INPUT_DIR = "./FigureGeneration/SerialCD";
 
         public static void Generate(string outputFolder)
         {

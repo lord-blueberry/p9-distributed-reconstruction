@@ -10,46 +10,55 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="ImageGeneration\MSClean\img-comparison-briggs-MFS-dirty.fits">
+    <None Update="FigureGeneration\ApproxImages\xImage_pcdm_4.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\MSClean\img-comparison-briggs-MFS-image.fits">
+    <None Update="FigureGeneration\ApproxImages\xImage_pcdm_5.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\MSClean\img-comparison-briggs-MFS-model.fits">
+    <None Update="FigureGeneration\ApproxImages\xImage_serial_4.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\MSClean\img-comparison-briggs-MFS-psf.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-briggs-MFS-dirty.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\MSClean\img-comparison-briggs-MFS-residual.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-briggs-MFS-image.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\MSClean\img-comparison-MFS-dirty.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-briggs-MFS-model.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\MSClean\img-comparison-MFS-image.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-briggs-MFS-psf.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\MSClean\img-comparison-MFS-model.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-briggs-MFS-residual.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\MSClean\img-comparison-MFS-psf.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-MFS-dirty.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\MSClean\img-comparison-MFS-residual.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-MFS-image.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\SerialCD\16dirty6.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-MFS-model.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\SerialCD\16x5.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-MFS-psf.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\SerialCD\dirtyReference4.fits">
+    <None Update="FigureGeneration\MSClean\img-comparison-MFS-residual.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="ImageGeneration\SerialCD\xReference4.fits">
+    <None Update="FigureGeneration\SerialCD\16dirty6.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\SerialCD\16x5.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\SerialCD\dirtyReference4.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\SerialCD\xReference4.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
