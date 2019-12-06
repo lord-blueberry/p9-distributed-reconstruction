@@ -91,7 +91,7 @@ namespace SingleReconstruction.Experiments
                             break;
                         }
                             
-                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 40, 1e-5f);
+                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 300, 1e-5f);
 
                         if (currentLambda == lambda | currentLambda == minLambda)
                             break;
@@ -314,7 +314,7 @@ namespace SingleReconstruction.Experiments
             {
                 
                 ReconstructPCDM(data, c, psf, "PCDMComparison/processors", "pcdm"+count, 3, 0.1f, count);
-                ReconstructSerial(data, c, psf, "PCDMComparison/processors", "serial"+count, count);
+                //ReconstructSerial(data, c, psf, "PCDMComparison/processors", "serial"+count, count);
 
             }
 
