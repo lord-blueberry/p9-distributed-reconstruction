@@ -20,7 +20,7 @@ namespace SingleReconstruction.FigureGeneration.ApproxImages
 
         public static void Generate(string outputFolder)
         {
-            //GenerateApproxRandomProblem(outputFolder);
+            GenerateApproxRandomProblem(outputFolder);
             GeneratePCDMComparison(outputFolder);
         }
 

@@ -11,7 +11,7 @@ using Core.Deconvolution;
 using Core.Deconvolution.ParallelDeconvolution;
 using Core.ImageDomainGridder;
 
-namespace SingleReconstruction.Reconstruction
+namespace SingleReconstruction
 {
     class MajorCycle
     {

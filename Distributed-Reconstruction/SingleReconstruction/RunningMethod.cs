@@ -1,16 +1,18 @@
 ﻿using Core.ImageDomainGridder;
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Text;
 
-namespace SingleReconstruction.Reconstruction
+namespace SingleReconstruction
 {
     class RunningMethod
     {
+        const string P9_DATA_FOLDER = @"C:\dev\GitHub\p9-data";
 
         public static void StartSimulatedReconstruction()
         {
-            var folder = @"C:\dev\GitHub\p9-data\small\fits\simulation_point\";
+            var folder = Path.Combine(P9_DATA_FOLDER, @"\small\fits\simulation_point\");
             var data = MeasurementData.LoadSimulatedPoints(folder);
 
             int gridSize = 256;
@@ -28,7 +30,7 @@ namespace SingleReconstruction.Reconstruction
 
         public static void StartLMCReconstruction()
         {
-            var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
+            var folder = Path.Combine(P9_DATA_FOLDER, @"\large\fits\meerkat_tiny\");
             var data = MeasurementData.LoadSimulatedPoints(folder);
 
             int gridSize = 3072;
