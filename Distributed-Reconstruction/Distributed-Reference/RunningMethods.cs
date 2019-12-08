@@ -42,11 +42,11 @@ namespace DistributedReconstruction
             {
                 var proc = Process.GetCurrentProcess();
                 var name = proc.ProcessName;
-                Console.WriteLine(" name: " + name);
 
                 var comm = Communicator.world;
+                Console.WriteLine(" name: " + name + " id: " + comm.Rank + " " + comm.Size);
 
-                var folder = @"C:\dev\GitHub\p9-data\large\fits\meerkat_tiny\";
+                var folder = @"/home/jonass/meerkat_tiny/";
                 var data = DistributedData.LoadTinyMeerKAT2(comm.Rank, comm.Size, folder);
                 var totalVisCount = comm.Allreduce(data.VisibilitiesCount, (x, y) => x+y);
 
@@ -63,7 +63,7 @@ namespace DistributedReconstruction
 
                 var lambda = 0.4f;
                 var alpha = 0.1f;
-                var reconstruction = MPIMajorCycle.Reconstruct(comm, data, c, 2, lambda, alpha, 10000);
+                var reconstruction = MPIMajorCycle.Reconstruct(comm, data, c, 5, lambda, alpha, 20000);
 
                 if (comm.Rank == 0)
                     FitsIO.Write(reconstruction, "tinyMeerKATReconstruction.fits");
