@@ -214,7 +214,7 @@ namespace SingleReconstruction.Experiments
 
         private static void RunSearchPercent(MeasurementData input, GriddingConstants c, float[,] fullPsf, string outFolder)
         {
-            var searchPercent = new float[] { 0.01f, 0.05f, 0.1f, 0.2f, 0.4f, 0.6f, 0.8f };
+            var searchPercent = new float[] { 0.01f, 0.1f, 0.2f, 0.4f, 0.8f };
             foreach (var percent in searchPercent)
             {
                 var file = "SearchPercent" + percent;

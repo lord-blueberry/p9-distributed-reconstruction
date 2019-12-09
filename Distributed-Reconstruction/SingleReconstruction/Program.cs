@@ -23,7 +23,7 @@ namespace SingleReconstruction
             //Experiments.PSFSize.RunApproximationMethods();
             //Experiments.PSFSize.RunApproximationMethods();
             //Experiments.ApproxParameters.Run();
-            // Experiments.PCDMComparison.Run();
+            //Experiments.PCDMComparison.Run();
 
             Experiments.PCDMComparison.RunProcessorComparison();
 
