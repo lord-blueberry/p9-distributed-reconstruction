@@ -31,7 +31,7 @@ namespace SingleReconstruction.Experiments
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, CUT_FACTOR_PCDM);
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
             var random = new Random(123);
-            var pcdm = new Deconvolver(totalSize, psfCut, 1, 1000, searchPercent);
+            var pcdm = new ParallelDeconvolver(totalSize, psfCut, 1, 1000, searchPercent);
 
             var metadata = Partitioner.CreatePartition(c, input.UVW, input.Frequencies);
 
@@ -50,7 +50,7 @@ namespace SingleReconstruction.Experiments
                 var writer = new StreamWriter(folder + "/" + file + ".txt");
                 var xImage = new float[c.GridSize, c.GridSize];
                 var residualVis = input.Visibilities;
-                Deconvolver.DeconvolutionResult lastResult = null;
+                ParallelDeconvolver.DeconvolutionResult lastResult = null;
                 for (int cycle = 0; cycle < 6; cycle++)
                 {
                     Console.WriteLine("Beginning Major cycle " + cycle);
@@ -318,6 +318,35 @@ namespace SingleReconstruction.Experiments
 
             }
 
+        }
+
+
+        public static void CalcESOs()
+        {
+            int gridSize = 3072;
+            var psfCuts = new int[] { 4, 8, 16, 32, 64 };
+            var psf = new float[gridSize, gridSize];
+            
+            var factor = 4;
+
+            foreach(var cut in psfCuts)
+            {
+                var psfCut = PSF.Cut(psf, cut);
+                var ESO = CalcESO(8, psfCut.Length * factor, gridSize * gridSize);
+                
+            }
+
+            Console.WriteLine("");
+            Console.WriteLine("");
+            Console.WriteLine("");
+            var processors = new int[] { 1, 4, 8, 16, 32 };
+
+            var psfCut32 = PSF.Cut(psf, 32);
+            foreach(var p in processors)
+            {
+                var ESO = CalcESO(p, psfCut32.Length * factor, gridSize * gridSize);
+                Console.WriteLine(ESO);
+            }
         }
     }
 }

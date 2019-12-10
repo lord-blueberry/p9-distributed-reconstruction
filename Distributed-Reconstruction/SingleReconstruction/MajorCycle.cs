@@ -145,7 +145,7 @@ namespace SingleReconstruction
             var maxSidelobe = PSF.CalcMaxSidelobe(psf, psfCutFactor);
             var sidelobeHalf = PSF.CalcMaxSidelobe(psf, 2);
 
-            var pcdm = new Deconvolver(totalSize, psfCut, Environment.ProcessorCount, 1000);
+            var pcdm = new ParallelDeconvolver(totalSize, psfCut, Environment.ProcessorCount, 1000);
 
             using (var gCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1))))
             using (var gCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psf, totalSize), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1))))
@@ -160,7 +160,7 @@ namespace SingleReconstruction
                 var switchedToOtherPsf = false;
                 var xImage = new float[c.GridSize, c.GridSize];
                 var residualVis = data.Visibilities;
-                Deconvolver.DeconvolutionResult lastResult = null;
+                ParallelDeconvolver.DeconvolutionResult lastResult = null;
                 for (int cycle = 0; cycle < maxMajorCycle; cycle++)
                 {
                     Console.WriteLine("Beginning Major cycle " + cycle);

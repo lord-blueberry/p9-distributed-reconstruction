@@ -9,7 +9,7 @@ using static Core.Common;
 
 namespace Core.Deconvolution.ParallelDeconvolution
 {
-    public class Deconvolver
+    public class ParallelDeconvolver
     {
         int threadCount;
         int concurrentIterations;
@@ -20,7 +20,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
         float[,] psf2;
         Rectangle totalSize;
 
-        public Deconvolver(Rectangle totalSize, float[,] psf, int threadCount = 8, int maxConcurrent = 1000,  float searchFraction = 0.1f)
+        public ParallelDeconvolver(Rectangle totalSize, float[,] psf, int threadCount = 8, int maxConcurrent = 1000,  float searchFraction = 0.1f)
         {
             this.totalSize = totalSize;
             this.psf = psf;
@@ -158,9 +158,6 @@ namespace Core.Deconvolution.ParallelDeconvolution
                 var currentAbsMax = GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha);
                 var activeSetValid = currentAbsMax > lastAbsMax && lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor;
                 activeSetValid |= lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor * 2;
-                //Console.WriteLine("LastAbsMaxFactor = " + lastAbsMax);
-                //Console.WriteLine("deconvolvers = " + deconvolvers.Max(d => d.DiffMax));
-                //Console.WriteLine("absMaxFactor = " + lastAbsMax / deconvolvers.Max(d => d.DiffMax));
                 Console.WriteLine("active set iteration: " + iter + " current max pixel: " + currentAbsMax);
                 
                 if (shared.TestRestart > 0.0f | activeSetValid)
@@ -255,9 +252,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
                 var currentAbsMax = GetAbsMax(shared.XExpl, shared.GExpl, shared.Lambda, shared.Alpha);
                 var activeSetInvalid = currentAbsMax > lastAbsMax && lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor;
                 activeSetInvalid |= lastAbsMax / deconvolvers.Max(d => d.DiffMax) > concurrentFactor * 2;
-                //Console.WriteLine("LastAbsMaxFactor = " + lastAbsMax);
-                //Console.WriteLine("deconvolvers = " + deconvolvers.Max(d => d.DiffMax));
-                //Console.WriteLine("absMaxFactor = " + lastAbsMax / deconvolvers.Max(d => d.DiffMax));
+
                 Console.WriteLine("active set iteration: " + iter + " current max pixel: " + currentAbsMax);
 
                 if (shared.TestRestart > 0.0f | activeSetInvalid)
