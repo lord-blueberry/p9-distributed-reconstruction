@@ -10,6 +10,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
         public float Alpha { get; set; }
 
         public int ProcessorCount { get; private set; }
+        public int ProcessorCount2 { get; private set; }
 
         public int DegreeOfSeperability { get; private set; }
         public float[,] Psf2 { get; private set; }
@@ -32,6 +33,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
             float lambda,
             float alpha,
             int processorCount,
+            int processorCount2,
 
             int degreeOfSep,
             float[,] psf2,
@@ -45,6 +47,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
             Lambda = lambda;
             Alpha = alpha;
             ProcessorCount = processorCount;
+            ProcessorCount2 = processorCount2;
 
             DegreeOfSeperability = degreeOfSep;
             Psf2 = psf2;

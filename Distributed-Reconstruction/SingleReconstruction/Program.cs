@@ -25,7 +25,7 @@ namespace SingleReconstruction
             //Experiments.ApproxParameters.Run();
             //Experiments.PCDMComparison.Run();
 
-            Experiments.PCDMComparison.RunProcessorComparison();
+            Experiments.PCDMComparison.RunLargeProcessorTest();
 
             //FigureGeneration.Figures.GenerateAll();
 

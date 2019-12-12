@@ -197,7 +197,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
                 var blockCount = shared.XExpl.Length;
                 DiffMax = 0.0f;
 
-                var beta = CalcESO(shared.ProcessorCount, shared.DegreeOfSeperability, blockCount);
+                var beta = CalcESO(shared.ProcessorCount2, shared.DegreeOfSeperability, blockCount);
                 var continueAsync = Thread.VolatileRead(ref shared.AsyncFinished) == 0;
                 for (int inner = 0; inner < shared.MaxConcurrentIterations & continueAsync; inner++)
                 {

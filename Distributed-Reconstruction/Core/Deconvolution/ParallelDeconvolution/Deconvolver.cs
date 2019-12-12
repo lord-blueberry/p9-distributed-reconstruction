@@ -101,7 +101,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
             var gExplore = gradients;
             var gCorrection = new float[gradients.GetLength(0), gradients.GetLength(1)];
 
-            var shared = new SharedData(lambda, alpha, threadCount,
+            var shared = new SharedData(lambda, alpha, threadCount, threadCount,
                 CountNonZero(psf), psf2, aMap,
                 xExplore, xCorrection, gExplore, gCorrection);
             shared.ActiveSet = GetActiveSet(xExplore, gExplore, lambda, alpha, shared.AMap);
@@ -203,9 +203,9 @@ namespace Core.Deconvolution.ParallelDeconvolution
         #endregion
 
         #region deconvolve PCDM
-        public DeconvolutionResult DeconvolvePCDM(float[,] xImage, float[,] gradients, float lambda, float alpha, int maxIteration = 100, float epsilon = 1e-4f)
+        public DeconvolutionResult DeconvolvePCDM(float[,] xImage, float[,] gradients, float lambda, float alpha, int maxIteration = 100, float epsilon = 1e-4f, float esoIncrease = 1.0f)
         {
-            var shared = new SharedData(lambda, alpha, threadCount,
+            var shared = new SharedData(lambda, alpha, threadCount, (int)(threadCount * esoIncrease),
                 CountNonZero(psf), psf2, aMap,
                 xImage, null, gradients, null);
             shared.ActiveSet = GetActiveSet(xImage, gradients, lambda, alpha, shared.AMap);

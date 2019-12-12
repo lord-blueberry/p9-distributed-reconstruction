@@ -21,7 +21,7 @@ namespace SingleReconstruction.Experiments
         const float ALPHA = 0.01f;
         const float MAJOR_STOP = 1e-4f;
 
-        private static void ReconstructPCDM(MeasurementData input, GriddingConstants c, float[,] fullPsf, string folder, string file, int minorCycles, float searchPercent, int processorCount)
+        private static void ReconstructPCDM(MeasurementData input, GriddingConstants c, float[,] fullPsf, string folder, string file, int minorCycles, float searchPercent, int processorCount, float esoIncrease = 1.0f)
         {
             var totalWatch = new Stopwatch();
             var currentWatch = new Stopwatch();
@@ -30,7 +30,6 @@ namespace SingleReconstruction.Experiments
             var psfCut = PSF.Cut(fullPsf, CUT_FACTOR_PCDM);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, CUT_FACTOR_PCDM);
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
-            var random = new Random(123);
             var pcdm = new Deconvolver(totalSize, psfCut, processorCount, 8000/processorCount, searchPercent);
 
             var metadata = Partitioner.CreatePartition(c, input.UVW, input.Frequencies);
@@ -91,7 +90,7 @@ namespace SingleReconstruction.Experiments
                             break;
                         }
                             
-                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 320, 1e-5f);
+                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 320, 1e-5f, esoIncrease);
 
                         if (currentLambda == lambda | currentLambda == minLambda)
                             break;
@@ -313,11 +312,58 @@ namespace SingleReconstruction.Experiments
             foreach(var count in processorCount)
             {
                 
-                ReconstructPCDM(data, c, psf, "PCDMComparison/processors", "pcdm"+count, 3, 0.1f, count);
-                //ReconstructSerial(data, c, psf, "PCDMComparison/processors", "serial"+count, count);
+                ReconstructPCDM(data, c, psf, "PCDMComparison/processors", "pcdm"+count, 3, 0.2f, count);
 
             }
 
+        }
+
+        public static void RunLargeProcessorTest()
+        {
+            var folder = "/home/jonass/meerkat_tiny/";
+
+            var data = MeasurementData.LoadLMC(folder);
+            int gridSize = 3072;
+            int subgridsize = 32;
+            int kernelSize = 16;
+            int max_nr_timesteps = 1024;
+            double cellSize = 1.5 / 3600.0 * Math.PI / 180.0;
+            int wLayerCount = 24;
+
+            var maxW = 0.0;
+            for (int i = 0; i < data.UVW.GetLength(0); i++)
+                for (int j = 0; j < data.UVW.GetLength(1); j++)
+                    maxW = Math.Max(maxW, Math.Abs(data.UVW[i, j, 2]));
+            maxW = Partitioner.MetersToLambda(maxW, data.Frequencies[data.Frequencies.Length - 1]);
+
+            var visCount2 = 0;
+            for (int i = 0; i < data.Flags.GetLength(0); i++)
+                for (int j = 0; j < data.Flags.GetLength(1); j++)
+                    for (int k = 0; k < data.Flags.GetLength(2); k++)
+                        if (!data.Flags[i, j, k])
+                            visCount2++;
+            double wStep = maxW / (wLayerCount);
+
+            var c = new GriddingConstants(data.VisibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
+            var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
+            var psfVis = new Complex[data.UVW.GetLength(0), data.UVW.GetLength(1), data.Frequencies.Length];
+            for (int i = 0; i < data.Visibilities.GetLength(0); i++)
+                for (int j = 0; j < data.Visibilities.GetLength(1); j++)
+                    for (int k = 0; k < data.Visibilities.GetLength(2); k++)
+                        if (!data.Flags[i, j, k])
+                            psfVis[i, j, k] = new Complex(1.0, 0);
+                        else
+                            psfVis[i, j, k] = new Complex(0, 0);
+
+            Console.WriteLine("gridding psf");
+            var psfGrid = IDG.GridW(c, metadata, psfVis, data.UVW, data.Frequencies);
+            var psf = FFT.WStackIFFTFloat(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+
+            Directory.CreateDirectory("PCDMComparison/largeProcessor");
+            ReconstructPCDM(data, c, psf, "PCDMComparison/largeProcessor", "pcdm_search", 3, 0.4f, 32);
+
+            ReconstructPCDM(data, c, psf, "PCDMComparison/largeProcessor", "pcdm_eso" + 32, 3, 0.1f, 32, 2.0f);
         }
     }
 }
