@@ -19,6 +19,60 @@
     <None Update="FigureGeneration\ApproxImages\xImage_serial_4.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs-dirty.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs-first-residual.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs-image.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs-model.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs-psf.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs-residual.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs3-dirty.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs3-first-residual.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs3-image.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs3-model.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs3-psf.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\iuwt-briggs3-residual.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\nat-iuwt-dirty.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\nat-iuwt-first-residual.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\nat-iuwt-image.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\nat-iuwt-model.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\nat-iuwt-psf.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\IUWT\nat-iuwt-residual.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="FigureGeneration\MSClean\img-comparison-briggs-MFS-dirty.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -47,6 +101,24 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="FigureGeneration\MSClean\img-comparison-MFS-residual.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\MSClean\nat-clean-dirty.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\MSClean\nat-clean-first-residual.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\MSClean\nat-clean-image.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\MSClean\nat-clean-model.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\MSClean\nat-clean-psf.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\MSClean\nat-clean-residual.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="FigureGeneration\SerialCD\16dirty6.fits">

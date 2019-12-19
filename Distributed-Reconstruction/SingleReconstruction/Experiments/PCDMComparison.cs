@@ -339,7 +339,7 @@ namespace SingleReconstruction.Experiments
             Console.WriteLine("");
             Console.WriteLine("");
             Console.WriteLine("");
-            var processors = new int[] { 1, 4, 8, 16, 32 };
+            var processors = new int[] { 1, 4, 8, 16, 32, 64 };
 
             var psfCut32 = PSF.Cut(psf, 32);
             foreach(var p in processors)

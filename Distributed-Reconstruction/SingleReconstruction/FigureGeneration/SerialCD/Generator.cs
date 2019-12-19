@@ -21,6 +21,9 @@ namespace SingleReconstruction.FigureGeneration.SerialCD
             Tools.WriteToMeltCSV(n132.Item1, Path.Combine(outputFolder, "CD-N132.csv"), n132.Item2, n132.Item3);
             var calibration = Tools.LMC.CutCalibration(reference);
             Tools.WriteToMeltCSV(calibration.Item1, Path.Combine(outputFolder, "CD-Calibration.csv"), calibration.Item2, calibration.Item3);
+
+            var residuals = FitsIO.ReadImage(Path.Combine(INPUT_DIR, "dirtyReference4.fits"));
+            Tools.WriteToMeltCSV(residuals, Path.Combine(outputFolder, "CD-reference-residuals.csv"));
         }
     }
 }

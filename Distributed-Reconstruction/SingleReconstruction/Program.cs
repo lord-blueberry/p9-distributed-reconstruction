@@ -24,12 +24,12 @@ namespace SingleReconstruction
             //Experiments.PSFSize.RunApproximationMethods();
             //Experiments.ApproxParameters.Run();
 
-            Experiments.PCDMComparison.CalcESOs();
-            Experiments.PCDMComparison.Run();
+            //Experiments.PCDMComparison.CalcESOs();
+            //Experiments.PCDMComparison.Run();
             
 
 
-            //FigureGeneration.Figures.GenerateAll();
+            FigureGeneration.Figures.GenerateAll();
 
 
             //Single_Reference.DebugMethods.DebugILGPU();
