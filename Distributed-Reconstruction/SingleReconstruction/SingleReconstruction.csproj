@@ -127,6 +127,15 @@
     <None Update="FigureGeneration\SerialCD\16x5.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="FigureGeneration\SerialCD\cd-image.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\SerialCD\cd-model.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="FigureGeneration\SerialCD\cd-residual.fits">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="FigureGeneration\SerialCD\dirtyReference4.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

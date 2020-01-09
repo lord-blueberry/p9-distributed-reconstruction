@@ -196,7 +196,7 @@ namespace SingleReconstruction.Experiments
                 var file = "PsfSize" + psfSize;
                 var currentFolder = Path.Combine(outFolder, "PsfSize");
                 Directory.CreateDirectory(currentFolder);
-                ReconstructMinorCycle(input, c, psfSize, fullPsf, currentFolder, file, 3, 0.1f);
+                ReconstructMinorCycle(input, c, psfSize, fullPsf, currentFolder, file, 3, 0.1f, false);
             }
         }
 
@@ -220,7 +220,7 @@ namespace SingleReconstruction.Experiments
                 var file = "SearchPercent" + percent;
                 var currentFolder = Path.Combine(outFolder, "Search");
                 Directory.CreateDirectory(currentFolder);
-                ReconstructMinorCycle(input, c, 32, fullPsf, currentFolder, file, 3, percent);
+                ReconstructMinorCycle(input, c, 32, fullPsf, currentFolder, file, 3, percent, false);
             }
         }
 
@@ -275,7 +275,7 @@ namespace SingleReconstruction.Experiments
             FitsIO.Write(psf, Path.Combine(outFolder, "psfFull.fits"));
 
             //tryout with simply cutting the PSF
-            //RunPsfSize(data, c, psf, outFolder);
+            RunPsfSize(data, c, psf, outFolder);
             //RunBlocksize(data, c, psf, outFolder);
             RunSearchPercent(data, c, psf, outFolder);
             //RunNotAccelerated(data, c, psf, outFolder);

@@ -22,8 +22,19 @@ namespace SingleReconstruction.FigureGeneration.SerialCD
             var calibration = Tools.LMC.CutCalibration(reference);
             Tools.WriteToMeltCSV(calibration.Item1, Path.Combine(outputFolder, "CD-Calibration.csv"), calibration.Item2, calibration.Item3);
 
-            var residuals = FitsIO.ReadImage(Path.Combine(INPUT_DIR, "dirtyReference4.fits"));
-            Tools.WriteToMeltCSV(residuals, Path.Combine(outputFolder, "CD-reference-residuals.csv"));
+            var residual= FitsIO.ReadCASAFits(Path.Combine(INPUT_DIR, "cd-residual.fits"));
+            Tools.WriteToMeltCSV(residual, Path.Combine(outputFolder, "CD-reference-residuals.csv"));
+
+            var reconstruction = FitsIO.ReadCASAFits(Path.Combine(INPUT_DIR, "cd-image.fits"));
+            var image = new float[reconstruction.GetLength(0), reconstruction.GetLength(1)];
+            for (int i = 0; i < reconstruction.GetLength(0); i++)
+                for (int j = 0; j < reconstruction.GetLength(1); j++)
+                    image[i, j] = reconstruction[i, j] - residual[i, j];
+
+            n132 = Tools.LMC.CutN132Remnant(image);
+            Tools.WriteToMeltCSV(n132.Item1, Path.Combine(outputFolder, "CD-image-N132.csv"), n132.Item2, n132.Item3);
+            calibration = Tools.LMC.CutCalibration(image);
+            Tools.WriteToMeltCSV(calibration.Item1, Path.Combine(outputFolder, "CD-image-Calibration.csv"), calibration.Item2, calibration.Item3);
         }
     }
 }

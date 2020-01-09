@@ -9,7 +9,6 @@ The solution is split into three projects:
 * DistributedReconstruction
 * SingleReconstruction
 
-
 The core project contains the implementation of the gridder and the deconvolution algorithms. All, except for the distributed coordinate descent algorithm, which is located in the DistributedReconstruction project. 
 
 The DistributedReconstruction project contains all code which uses MPI for distributed processing. 
@@ -18,10 +17,23 @@ The SingleReconstruction project does not use MPI. It uses the gridder and decon
 
 ## Getting the data
 
-## Windows installation
+## Windows setup of the development environment
 
-Simply open the project with visual studio, it should download all the necessaary dependencies.
+### Installations
 
+* Visual Studio (Community). Install with .Net Core Cross Platform development
+* FitsViewer, for example DS9 http://ds9.si.edu/site/Download.html (Images are written as FITS files)
+* Git clone (or download) project to your system.
+* Get the data
+
+### Running the project from Visual Studio
+
+* Open the solution file **project folder**/DistributedReconstruction/DisrtibutedReconstruction.sln with Visual Studio
+* Select SingleReconstruction project to run
+* Enter the full path of the **p9-data** folder
+* Press F5 to run in Visual Studio
+
+The File SingleReconstruction/RunningMethods.cs executes the two reconstruction algorithms (serial and parallel coordinate desecnent) on a simulated observation, and on the LMC observation. The output is written in the folder SingleReconstruction/bin/(debug or release)/
 
 
 ## ix installation

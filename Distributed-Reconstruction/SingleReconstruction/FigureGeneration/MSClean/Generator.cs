@@ -44,6 +44,11 @@ namespace SingleReconstruction.FigureGeneration.MSClean
             Tools.WriteToMeltCSV(n132.Item1, Path.Combine(outputFolder, "Natural-N132.csv"), n132.Item2, n132.Item3);
             calibration = Tools.LMC.CutCalibration(model);
             Tools.WriteToMeltCSV(calibration.Item1, Path.Combine(outputFolder, "Natural-Calibration.csv"), calibration.Item2, calibration.Item3);
+
+            n132 = Tools.LMC.CutN132Remnant(image);
+            Tools.WriteToMeltCSV(n132.Item1, Path.Combine(outputFolder, "Natural-image-N132.csv"), n132.Item2, n132.Item3);
+            calibration = Tools.LMC.CutCalibration(image);
+            Tools.WriteToMeltCSV(calibration.Item1, Path.Combine(outputFolder, "Natural-image-Calibration.csv"), calibration.Item2, calibration.Item3);
         }
     }
 }
