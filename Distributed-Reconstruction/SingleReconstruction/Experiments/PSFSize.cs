@@ -45,8 +45,8 @@ namespace SingleReconstruction.Experiments
             var psfBMap = psfCut;
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
             var bMapCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(fullPsf, totalSize), new Rectangle(0, 0, fullPsf.GetLength(0), fullPsf.GetLength(1)));
-            var fastCD = new FastGreedyCD(totalSize, psfCut);
-            var fastCD2 = new FastGreedyCD(totalSize, psfCut);
+            var fastCD = new FastSerialCD(totalSize, psfCut);
+            var fastCD2 = new FastSerialCD(totalSize, psfCut);
             fastCD2.ResetLipschitzMap(fullPsf);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 
@@ -152,10 +152,10 @@ namespace SingleReconstruction.Experiments
             var totalSize = new Rectangle(0, 0, input.c.GridSize, input.c.GridSize);
             var psfBMap = startWithFullPSF ? fullPsf : psfCut;
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfBMap, totalSize), new Rectangle(0, 0, psfBMap.GetLength(0), psfBMap.GetLength(1)));
-            var fastCD = new FastGreedyCD(totalSize, psfCut);
+            var fastCD = new FastSerialCD(totalSize, psfCut);
             if (startWithFullPSF)
                 fastCD.ResetLipschitzMap(fullPsf);
-            var referenceCD = new FastGreedyCD(totalSize, psfCut);
+            var referenceCD = new FastSerialCD(totalSize, psfCut);
             referenceCD.ResetLipschitzMap(fullPsf);
             FitsIO.Write(psfCut, folder + cutFactor + "psf.fits");
 

@@ -88,7 +88,7 @@ namespace Core
                 var lambda = 0.8;
                 var alpha = 0.05;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
-                var converged = GreedyCDReference.DeconvolvePath(xImage, b, psfCut, currentLambda, 4.0, alpha, 5, 1000, 2e-5);
+                var converged = SerialCDReference.DeconvolvePath(xImage, b, psfCut, currentLambda, 4.0, alpha, 5, 1000, 2e-5);
                 //var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, currentLambda, alpha, 5000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!! with lambda " + currentLambda + "------------------------");
@@ -164,7 +164,7 @@ namespace Core
                 var lambda = 100.0;
                 var alpha = 0.95;
                 var currentLambda = Math.Max(1.0 / alpha * sideLobe, lambda);
-                var converged = GreedyCDReference.DeconvolvePath(xImage, b, psfCut, currentLambda, 5.0, alpha, 5, 6000, 1e-3);
+                var converged = SerialCDReference.DeconvolvePath(xImage, b, psfCut, currentLambda, 5.0, alpha, 5, 6000, 1e-3);
                 //var converged = GreedyCD2.Deconvolve(xImage, b, psfCut, currentLambda, alpha, 5000);
                 if (converged)
                     Console.WriteLine("-----------------------------CONVERGED!!!! with lambda " + currentLambda + "------------------------");
@@ -225,7 +225,7 @@ namespace Core
             var random = new Random(123);
             var totalSize = new Rectangle(0, 0, gridSize, gridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
-            var fastCD = new FastGreedyCD(totalSize, psfCut);
+            var fastCD = new FastSerialCD(totalSize, psfCut);
             //fastCD.ResetAMap(psf);
             var lambda = 0.5f * fastCD.MaxLipschitz;
             var alpha = 0.8f;
@@ -332,9 +332,9 @@ namespace Core
             var totalSize = new Rectangle(0, 0, gridSize, gridSize);
             var imageSection = new Rectangle(0, 128, gridSize, gridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize) , new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1)));
-            var fastCD = new FastGreedyCD(totalSize, psfCut);
+            var fastCD = new FastSerialCD(totalSize, psfCut);
             fastCD.ResetLipschitzMap(ToFloatImage(psf));
-            var gpuCD = new GPUGreedyCD(totalSize, psfCut, 100);
+            var gpuCD = new GPUSerialCD(totalSize, psfCut, 100);
             var lambda = 0.5f * fastCD.MaxLipschitz;
             var alpha = 0.8f;
 
@@ -451,7 +451,7 @@ namespace Core
 
             var totalSize = new Rectangle(0, 0, gridSize, gridSize);
             var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psf, totalSize), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
-            var fastCD = new FastGreedyCD(totalSize, psf);
+            var fastCD = new FastSerialCD(totalSize, psf);
             var lambda = 0.4f * fastCD.MaxLipschitz;
             var alpha = 0.1f;
 

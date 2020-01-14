@@ -42,7 +42,7 @@ namespace Core.Deconvolution.ToyImplementations
             if (coldStart)
             {
                 var rec = new Rectangle(0, 0, xImage.GetLength(0), xImage.GetLength(1));
-                var fastCD = new FastGreedyCD(rec, rec, psf, psf2);
+                var fastCD = new FastSerialCD(rec, rec, psf, psf2);
                 fastCD.Deconvolve(xExplore, gExplore, lambda, alpha, xImage.GetLength(0));
             }
 

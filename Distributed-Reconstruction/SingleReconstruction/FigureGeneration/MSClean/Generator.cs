@@ -28,13 +28,16 @@ namespace SingleReconstruction.FigureGeneration.MSClean
             var calibration = Tools.LMC.CutCalibration(image);
             Tools.WriteToMeltCSV(calibration.Item1, Path.Combine(outputFolder, "Briggs-Calibration.csv"), calibration.Item2, calibration.Item3);
 
-
             reconstruction = FitsIO.ReadCASAFits(Path.Combine(INPUT_DIR, "nat-clean-image.fits"));
             residual = FitsIO.ReadCASAFits(Path.Combine(INPUT_DIR, "nat-clean-residual.fits"));
             image = new float[reconstruction.GetLength(0), reconstruction.GetLength(1)];
             for (int i = 0; i < reconstruction.GetLength(0); i++)
                 for (int j = 0; j < reconstruction.GetLength(1); j++)
                     image[i, j] = reconstruction[i, j] - residual[i, j];
+
+            var example = Tools.LMC.CutExampleImage(image);
+            Tools.WriteToMeltCSV(example.Item1, Path.Combine(outputFolder, "natclean-example.csv"), example.Item2, example.Item3);
+
             FitsIO.Write(image, Path.Combine(outputFolder, "NaturalMSClean.fits"));
             var model = FitsIO.ReadCASAFits(Path.Combine(INPUT_DIR, "nat-clean-model.fits"));
             Tools.WriteToMeltCSV(model, Path.Combine(outputFolder, "Natural-CLEAN.csv"));

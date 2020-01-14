@@ -7,6 +7,10 @@ using static Core.Common;
 
 namespace Core.Deconvolution.ParallelDeconvolution
 {
+    /// <summary>
+    /// Implementation of an asynchronous deconvolver. The ParallelDeconvolver object uses an instance of AsyncDeconvolver.{Approx, PCDM} for each processor in use. 
+    /// The AsyncDeconvolver.Approx uses gradient acceleration, while AsyncDeconvolver.PCDM does not, but leads to a more light-weight code.
+    /// </summary>
     static class AsyncDeconvolver
     {
         public class Approx 

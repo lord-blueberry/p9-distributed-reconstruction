@@ -18,7 +18,10 @@ using static Core.Common;
 
 namespace Core.Deconvolution
 {
-    public class GPUGreedyCD : Deconvolution.IDeconvolver, IDisposable
+    /// <summary>
+    /// GPU implementation of the Serial coordinate descent algorithm
+    /// </summary>
+    public class GPUSerialCD : Deconvolution.IDeconvolver, IDisposable
     {
         private static float GPUProximalOperator(float x, float lipschitz, float lambda, float alpha) => XMath.Max(x - lambda * alpha, 0.0f) / (lipschitz + lambda * (1 - alpha));
 
@@ -60,13 +63,13 @@ namespace Core.Deconvolution
             return GPUSupported;
         }
 
-        public GPUGreedyCD(Rectangle totalSize, float[,] psf, int nrBatchIterations) :
+        public GPUSerialCD(Rectangle totalSize, float[,] psf, int nrBatchIterations) :
             this(totalSize, psf, PSF.CalcPSFSquared(psf), nrBatchIterations)
         {
 
         }
 
-        public GPUGreedyCD(Rectangle totalSize, float[,] psf, float[,] psfSquared, int nrBatchIterations)
+        public GPUSerialCD(Rectangle totalSize, float[,] psf, float[,] psfSquared, int nrBatchIterations)
         {
             this.totalSize = totalSize;
             psf2 = psfSquared;

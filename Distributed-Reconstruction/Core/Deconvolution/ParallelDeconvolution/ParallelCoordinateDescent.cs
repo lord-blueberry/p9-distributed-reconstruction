@@ -9,7 +9,10 @@ using static Core.Common;
 
 namespace Core.Deconvolution.ParallelDeconvolution
 {
-    public class ParallelDeconvolver
+    /// <summary>
+    /// Main class of the parallel coordinate descent algorithm. It uses an AsyncDeconvolver object for each processor in use, and the SharedData object contains all the data shared between the processors.
+    /// </summary>
+    public class ParallelCoordinateDescent
     {
         int threadCount;
         int concurrentIterations;
@@ -20,7 +23,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
         float[,] psf2;
         Rectangle totalSize;
 
-        public ParallelDeconvolver(Rectangle totalSize, float[,] psf, int threadCount = 8, int maxConcurrent = 1000,  float searchFraction = 0.1f)
+        public ParallelCoordinateDescent(Rectangle totalSize, float[,] psf, int threadCount = 8, int maxConcurrent = 1000,  float searchFraction = 0.1f)
         {
             this.totalSize = totalSize;
             this.psf = psf;
@@ -93,7 +96,17 @@ namespace Core.Deconvolution.ParallelDeconvolution
         }
 
         #region deconvolveApprox
-        public DeconvolutionResult DeconvolveApprox(float[,] xImage, float[,] gradients, float lambda, float alpha, int maxIteration = 100, float epsilon = 1e-4f)
+        /// <summary>
+        /// Deconvolve with gradient acceleration
+        /// </summary>
+        /// <param name="xImage">intermediate solution</param>
+        /// <param name="gradients">map of gradients</param>
+        /// <param name="lambda">elastic net regularization parameter</param>
+        /// <param name="alpha"></param>
+        /// <param name="maxIteration">maximum number of active set iterations</param>
+        /// <param name="epsilon">abort algorithm when a change to the xImage becomes smaller than epsilon</param>
+        /// <returns>PCDM Runtime Statistics</returns>
+        public PCDMStatistics DeconvolveAccelerated(float[,] xImage, float[,] gradients, float lambda, float alpha, int maxIteration = 100, float epsilon = 1e-4f)
         {
             Stopwatch watch = new Stopwatch();
             var xExplore = Copy(xImage);
@@ -108,7 +121,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
             shared.BlockLock = new int[shared.ActiveSet.Count];
             shared.MaxConcurrentIterations = concurrentIterations;
 
-            var output = DeconvolveApproxConcurrent(shared, maxIteration, epsilon);
+            var output = DeconvolveAcceleratedConcurrent(shared, maxIteration, epsilon);
 
             var theta0 = shared.ProcessorCount / (shared.XExpl.Length);
             var theta = output.Theta;
@@ -120,7 +133,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
             return output;
         }
 
-        private DeconvolutionResult DeconvolveApproxConcurrent(SharedData shared, int activeSetIterations, float epsilon)
+        private PCDMStatistics DeconvolveAcceleratedConcurrent(SharedData shared, int activeSetIterations, float epsilon)
         {
             var watch = new Stopwatch();
 
@@ -195,12 +208,22 @@ namespace Core.Deconvolution.ParallelDeconvolution
                 iter++;
             }
 
-            return new DeconvolutionResult(converged, deconvolvers.Sum(x => x.AsyncIterations), deconvolvers[0].Theta);
+            return new PCDMStatistics(converged, deconvolvers.Sum(x => x.AsyncIterations), deconvolvers[0].Theta);
         }
         #endregion
 
         #region deconvolve PCDM
-        public DeconvolutionResult DeconvolvePCDM(float[,] xImage, float[,] gradients, float lambda, float alpha, int maxIteration = 100, float epsilon = 1e-4f)
+        /// <summary>
+        /// Deconvolve
+        /// </summary>
+        /// <param name="xImage">intermediate solution</param>
+        /// <param name="gradients">map of gradients</param>
+        /// <param name="lambda">elastic net regularization parameter</param>
+        /// <param name="alpha"></param>
+        /// <param name="maxIteration">maximum number of active set iterations</param>
+        /// <param name="epsilon">abort algorithm when a change to the xImage becomes smaller than epsilon</param>
+        /// <returns>PCDM Runtime Statistics</returns>
+        public PCDMStatistics Deconvolve(float[,] xImage, float[,] gradients, float lambda, float alpha, int maxIteration = 100, float epsilon = 1e-4f)
         {
             var shared = new SharedData(lambda, alpha, threadCount,
                 CountNonZero(psf), psf2, aMap,
@@ -214,7 +237,7 @@ namespace Core.Deconvolution.ParallelDeconvolution
             return output;
         }
 
-        private DeconvolutionResult DeconvolvePCDMConcurrent(SharedData shared, int activeSetIterations, float epsilon)
+        private PCDMStatistics DeconvolvePCDMConcurrent(SharedData shared, int activeSetIterations, float epsilon)
         {
             var watch = new Stopwatch();
 
@@ -274,18 +297,18 @@ namespace Core.Deconvolution.ParallelDeconvolution
                 iter++;
             }
 
-            return new DeconvolutionResult(converged, deconvolvers.Sum(x => x.AsyncIterations), 0f);
+            return new PCDMStatistics(converged, deconvolvers.Sum(x => x.AsyncIterations), 0f);
         }
         #endregion
 
-        public class DeconvolutionResult
+        public class PCDMStatistics
         {
             public bool Converged { get; private set; }
             public int IterationCount { get; private set; }
             public float Theta { get; private set; }
 
 
-            public DeconvolutionResult(bool converged, int iteration, float theta)
+            public PCDMStatistics(bool converged, int iteration, float theta)
             {
                 Converged = converged;
                 IterationCount = iteration;

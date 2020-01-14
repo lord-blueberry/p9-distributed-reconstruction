@@ -26,7 +26,7 @@ namespace SingleReconstruction.Experiments
             if (maskPsf2)
                 Mask(maskedPsf2, 1e-5f);
             writer.WriteLine((CountNonZero(maskedPsf2) - maskedPsf2.Length)/ (double)maskedPsf2.Length);
-            var fastCD = new FastGreedyCD(totalSize, totalSize, maskedPsf, maskedPsf2);
+            var fastCD = new FastSerialCD(totalSize, totalSize, maskedPsf, maskedPsf2);
             FitsIO.Write(maskedPsf, folder + maskFactor + "psf.fits");
 
             

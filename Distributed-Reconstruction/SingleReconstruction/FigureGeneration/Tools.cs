@@ -35,6 +35,19 @@ namespace SingleReconstruction.FigureGeneration
 
                 return new Tuple<float[,], int, int>(output, yOffset, xOffset); 
             }
+
+            public static Tuple<float[,], int, int> CutExampleImage(float[,] image)
+            {
+                var yOffset = 800;
+                var xOffset = 800;
+                var rectangle = new Rectangle(yOffset, xOffset, 3072, 3072);
+                var output = new float[rectangle.YExtent(), rectangle.XExtent()];
+                for (int y = rectangle.Y; y < rectangle.YEnd; y++)
+                    for (int x = rectangle.X; x < rectangle.XEnd; x++)
+                        output[y - rectangle.Y, x - rectangle.X] = image[y, x];
+
+                return new Tuple<float[,], int, int>(output, yOffset, xOffset);
+            }
         }
         
         public static void Mask(float[,] image, int cutFactor)

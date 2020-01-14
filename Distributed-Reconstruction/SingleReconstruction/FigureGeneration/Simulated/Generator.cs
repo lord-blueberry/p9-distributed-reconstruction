@@ -58,7 +58,7 @@ namespace SingleReconstruction.FigureGeneration.Simulated
             //================================================= Reconstruct =============================================================
             var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
             var reconstruction = new float[c.GridSize, c.GridSize];
-            var fastCD = new FastGreedyCD(totalSize, psf);
+            var fastCD = new FastSerialCD(totalSize, psf);
             var lambda = 0.50f * fastCD.MaxLipschitz;
             var alpha = 0.2f;
 

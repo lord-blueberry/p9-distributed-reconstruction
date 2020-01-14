@@ -6,7 +6,10 @@ using Core.ImageDomainGridder;
 
 namespace Core.Deconvolution
 {
-    public class GreedyCDReference
+    /// <summary>
+    /// Reference implementation of the serial coordinate descent algorithms
+    /// </summary>
+    public class SerialCDReference
     {
         public static bool DeconvolvePath(double[,] xImage, double[,] b, double[,] psf, double lambdaMin, double lambdaFactor, double alpha, int maxPathIteration = 10,  int maxIteration = 100, double epsilon = 1e-4)
         {

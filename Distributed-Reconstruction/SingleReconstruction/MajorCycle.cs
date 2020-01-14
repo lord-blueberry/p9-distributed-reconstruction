@@ -17,6 +17,18 @@ namespace SingleReconstruction
     {
         const float MAJOR_EPSILON = 1e-4f;
 
+        /// <summary>
+        /// Major cycle implementation for the Serial CD
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="c"></param>
+        /// <param name="useGPU"></param>
+        /// <param name="psfCutFactor"></param>
+        /// <param name="maxMajorCycle"></param>
+        /// <param name="lambda"></param>
+        /// <param name="alpha"></param>
+        /// <param name="deconvIterations"></param>
+        /// <param name="deconvEpsilon"></param>
         public static void ReconstructSerialCD(MeasurementData data, GriddingConstants c, bool useGPU, int psfCutFactor, int maxMajorCycle, float lambda, float alpha, int deconvIterations, float deconvEpsilon)
         {
             var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
@@ -42,18 +54,18 @@ namespace SingleReconstruction
             var maxSidelobe = PSF.CalcMaxSidelobe(psf, psfCutFactor);
 
             IDeconvolver deconvolver = null;
-            if (useGPU & GPUGreedyCD.IsGPUSupported())
+            if (useGPU & GPUSerialCD.IsGPUSupported())
             {
-                deconvolver = new GPUGreedyCD(totalSize, psfCut, 1000);
+                deconvolver = new GPUSerialCD(totalSize, psfCut, 1000);
             }
-            else if(useGPU & !GPUGreedyCD.IsGPUSupported())
+            else if(useGPU & !GPUSerialCD.IsGPUSupported())
             {
                 Console.WriteLine("GPU not supported by library. Switching to CPU implementation");
-                deconvolver = new FastGreedyCD(totalSize, psfCut);
+                deconvolver = new FastSerialCD(totalSize, psfCut);
             }
             else
             {
-                deconvolver = new FastGreedyCD(totalSize, psfCut);
+                deconvolver = new FastSerialCD(totalSize, psfCut);
             }
 
             var psfBMap = psfCut;
@@ -120,6 +132,18 @@ namespace SingleReconstruction
             }
         }
 
+        /// <summary>
+        /// Major cycle implemnentation for the parallel coordinate descent algorithm
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="c"></param>
+        /// <param name="psfCutFactor"></param>
+        /// <param name="maxMajorCycle"></param>
+        /// <param name="maxMinorCycle"></param>
+        /// <param name="lambda"></param>
+        /// <param name="alpha"></param>
+        /// <param name="deconvIterations"></param>
+        /// <param name="deconvEpsilon"></param>
         public static void ReconstructPCDM(MeasurementData data, GriddingConstants c, int psfCutFactor, int maxMajorCycle, int maxMinorCycle, float lambda, float alpha, int deconvIterations, float deconvEpsilon)
         {
             var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
@@ -145,7 +169,7 @@ namespace SingleReconstruction
             var maxSidelobe = PSF.CalcMaxSidelobe(psf, psfCutFactor);
             var sidelobeHalf = PSF.CalcMaxSidelobe(psf, 2);
 
-            var pcdm = new ParallelDeconvolver(totalSize, psfCut, Environment.ProcessorCount, 1000);
+            var pcdm = new ParallelCoordinateDescent(totalSize, psfCut, Environment.ProcessorCount, 1000);
 
             using (var gCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psfCut, totalSize), new Rectangle(0, 0, psfCut.GetLength(0), psfCut.GetLength(1))))
             using (var gCalculator2 = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psf, totalSize), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1))))
@@ -160,7 +184,7 @@ namespace SingleReconstruction
                 var switchedToOtherPsf = false;
                 var xImage = new float[c.GridSize, c.GridSize];
                 var residualVis = data.Visibilities;
-                ParallelDeconvolver.DeconvolutionResult lastResult = null;
+                ParallelCoordinateDescent.PCDMStatistics lastResult = null;
                 for (int cycle = 0; cycle < maxMajorCycle; cycle++)
                 {
                     Console.WriteLine("Beginning Major cycle " + cycle);
@@ -201,7 +225,7 @@ namespace SingleReconstruction
                             break;
                         }
 
-                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 40, deconvEpsilon);
+                        lastResult = pcdm.Deconvolve(xImage, bMap, currentLambda, alpha, 40, deconvEpsilon);
 
                         if (currentLambda == lambda | currentLambda == minLambda)
                             break;

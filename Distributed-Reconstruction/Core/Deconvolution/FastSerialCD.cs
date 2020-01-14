@@ -8,7 +8,10 @@ using static Core.Common;
 
 namespace Core.Deconvolution
 {
-    public class FastGreedyCD : IDeconvolver
+    /// <summary>
+    /// Fast implementation of the serial coordinate descent algorithm
+    /// </summary>
+    public class FastSerialCD : IDeconvolver
     {
         /*
          * ImageSize, patchSize and subPatchSize. Only relevant for ISubpatchDeconvolver
@@ -25,13 +28,13 @@ namespace Core.Deconvolution
 
         public float MaxLipschitz { get; private set; }
 
-        public FastGreedyCD(Rectangle totalSize, float[,] psf, int processorLimit = -1) :
+        public FastSerialCD(Rectangle totalSize, float[,] psf, int processorLimit = -1) :
             this(totalSize, totalSize, psf, PSF.CalcPSFSquared(psf), processorLimit)
         {
             
         }
 
-        public FastGreedyCD(Rectangle totalSize, Rectangle patchSize, float[,] psf, float[,] psfSquared, int processorLimit = -1)
+        public FastSerialCD(Rectangle totalSize, Rectangle patchSize, float[,] psf, float[,] psfSquared, int processorLimit = -1)
         {
             this.patch = patchSize;
             psf2 = psfSquared;

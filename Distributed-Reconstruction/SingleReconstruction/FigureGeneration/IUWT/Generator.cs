@@ -25,6 +25,9 @@ namespace SingleReconstruction.FigureGeneration.IUWT
                 for (int j = 0; j < reconstruction.GetLength(1); j++)
                     image[i, j] = reconstruction[i, j] - residual[i, j];
 
+            var example = Tools.LMC.CutExampleImage(image);
+            Tools.WriteToMeltCSV(example.Item1, Path.Combine(outputFolder, "iuwt-example.csv"), example.Item2, example.Item3);
+
             var n132 = Tools.LMC.CutN132Remnant(image);
             Tools.WriteToMeltCSV(n132.Item1, Path.Combine(outputFolder, "iuwt-image-N132.csv"), n132.Item2, n132.Item3);
             var calibration = Tools.LMC.CutCalibration(image);

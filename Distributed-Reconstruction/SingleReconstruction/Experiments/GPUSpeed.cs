@@ -49,8 +49,8 @@ namespace SingleReconstruction.Experiments
                 var bMapCalculator = new PaddedConvolver(PSF.CalcPaddedFourierCorrelation(psf, totalSize), new Rectangle(0, 0, psf.GetLength(0), psf.GetLength(1)));
                 var bMapCPU = bMapCalculator.Convolve(dirtyImage);
                 var bMapGPU = bMapCalculator.Convolve(dirtyImage);
-                var fastCD = new FastGreedyCD(totalSize, psf);
-                var gpuCD = new GPUGreedyCD(totalSize, psf, 1000);
+                var fastCD = new FastSerialCD(totalSize, psf);
+                var gpuCD = new GPUSerialCD(totalSize, psf, 1000);
                 var lambda = 0.5f * fastCD.MaxLipschitz;
                 var alpha = 0.5f;
 

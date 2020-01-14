@@ -31,7 +31,7 @@ namespace SingleReconstruction.Experiments
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, CUT_FACTOR_PCDM);
             var sidelobeHalf = PSF.CalcMaxSidelobe(fullPsf, 2);
             var random = new Random(123);
-            var pcdm = new ParallelDeconvolver(totalSize, psfCut, 1, 1000, searchPercent);
+            var pcdm = new ParallelCoordinateDescent(totalSize, psfCut, 1, 1000, searchPercent);
 
             var metadata = Partitioner.CreatePartition(c, input.UVW, input.Frequencies);
 
@@ -50,7 +50,7 @@ namespace SingleReconstruction.Experiments
                 var writer = new StreamWriter(folder + "/" + file + ".txt");
                 var xImage = new float[c.GridSize, c.GridSize];
                 var residualVis = input.Visibilities;
-                ParallelDeconvolver.DeconvolutionResult lastResult = null;
+                ParallelCoordinateDescent.PCDMStatistics lastResult = null;
                 for (int cycle = 0; cycle < 6; cycle++)
                 {
                     Console.WriteLine("Beginning Major cycle " + cycle);
@@ -91,7 +91,7 @@ namespace SingleReconstruction.Experiments
                             break;
                         }
                             
-                        lastResult = pcdm.DeconvolvePCDM(xImage, bMap, currentLambda, alpha, 100, 1e-5f);
+                        lastResult = pcdm.Deconvolve(xImage, bMap, currentLambda, alpha, 100, 1e-5f);
 
                         if (currentLambda == lambda | currentLambda == minLambda)
                             break;
@@ -148,7 +148,7 @@ namespace SingleReconstruction.Experiments
             var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
             var psfCut = PSF.Cut(fullPsf, CUT_FACTOR_SERIAL);
             var maxSidelobe = PSF.CalcMaxSidelobe(fullPsf, CUT_FACTOR_SERIAL);
-            var fastCD = new FastGreedyCD(totalSize, psfCut, processorCount);
+            var fastCD = new FastSerialCD(totalSize, psfCut, processorCount);
             var metadata = Partitioner.CreatePartition(c, input.UVW, input.Frequencies);
 
             var writer = new StreamWriter(folder + "/" + file + ".txt");
