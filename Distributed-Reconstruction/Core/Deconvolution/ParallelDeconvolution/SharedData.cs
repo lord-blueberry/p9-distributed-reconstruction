@@ -4,6 +4,9 @@ using System.Text;
 
 namespace Core.Deconvolution.ParallelDeconvolution
 {
+    /// <summary>
+    /// This object contains all the data shared by different AsyncDeconvovlers.
+    /// </summary>
     class SharedData
     {
         public float Lambda { get; set; }

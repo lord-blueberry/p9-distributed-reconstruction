@@ -136,6 +136,9 @@
     <None Update="FigureGeneration\SerialCD\cd-residual.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="FigureGeneration\SerialCD\dirty0.fits">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="FigureGeneration\SerialCD\dirtyReference4.fits">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

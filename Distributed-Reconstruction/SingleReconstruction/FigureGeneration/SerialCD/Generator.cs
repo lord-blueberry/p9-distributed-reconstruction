@@ -25,7 +25,11 @@ namespace SingleReconstruction.FigureGeneration.SerialCD
             var residual= FitsIO.ReadCASAFits(Path.Combine(INPUT_DIR, "cd-residual.fits"));
             Tools.WriteToMeltCSV(residual, Path.Combine(outputFolder, "CD-reference-residuals.csv"));
 
+            var dirtyImage = FitsIO.ReadImage(Path.Combine(INPUT_DIR, "dirty0.fits"));
+            Tools.WriteToMeltCSV(dirtyImage, Path.Combine(outputFolder, "CD-dirty.csv"));
             var reconstruction = FitsIO.ReadCASAFits(Path.Combine(INPUT_DIR, "cd-image.fits"));
+            Tools.WriteToMeltCSV(reconstruction, Path.Combine(outputFolder, "CD-restored.csv"));
+
             var image = new float[reconstruction.GetLength(0), reconstruction.GetLength(1)];
             for (int i = 0; i < reconstruction.GetLength(0); i++)
                 for (int j = 0; j < reconstruction.GetLength(1); j++)

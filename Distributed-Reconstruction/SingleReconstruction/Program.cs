@@ -16,8 +16,8 @@ namespace SingleReconstruction
     {
         static void Main(string[] args)
         {
-            RunningMethod.StartSimulatedReconstruction();
-            RunningMethod.StartLMCReconstruction();
+            //RunningMethod.StartSimulatedReconstruction();
+            //RunningMethod.StartLMCReconstruction();
 
             //Experiments.GPUSpeed.Run();
             //Experiments.PSFSize.RunApproximationMethods();
@@ -28,7 +28,7 @@ namespace SingleReconstruction
             //Experiments.PCDMComparison.Run();
 
 
-            //FigureGeneration.Figures.GenerateAll();
+            FigureGeneration.Figures.GenerateAll();
         }
     }
 }
