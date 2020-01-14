@@ -1,10 +1,13 @@
 # P9-distributed-reconstruction
 
-This repository holds the code of the Master-Thesis: Twowards distributed reconstruction.
+This repository holds the code of the Master-Thesis: Twowards distributed reconstruction. There are three other repositories which belong to the master thesis:
 
-
+* p9-data, which contains the measurement data used in this project. *Necessary to run the code*
+* p9-results, which holds the reconstructed images created with the serial and parallel coordinate descent algorithm. 
+* p9-doc, which contains the master thesis and the paper-draft
 
 ## Getting the data
+
 
 ## Windows setup of the development environment
 
@@ -13,13 +16,13 @@ This repository holds the code of the Master-Thesis: Twowards distributed recons
 * Visual Studio (Community). Install with .Net Core Cross Platform development
 * FitsViewer, for example [DS9](http://ds9.si.edu/site/Download.html) (Images are written as FITS files)
 * Git clone (or download) project to your system.
-* Get the data
 
-### Running the project from Visual Studio
+* Get the p9-data folder on your system
 
 * Open the solution file **project folder**/DistributedReconstruction/DisrtibutedReconstruction.sln with Visual Studio
 * Select SingleReconstruction project to run
-* Enter the full path of the **p9-data** folder
+* Open the file: SingleReconstruction/RunningMethods.cs
+* Change the constant variable P9_DATA_FOLDER and put in the full path of the **p9-data** folder
 * Press F5 to run in Visual Studio
 
 The file SingleReconstruction/RunningMethods.cs executes the two reconstruction algorithms (serial and parallel coordinate desecnent) on a simulated observation, and on the LMC observation. The output is written in the folder SingleReconstruction/bin/(debug or release)/
@@ -38,19 +41,20 @@ The DistributedReconstruction project contains all code which uses MPI for distr
 
 The SingleReconstruction project does not use MPI. It uses the gridder and deconvolution algorithms from the Core project. The SingleReconstruction project itself contains the code for running the algorithms on a single machine, and all the code which runs the experiments of this P9.
 
-## ix installation
+## Linix installation of a reconstruction pipeline
 On Linux/unix machines we need to build dependencies and add them to the C\# build. First, build the project (preferrably in a self-contained build), and then copy the dependencies into the build folder (for example: ~/Distibuted-Reconstruction/SingleReconstruction/bin/publish/).
 
- The project has two native code dependencies:
+This project has two native code dependencies:
 
 * FFTW
 * MPI
 
 
-
 FFTW: build the library with the following command:
 
+```bash
 fftw3 ./configure --prefix=/home/jon/fftw --enable-threads --with-combined-threads --enable-shared
+```
 
 Rename the library to "libfftw3-3-x64.so" and copy it to the build folder.
 
