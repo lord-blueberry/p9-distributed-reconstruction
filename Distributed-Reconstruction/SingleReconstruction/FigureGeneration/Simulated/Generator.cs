@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
+using System.Threading.Tasks;
 using System.Numerics;
 using Core;
 using Core.ImageDomainGridder;
@@ -104,7 +105,6 @@ namespace SingleReconstruction.FigureGeneration.Simulated
             FFT.Shift(psf);
 
             Directory.CreateDirectory(outputFolder);
-
             var reconstruction = new float[c.GridSize, c.GridSize];
 
             var residualVis = data.Visibilities;
@@ -158,6 +158,62 @@ namespace SingleReconstruction.FigureGeneration.Simulated
             //FFT.Shift(cleaned);
             FitsIO.Write(cleaned, Path.Combine(outputFolder, "rec_CLEAN.fits"));
             Tools.WriteToMeltCSV(cleaned, Path.Combine(outputFolder, "rec_CLEAN.csv"));
+        }
+
+        public static void GenerateSerialCDExample(string simulatedLocation, string outputFolder)
+        {
+            var data = MeasurementData.LoadSimulatedPoints(simulatedLocation);
+            var cellSize = 2.0 / 3600.0 * Math.PI / 180.0;
+            var c = new GriddingConstants(data.VisibilitiesCount, 128, 8, 4, 512, (float)cellSize, 1, 0.0);
+            var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
+
+            var psfGrid = IDG.GridPSF(c, metadata, data.UVW, data.Flags, data.Frequencies);
+            var psf = FFT.BackwardFloat(psfGrid, c.VisibilitiesCount);
+            FFT.Shift(psf);
+            var corrKernel = PSF.CalcPaddedFourierCorrelation(psf, new Rectangle(0, 0, c.GridSize, c.GridSize));
+
+            Directory.CreateDirectory(outputFolder);
+            var reconstruction = new float[c.GridSize, c.GridSize];
+            var residualVis = data.Visibilities;
+            int cycle = 0;
+            var dirtyGrid = IDG.Grid(c, metadata, residualVis, data.UVW, data.Frequencies);
+            var dirtyImage = FFT.BackwardFloat(dirtyGrid, c.VisibilitiesCount);
+            FFT.Shift(dirtyImage);
+
+            //first iteration output
+            Tools.WriteToMeltCSV(reconstruction, Path.Combine(outputFolder, "model_CD_" + 0 + ".csv"));
+            Tools.WriteToMeltCSV(dirtyImage, Path.Combine(outputFolder, "residual_CD_" + 0 + ".csv"));
+
+            var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
+            var fastCD = new FastSerialCD(totalSize, psf);
+            var lambda = 0.50f * fastCD.MaxLipschitz;
+            var alpha = 0.2f;
+            using (var residualsConvolver = new PaddedConvolver(totalSize, psf))
+            {
+                for (int i = 0; i < 100; i++)
+                {
+                    var gradients = Residuals.CalcGradientMap(dirtyImage, corrKernel, totalSize);
+                    var recCopy = Common.Copy(reconstruction);
+
+                    fastCD.Deconvolve(reconstruction, gradients, lambda, alpha, 1);
+
+                    var residualsUpdate = new float[reconstruction.GetLength(0), reconstruction.GetLength(1)];
+                    Parallel.For(0, recCopy.GetLength(0), (i) =>
+                    {
+                        for (int j = 0; j < recCopy.GetLength(1); j++)
+                            residualsUpdate[i, j] = reconstruction[i, j] - recCopy[i, j];
+                    });
+                    residualsConvolver.ConvolveInPlace(residualsUpdate);
+                    Parallel.For(0, recCopy.GetLength(0), (i) =>
+                    {
+                        for (int j = 0; j < recCopy.GetLength(1); j++)
+                            dirtyImage[i, j] = dirtyImage[i, j] - residualsUpdate[i, j];
+                    });
+                    Tools.WriteToMeltCSV(reconstruction, Path.Combine(outputFolder, "model_CD_" + (i + 1) + ".csv"));
+                    Tools.WriteToMeltCSV(dirtyImage, Path.Combine(outputFolder, "residual_CD_" + (i + 1) + ".csv"));
+                }
+            }
+
         }
     }
 }

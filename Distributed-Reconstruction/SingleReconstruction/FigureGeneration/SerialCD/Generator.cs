@@ -43,5 +43,11 @@ namespace SingleReconstruction.FigureGeneration.SerialCD
             calibration = Tools.LMC.CutCalibration(image);
             Tools.WriteToMeltCSV(calibration.Item1, Path.Combine(outputFolder, "CD-image-Calibration.csv"), calibration.Item2, calibration.Item3);
         }
+
+        public static void GenerateAnimation()
+        {
+            var folder = @"C:\dev\GitHub\p9-data\small\fits\simulation_point\";
+            Console.WriteLine("Generating approx random images");
+        }
     }
 }

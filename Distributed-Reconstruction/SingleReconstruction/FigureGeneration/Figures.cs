@@ -21,6 +21,7 @@ namespace SingleReconstruction.FigureGeneration
             var outputFolder = "images/simulated";
             Simulated.Generator.GeneratePSFs(simulated, outputFolder);
             Simulated.Generator.GenerateCLEANExample(simulated, outputFolder);
+            Simulated.Generator.GenerateSerialCDExample(simulated, outputFolder + "/cd-example");
         }
     }
 }
