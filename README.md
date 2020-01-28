@@ -11,21 +11,19 @@ This repository holds the code of the Master-Thesis: Twowards distributed recons
 The data is saved in a github LFS repository. To clone the repository:
 
  * Install a git client
- * Install [github lfs] https://git-lfs.github.com/ command line extension (may not be necessary).
+ * Install [github lfs](https://git-lfs.github.com/) command line extension (may not be necessary).
  * Checkout the [p9-data](https://github.com/i4Ds/Schwammberger-P9-Data) repository. It is a github lfs repository. It takes a while to download all the files.
  
 The repository contains the simulated and the LMC observations.
 
 ## Windows setup of the development environment
-
-### Setting up the environment
-
-* Visual Studio (Community). Install with .Net Core Cross Platform development
-* FitsViewer, for example [DS9](http://ds9.si.edu/site/Download.html) (Images are written as FITS files)
+Install/Download the following:
+* Install Visual Studio (Community). Install with .Net Core Cross Platform development
+* Install FitsViewer, for example [DS9](http://ds9.si.edu/site/Download.html) (Images are written as FITS files)
 * Git clone (or download) project to your system.
+* Download the p9-data folder to your system. 
 
-* Get the p9-data folder on your system
-
+Run the project within Visual Studio
 * Open the solution file **project folder**/DistributedReconstruction/DisrtibutedReconstruction.sln with Visual Studio
 * Select SingleReconstruction project to run
 * Open the file: SingleReconstruction/RunningMethods.cs
@@ -33,6 +31,8 @@ The repository contains the simulated and the LMC observations.
 * Press F5 to run in Visual Studio
 
 The file SingleReconstruction/RunningMethods.cs executes the two reconstruction algorithms (serial and parallel coordinate desecnent) on a simulated observation, and on the LMC observation. The output is written in the folder SingleReconstruction/bin/(debug or release)/
+
+
 
 
 ## Project structure
