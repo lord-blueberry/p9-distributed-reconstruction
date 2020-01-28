@@ -87,7 +87,7 @@ namespace SingleReconstruction
                     var dirtyGrid = IDG.GridW(c, metadata, residualVis, data.UVW, data.Frequencies);
                     var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, c.VisibilitiesCount);
                     FFT.Shift(dirtyImage);
-                    FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
+                    FitsIO.Write(dirtyImage, "dirty_serial_majorCycle" + cycle + ".fits");
 
                     currentWatch.Restart();
                     totalWatch.Start();
@@ -113,7 +113,7 @@ namespace SingleReconstruction
                         switchedToOtherPsf = true;
                     }
 
-                    FitsIO.Write(xImage, "xImage_serial_" + cycle + ".fits");
+                    FitsIO.Write(xImage, "model_serial_majorCycle" + cycle + ".fits");
 
                     currentWatch.Stop();
                     totalWatch.Stop();
@@ -191,7 +191,7 @@ namespace SingleReconstruction
                     var dirtyGrid = IDG.GridW(c, metadata, residualVis, data.UVW, data.Frequencies);
                     var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, c.VisibilitiesCount);
                     FFT.Shift(dirtyImage);
-                    FitsIO.Write(dirtyImage, "dirty" + cycle + ".fits");
+                    FitsIO.Write(dirtyImage, "dirty_pcdm_majorCycle" + cycle + ".fits");
 
                     currentWatch.Restart();
                     totalWatch.Start();
@@ -257,7 +257,7 @@ namespace SingleReconstruction
                         switchedToOtherPsf = true;
                     }
 
-                    FitsIO.Write(xImage, "xImage_pcdm_" + cycle + ".fits");
+                    FitsIO.Write(xImage, "model_pcdm_majorCycle" + cycle + ".fits");
 
                     FFT.Shift(xImage);
                     var xGrid = FFT.Forward(xImage);

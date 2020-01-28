@@ -8,7 +8,7 @@ namespace SingleReconstruction
 {
     class RunningMethod
     {
-        const string P9_DATA_FOLDER = "C:/dev/GitHub/p9-data/";
+        const string P9_DATA_FOLDER = "C:/dev/GitHub/Schwammberger-P9-Data/p9-data/";
 
         public static void StartSimulatedReconstruction()
         {

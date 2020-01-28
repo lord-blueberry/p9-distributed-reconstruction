@@ -23,7 +23,7 @@ Install/Download the following:
 * Git clone (or download) project to your system.
 * Download the p9-data folder to your system. 
 
-Run the project within Visual Studio
+Run the project within Visual Studio:
 * Open the solution file **project folder**/DistributedReconstruction/DisrtibutedReconstruction.sln with Visual Studio
 * Select SingleReconstruction project to run
 * Open the file: SingleReconstruction/RunningMethods.cs
