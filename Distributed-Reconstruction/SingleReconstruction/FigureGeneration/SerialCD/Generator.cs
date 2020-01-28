@@ -34,7 +34,7 @@ namespace SingleReconstruction.FigureGeneration.SerialCD
             for (int i = 0; i < reconstruction.GetLength(0); i++)
                 for (int j = 0; j < reconstruction.GetLength(1); j++)
                     image[i, j] = reconstruction[i, j] - residual[i, j];
-
+            Tools.WriteToMeltCSV(image, Path.Combine(outputFolder, "CD-image-no-residuals.csv"));
             var example = Tools.LMC.CutExampleImage(image);
             Tools.WriteToMeltCSV(example.Item1, Path.Combine(outputFolder, "CD-example.csv"), example.Item2, example.Item3);
 

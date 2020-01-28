@@ -2,12 +2,19 @@
 
 This repository holds the code of the Master-Thesis: Twowards distributed reconstruction. There are three other repositories which belong to the master thesis:
 
-* p9-data, which contains the measurement data used in this project. *Necessary to run the code*
-* p9-results, which holds the reconstructed images created with the serial and parallel coordinate descent algorithm. 
-* p9-doc, which contains the master thesis and the paper-draft
+* [p9-data](https://github.com/i4Ds/Schwammberger-P9-Data), which contains the measurement data used in this project. *Necessary to run the code*
+* [p9-results](https://github.com/lord-blueberry/p9-results), which holds the reconstructed images created with the serial and parallel coordinate descent algorithm. 
+* [p9-doc](https://github.com/lord-blueberry/p9-doc), which contains the master thesis and the paper-draft
 
 ## Getting the data
 
+The data is saved in a github LFS repository. To clone the repository:
+
+ * Install a git client
+ * Install [github lfs] https://git-lfs.github.com/ command line extension (may not be necessary).
+ * Checkout the [p9-data](https://github.com/i4Ds/Schwammberger-P9-Data) repository. It is a github lfs repository. It takes a while to download all the files.
+ 
+The repository contains the simulated and the LMC observations.
 
 ## Windows setup of the development environment
 

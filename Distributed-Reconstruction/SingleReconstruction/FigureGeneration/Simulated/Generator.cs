@@ -77,7 +77,6 @@ namespace SingleReconstruction.FigureGeneration.Simulated
                 {
                     Tools.WriteToMeltCSV(dirtyImage, Path.Combine(outputFolder, "dirty.csv"));
                     Tools.WriteToMeltCSV(gradients, Path.Combine(outputFolder, "gradients.csv"));
-
                 }
 
                 fastCD.Deconvolve(reconstruction, gradients, lambda, alpha, 10000, 1e-5f);
@@ -96,8 +95,8 @@ namespace SingleReconstruction.FigureGeneration.Simulated
         public static void GenerateCLEANExample(string simulatedLocation, string outputFolder)
         {
             var data = MeasurementData.LoadSimulatedPoints(simulatedLocation);
-            var cellSize = 2.0 / 3600.0 * Math.PI / 180.0;
-            var c = new GriddingConstants(data.VisibilitiesCount, 128, 8, 4, 512, (float)cellSize, 1, 0.0);
+            var cellSize = 1.0 / 3600.0 * Math.PI / 180.0;
+            var c = new GriddingConstants(data.VisibilitiesCount, 256, 8, 4, 512, (float)cellSize, 1, 0.0);
             var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
 
             var psfGrid = IDG.GridPSF(c, metadata, data.UVW, data.Flags, data.Frequencies);
@@ -108,13 +107,13 @@ namespace SingleReconstruction.FigureGeneration.Simulated
             var reconstruction = new float[c.GridSize, c.GridSize];
 
             var residualVis = data.Visibilities;
-            for (int cycle = 0; cycle < 4; cycle++)
+            for (int cycle = 0; cycle < 10; cycle++)
             {
                 Console.WriteLine("in cycle " + cycle);
                 var dirtyGrid = IDG.Grid(c, metadata, residualVis, data.UVW, data.Frequencies);
                 var dirtyImage = FFT.BackwardFloat(dirtyGrid, c.VisibilitiesCount);
                 FFT.Shift(dirtyImage);
-                FitsIO.Write(dirtyImage, Path.Combine(outputFolder, "dirty_CLEAN_" + cycle + ".fits"));
+                //FitsIO.Write(dirtyImage, Path.Combine(outputFolder, "dirty_CLEAN_" + cycle + ".fits"));
                 Tools.WriteToMeltCSV(dirtyImage, Path.Combine(outputFolder, "dirty_CLEAN_" + cycle + ".csv"));
 
                 var maxY = -1;
@@ -129,10 +128,10 @@ namespace SingleReconstruction.FigureGeneration.Simulated
                             max = Math.Abs(dirtyImage[y, x]);
                         }
 
-                FitsIO.Write(reconstruction, Path.Combine(outputFolder, "model_CLEAN_" + cycle + ".fits"));
-                Tools.WriteToMeltCSV(reconstruction, Path.Combine(outputFolder, "model_CLEAN_" + cycle + ".csv"));
+                //FitsIO.Write(reconstruction, Path.Combine(outputFolder, "model_CLEAN_" + cycle + ".fits"));
+                Tools.WriteToMeltCSV(PSF.Cut(reconstruction), Path.Combine(outputFolder, "model_CLEAN_" + cycle + ".csv"));
 
-                reconstruction[maxY, maxX] = 0.5f * dirtyImage[maxY, maxX];
+                reconstruction[maxY, maxX] += 0.5f * dirtyImage[maxY, maxX];
                 
                 FFT.Shift(reconstruction);
                 var xGrid = FFT.Forward(reconstruction);
@@ -141,12 +140,12 @@ namespace SingleReconstruction.FigureGeneration.Simulated
                 residualVis = Visibilities.Substract(data.Visibilities, modelVis, data.Flags);
             }
 
-            var cleanbeam = new float[128, 128];
-            var x0 = 64;
-            var y0 = 64;
+            var cleanbeam = new float[c.GridSize, c.GridSize];
+            var x0 = c.GridSize/2;
+            var y0 = c.GridSize/2;
             for (int y = 0; y < cleanbeam.GetLength(0); y++)
                 for (int x = 0; x < cleanbeam.GetLength(1); x++)
-                    cleanbeam[y, x] = (float)(1.0 * Math.Exp(-(Math.Pow(x0 - x, 2) / 4 + Math.Pow(y0 - y, 2) / 4)));
+                    cleanbeam[y, x] = (float)(1.0 * Math.Exp(-(Math.Pow(x0 - x, 2) / 16 + Math.Pow(y0 - y, 2) / 16)));
 
             FitsIO.Write(cleanbeam, Path.Combine(outputFolder, "clbeam.fits"));
 
@@ -156,15 +155,15 @@ namespace SingleReconstruction.FigureGeneration.Simulated
             var CONF = Common.Fourier2D.Multiply(REC, CL);
             var cleaned = FFT.BackwardFloat(CONF, reconstruction.Length);
             //FFT.Shift(cleaned);
-            FitsIO.Write(cleaned, Path.Combine(outputFolder, "rec_CLEAN.fits"));
-            Tools.WriteToMeltCSV(cleaned, Path.Combine(outputFolder, "rec_CLEAN.csv"));
+            //FitsIO.Write(cleaned, Path.Combine(outputFolder, "rec_CLEAN.fits"));
+            Tools.WriteToMeltCSV(PSF.Cut(cleaned), Path.Combine(outputFolder, "rec_CLEAN.csv"));
         }
 
         public static void GenerateSerialCDExample(string simulatedLocation, string outputFolder)
         {
             var data = MeasurementData.LoadSimulatedPoints(simulatedLocation);
-            var cellSize = 2.0 / 3600.0 * Math.PI / 180.0;
-            var c = new GriddingConstants(data.VisibilitiesCount, 128, 8, 4, 512, (float)cellSize, 1, 0.0);
+            var cellSize = 1.0 / 3600.0 * Math.PI / 180.0;
+            var c = new GriddingConstants(data.VisibilitiesCount, 256, 8, 4, 512, (float)cellSize, 1, 0.0);
             var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
 
             var psfGrid = IDG.GridPSF(c, metadata, data.UVW, data.Flags, data.Frequencies);
@@ -175,44 +174,30 @@ namespace SingleReconstruction.FigureGeneration.Simulated
             Directory.CreateDirectory(outputFolder);
             var reconstruction = new float[c.GridSize, c.GridSize];
             var residualVis = data.Visibilities;
-            int cycle = 0;
-            var dirtyGrid = IDG.Grid(c, metadata, residualVis, data.UVW, data.Frequencies);
-            var dirtyImage = FFT.BackwardFloat(dirtyGrid, c.VisibilitiesCount);
-            FFT.Shift(dirtyImage);
-
-            //first iteration output
-            Tools.WriteToMeltCSV(reconstruction, Path.Combine(outputFolder, "model_CD_" + 0 + ".csv"));
-            Tools.WriteToMeltCSV(dirtyImage, Path.Combine(outputFolder, "residual_CD_" + 0 + ".csv"));
-
             var totalSize = new Rectangle(0, 0, c.GridSize, c.GridSize);
             var fastCD = new FastSerialCD(totalSize, psf);
             var lambda = 0.50f * fastCD.MaxLipschitz;
             var alpha = 0.2f;
-            using (var residualsConvolver = new PaddedConvolver(totalSize, psf))
+            
+            for (int cycle = 0; cycle < 100; cycle++)
             {
-                for (int i = 0; i < 100; i++)
-                {
-                    var gradients = Residuals.CalcGradientMap(dirtyImage, corrKernel, totalSize);
-                    var recCopy = Common.Copy(reconstruction);
+                var dirtyGrid = IDG.Grid(c, metadata, residualVis, data.UVW, data.Frequencies);
+                var dirtyImage = FFT.BackwardFloat(dirtyGrid, c.VisibilitiesCount);
+                FFT.Shift(dirtyImage);
+                var gradients = Residuals.CalcGradientMap(dirtyImage, corrKernel, totalSize);
 
-                    fastCD.Deconvolve(reconstruction, gradients, lambda, alpha, 1);
+                Tools.WriteToMeltCSV(Common.PSF.Cut(reconstruction), Path.Combine(outputFolder, "model_CD_" + cycle + ".csv"));
+                Tools.WriteToMeltCSV(gradients, Path.Combine(outputFolder, "gradients_CD_" + cycle + ".csv"));
 
-                    var residualsUpdate = new float[reconstruction.GetLength(0), reconstruction.GetLength(1)];
-                    Parallel.For(0, recCopy.GetLength(0), (i) =>
-                    {
-                        for (int j = 0; j < recCopy.GetLength(1); j++)
-                            residualsUpdate[i, j] = reconstruction[i, j] - recCopy[i, j];
-                    });
-                    residualsConvolver.ConvolveInPlace(residualsUpdate);
-                    Parallel.For(0, recCopy.GetLength(0), (i) =>
-                    {
-                        for (int j = 0; j < recCopy.GetLength(1); j++)
-                            dirtyImage[i, j] = dirtyImage[i, j] - residualsUpdate[i, j];
-                    });
-                    Tools.WriteToMeltCSV(reconstruction, Path.Combine(outputFolder, "model_CD_" + (i + 1) + ".csv"));
-                    Tools.WriteToMeltCSV(dirtyImage, Path.Combine(outputFolder, "residual_CD_" + (i + 1) + ".csv"));
-                }
+                fastCD.Deconvolve(reconstruction, gradients, lambda, alpha, 4);
+
+                FFT.Shift(reconstruction);
+                var xGrid = FFT.Forward(reconstruction);
+                FFT.Shift(reconstruction);
+                var modelVis = IDG.DeGrid(c, metadata, xGrid, data.UVW, data.Frequencies);
+                residualVis = Visibilities.Substract(data.Visibilities, modelVis, data.Flags);
             }
+            
 
         }
     }
