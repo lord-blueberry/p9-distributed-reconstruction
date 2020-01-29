@@ -20,6 +20,7 @@ namespace SingleReconstruction
         /// <summary>
         /// Major cycle implementation for the Serial CD
         /// </summary>
+        /// <param name="obsName"></param>
         /// <param name="data"></param>
         /// <param name="c"></param>
         /// <param name="useGPU"></param>
@@ -29,7 +30,7 @@ namespace SingleReconstruction
         /// <param name="alpha"></param>
         /// <param name="deconvIterations"></param>
         /// <param name="deconvEpsilon"></param>
-        public static void ReconstructSerialCD(MeasurementData data, GriddingConstants c, bool useGPU, int psfCutFactor, int maxMajorCycle, float lambda, float alpha, int deconvIterations, float deconvEpsilon)
+        public static void ReconstructSerialCD(string obsName, MeasurementData data, GriddingConstants c, bool useGPU, int psfCutFactor, int maxMajorCycle, float lambda, float alpha, int deconvIterations, float deconvEpsilon)
         {
             var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
             var psfVis = new Complex[data.UVW.GetLength(0), data.UVW.GetLength(1), data.Frequencies.Length];
@@ -87,7 +88,7 @@ namespace SingleReconstruction
                     var dirtyGrid = IDG.GridW(c, metadata, residualVis, data.UVW, data.Frequencies);
                     var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, c.VisibilitiesCount);
                     FFT.Shift(dirtyImage);
-                    FitsIO.Write(dirtyImage, "dirty_serial_majorCycle" + cycle + ".fits");
+                    FitsIO.Write(dirtyImage, obsName + "_dirty_serial_majorCycle" + cycle + ".fits");
 
                     currentWatch.Restart();
                     totalWatch.Start();
@@ -113,7 +114,7 @@ namespace SingleReconstruction
                         switchedToOtherPsf = true;
                     }
 
-                    FitsIO.Write(xImage, "model_serial_majorCycle" + cycle + ".fits");
+                    FitsIO.Write(xImage, obsName + "_model_serial_majorCycle" + cycle + ".fits");
 
                     currentWatch.Stop();
                     totalWatch.Stop();
@@ -144,7 +145,7 @@ namespace SingleReconstruction
         /// <param name="alpha"></param>
         /// <param name="deconvIterations"></param>
         /// <param name="deconvEpsilon"></param>
-        public static void ReconstructPCDM(MeasurementData data, GriddingConstants c, int psfCutFactor, int maxMajorCycle, int maxMinorCycle, float lambda, float alpha, int deconvIterations, float deconvEpsilon)
+        public static void ReconstructPCDM(string obsName, MeasurementData data, GriddingConstants c, int psfCutFactor, int maxMajorCycle, int maxMinorCycle, float lambda, float alpha, int deconvIterations, float deconvEpsilon)
         {
             var metadata = Partitioner.CreatePartition(c, data.UVW, data.Frequencies);
             var psfVis = new Complex[data.UVW.GetLength(0), data.UVW.GetLength(1), data.Frequencies.Length];
@@ -191,7 +192,7 @@ namespace SingleReconstruction
                     var dirtyGrid = IDG.GridW(c, metadata, residualVis, data.UVW, data.Frequencies);
                     var dirtyImage = FFT.WStackIFFTFloat(dirtyGrid, c.VisibilitiesCount);
                     FFT.Shift(dirtyImage);
-                    FitsIO.Write(dirtyImage, "dirty_pcdm_majorCycle" + cycle + ".fits");
+                    FitsIO.Write(dirtyImage, obsName + "_dirty_pcdm_majorCycle" + cycle + ".fits");
 
                     currentWatch.Restart();
                     totalWatch.Start();
@@ -257,7 +258,7 @@ namespace SingleReconstruction
                         switchedToOtherPsf = true;
                     }
 
-                    FitsIO.Write(xImage, "model_pcdm_majorCycle" + cycle + ".fits");
+                    FitsIO.Write(xImage, obsName + "_model_pcdm_majorCycle" + cycle + ".fits");
 
                     FFT.Shift(xImage);
                     var xGrid = FFT.Forward(xImage);

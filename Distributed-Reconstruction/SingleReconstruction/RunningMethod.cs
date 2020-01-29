@@ -23,15 +23,20 @@ namespace SingleReconstruction
 
             var griddingConstants = new GriddingConstants(data.VisibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, 1, 0.0f);
 
-            MajorCycle.ReconstructSerialCD(data, griddingConstants, true, 1, 5, 0.5f, 0.2f, 5000, 1e-5f);
-            MajorCycle.ReconstructPCDM(data, griddingConstants, 1, 5, 1, 0.5f, 0.2f, 30, 1e-5f);
-
+            var obsName = "simulated";
+            var lambda = 0.5f;
+            var alpha = 0.2f;
+            var epsilon = 1e-5f;
+            var maxMajorCycles = 5;
+  
+            MajorCycle.ReconstructSerialCD(obsName, data, griddingConstants, true, 1, maxMajorCycles, lambda, alpha, 5000, epsilon);
+            MajorCycle.ReconstructPCDM(obsName, data, griddingConstants, 1, maxMajorCycles, 1, lambda, alpha, 30, epsilon);
         }
 
         public static void StartLMCReconstruction()
         {
             var folder = Path.Combine(P9_DATA_FOLDER, "large/fits/meerkat_tiny/");
-            var data = MeasurementData.LoadSimulatedPoints(folder);
+            var data = MeasurementData.LoadLMC(folder);
 
             int gridSize = 3072;
             int subgridsize = 32;
@@ -49,8 +54,14 @@ namespace SingleReconstruction
 
             var griddingConstants = new GriddingConstants(data.VisibilitiesCount, gridSize, subgridsize, kernelSize, max_nr_timesteps, (float)cellSize, wLayerCount, wStep);
 
-            MajorCycle.ReconstructSerialCD(data, griddingConstants, true, 16, 5, 1.0f, 0.01f, 30000, 1e-5f);
-            MajorCycle.ReconstructPCDM(data, griddingConstants, 32, 5, 3, 1.0f, 0.01f, 30, 1e-5f);
+            var obsName = "LMC";
+            var lambda = 1.0f;
+            var alpha = 0.01f;
+            var epsilon = 1e-5f;
+            var maxMajorCycles = 5;
+
+            MajorCycle.ReconstructSerialCD(obsName, data, griddingConstants, true, 16, maxMajorCycles, lambda, alpha, 30000, epsilon);
+            MajorCycle.ReconstructPCDM(obsName, data, griddingConstants, 32, maxMajorCycles, 3, lambda, alpha, 30, epsilon);
         }
     }
 }

@@ -18,7 +18,7 @@ The repository contains the simulated and the LMC observations.
 
 ## Windows setup of the development environment
 Install/Download the following:
-* Install Visual Studio (Community). Install with .Net Core Cross Platform development
+* Install Visual Studio (Community). Install with .Net Core Cross Platform development. If a visual studio is already installed, make sure it is up-to-date.
 * Install FitsViewer, for example [DS9](http://ds9.si.edu/site/Download.html) (Images are written as FITS files)
 * Git clone (or download) project to your system.
 * Download the p9-data folder to your system. 
@@ -30,9 +30,18 @@ Run the project within Visual Studio:
 * Change the constant variable P9_DATA_FOLDER and put in the full path of the **p9-data** folder
 * Press F5 to run in Visual Studio
 
-The file SingleReconstruction/RunningMethods.cs executes the two reconstruction algorithms (serial and parallel coordinate desecnent) on a simulated observation, and on the LMC observation. The output is written in the folder SingleReconstruction/bin/(debug or release)/
+The file SingleReconstruction/RunningMethods.cs executes the two reconstruction algorithms (serial and parallel coordinate desecnent) on a simulated observation, and on the LMC observation. 
+The output is written in the folder SingleReconstruction/bin/(debug or release)/
 
+### Run on simulated dataset
 
+The simulated observation consists of two point sources in a small image (256 \* 256 pixels) If a NVIDIA GPU is available, then the serial coordinate descent algorithm will use GPU acceleration. The serial coordinate descent algorithm is faster on this dataset than the parallel algorithm. The parallel algorithm is configured to not approximate the PSF (psfCutFactor = 1) and cannot efficiently use multiple processors on this dataset.
+
+### Run on the LMC Dataset
+
+Warning: 16 GB of RAM are needed to reconstruct this dataset. You should run this reconstruction in release mode. Calculating the PSF and the dirty image may take several minutes.
+
+The serial and parallel coordinate descent algorithm use the same configuration as in the comparison in Section 7.4 of the documentation. 
 
 
 ## Project structure
@@ -48,13 +57,8 @@ The DistributedReconstruction project contains all code which uses MPI for distr
 
 The SingleReconstruction project does not use MPI. It uses the gridder and deconvolution algorithms from the Core project. The SingleReconstruction project itself contains the code for running the algorithms on a single machine, and all the code which runs the experiments of this P9.
 
-## Linix installation of a reconstruction pipeline
-On Linux/unix machines we need to build dependencies and add them to the C\# build. First, build the project (preferrably in a self-contained build), and then copy the dependencies into the build folder (for example: ~/Distibuted-Reconstruction/SingleReconstruction/bin/publish/).
-
-This project has two native code dependencies:
-
-* FFTW
-* MPI
+## Linux installation of a reconstruction pipeline
+For Linux/Unix machines, create a self-contained .Net Core deployment for the Linux platform. Now we need to replace the native code dependencies of fftw and MPI. 
 
 
 FFTW: build the library with the following command:
