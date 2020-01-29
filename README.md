@@ -20,7 +20,7 @@ The repository contains the simulated and the LMC observations.
 Install/Download the following:
 * Install Visual Studio (Community). Install with .Net Core Cross Platform development. If a visual studio is already installed, make sure it is up-to-date.
 * Install FitsViewer, for example [DS9](http://ds9.si.edu/site/Download.html) (Images are written as FITS files)
-* Git clone (or download) project to your system.
+* Git clone, or download the project to your system https://github.com/lord-blueberry/p9-distributed-reconstruction/releases/tag/v1.0.0
 * Download the p9-data folder to your system. 
 
 Run the project within Visual Studio:
